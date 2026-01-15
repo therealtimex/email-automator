@@ -55,7 +55,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:3002/api/migrate', {
+            // Use relative URL so it works in both dev (vite middleware) and production (express server)
+            const response = await fetch('/api/migrate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectRef, dbPassword })
