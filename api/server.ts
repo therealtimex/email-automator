@@ -32,9 +32,56 @@ app.use(express.json());
 const processor = new EmailProcessor();
 const actions = new EmailActions();
 
+// Import auth handlers
+import { GmailHandler } from '../src/core/auth';
+import { MicrosoftGraphHandler } from '../src/core/auth';
+
+const gmailHandler = new GmailHandler();
+const m365Handler = new MicrosoftGraphHandler();
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Gmail Auth Endpoints
+app.get('/api/auth/gmail/url', async (req, res) => {
+    try {
+        const url = await gmailHandler.getAuthUrl();
+        res.json({ url });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/auth/gmail/callback', async (req, res) => {
+    const { code } = req.body;
+    try {
+        await gmailHandler.handleCallback(code);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// M365 Auth Endpoints
+app.post('/api/auth/m365/device-flow', async (req, res) => {
+    try {
+        const flow = await m365Handler.initiateDeviceFlow();
+        res.json(flow);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/auth/m365/complete', async (req, res) => {
+    const { device_code } = req.body;
+    try {
+        await m365Handler.completeDeviceFlow(device_code);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Sync triggers
