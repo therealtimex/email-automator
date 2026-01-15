@@ -35,8 +35,8 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
     supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 }
 
-const processor = new EmailProcessor();
-const actions = new EmailActions();
+const processor = new EmailProcessor(supabase);
+const actions = new EmailActions(supabase);
 
 // Import auth handlers
 import { GmailHandler } from '../src/core/auth';

@@ -1,17 +1,20 @@
 import { google } from 'googleapis';
-import { supabase } from '../lib/supabase';
 import { IntelligenceLayer } from './intelligence';
 
 export class EmailProcessor {
     private ai: IntelligenceLayer;
+    private supabase: any;
 
-    constructor() {
+    constructor(supabaseClient?: any) {
         this.ai = new IntelligenceLayer();
+        this.supabase = supabaseClient;
     }
 
     async syncAccount(accountId: string) {
+        if (!this.supabase) throw new Error('Supabase client not configured');
+
         // 1. Fetch account details
-        const { data: account, error: accError } = await supabase
+        const { data: account, error: accError } = await this.supabase
             .from('email_accounts')
             .select('*')
             .eq('id', accountId)
@@ -54,7 +57,7 @@ export class EmailProcessor {
             if (!msg.id) continue;
 
             // Check if already processed
-            const { data: existing } = await supabase
+            const { data: existing } = await this.supabase
                 .from('emails')
                 .select('id')
                 .eq('account_id', account.id)
@@ -88,7 +91,7 @@ export class EmailProcessor {
 
             // 6. Save to Supabase
             if (analysis) {
-                await supabase.from('emails').insert({
+                await this.supabase.from('emails').insert({
                     account_id: account.id,
                     external_id: msg.id,
                     subject,

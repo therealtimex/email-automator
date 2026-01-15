@@ -1,6 +1,5 @@
 import { google } from 'googleapis';
 import * as msal from '@azure/msal-node';
-import { supabase } from '../lib/supabase';
 
 export class GmailHandler {
     private oauth2Client;
@@ -26,29 +25,16 @@ export class GmailHandler {
         const { tokens } = await this.oauth2Client.getToken(code);
         this.oauth2Client.setCredentials(tokens);
 
-        // For now, save to Supabase without user_id (will need proper auth later)
-        const { error } = await supabase
-            .from('email_accounts')
-            .insert({
-                email_address: 'user@gmail.com', // TODO: Extract from token
-                provider: 'gmail',
-                access_token: tokens.access_token,
-                refresh_token: tokens.refresh_token,
-                token_expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
-                scopes: tokens.scope ? tokens.scope.split(' ') : [],
-                is_active: true
-            });
-
-        if (error) throw error;
+        // Return tokens for the caller to save
         return tokens;
     }
 
-    async authenticate(code: string, userId: string, emailAddress: string) {
+    async authenticate(code: string, userId: string, emailAddress: string, supabaseClient: any) {
         const { tokens } = await this.oauth2Client.getToken(code);
         this.oauth2Client.setCredentials(tokens);
 
         // Save tokens to Supabase
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('email_accounts')
             .upsert({
                 user_id: userId,
@@ -103,8 +89,8 @@ export class MicrosoftGraphHandler {
         return { success: true };
     }
 
-    async saveToken(userId: string, emailAddress: string, response: msal.AuthenticationResult) {
-        const { error } = await supabase
+    async saveToken(userId: string, emailAddress: string, response: msal.AuthenticationResult, supabaseClient: any) {
+        const { error } = await supabaseClient
             .from('email_accounts')
             .upsert({
                 user_id: userId,

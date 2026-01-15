@@ -1,10 +1,18 @@
+```typescript
 import { google } from 'googleapis';
-import { supabase } from '../lib/supabase';
 
 export class EmailActions {
+    private supabase: any;
+
+    constructor(supabaseClient?: any) {
+        this.supabase = supabaseClient;
+    }
+
     async executeAction(emailId: string, action: 'delete' | 'archive' | 'draft', draftContent?: string) {
+        if (!this.supabase) throw new Error('Supabase client not configured');
+        
         // 1. Fetch email and account details
-        const { data: email, error: emailError } = await supabase
+        const { data: email, error: emailError } = await this.supabase
             .from('emails')
             .select('*, email_accounts(*)')
             .eq('id', emailId)
@@ -20,7 +28,7 @@ export class EmailActions {
         }
 
         // 2. Update status in Supabase
-        await supabase.from('emails').update({ action_taken: action }).eq('id', emailId);
+        await this.supabase.from('emails').update({ action_taken: action }).eq('id', emailId);
     }
 
     private async executeGmailAction(account: any, messageId: string, action: string, draftContent?: string) {
@@ -55,11 +63,11 @@ export class EmailActions {
                     message: {
                         threadId: threadId,
                         raw: Buffer.from(
-                            `To: ${original.data.payload?.headers?.find(h => h.name === 'From')?.value || ''}\r\n` +
-                            `Subject: Re: ${original.data.payload?.headers?.find(h => h.name === 'Subject')?.value || ''}\r\n` +
-                            `In-Reply-To: ${messageId}\r\n` +
-                            `References: ${messageId}\r\n\r\n` +
-                            `${draftContent}`
+                            `To: ${ original.data.payload?.headers?.find(h => h.name === 'From')?.value || '' } \r\n` +
+                            `Subject: Re: ${ original.data.payload?.headers?.find(h => h.name === 'Subject')?.value || '' } \r\n` +
+                            `In - Reply - To: ${ messageId } \r\n` +
+                            `References: ${ messageId } \r\n\r\n` +
+                            `${ draftContent } `
                         ).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
                     }
                 }
