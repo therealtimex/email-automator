@@ -1,0 +1,45 @@
+# Development files
+.env
+.env.local
+.env.*.local
+*.log
+
+# Build artifacts
+node_modules
+dist
+coverage
+.vite
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git
+.gitignore
+.github
+
+# Test files
+tests/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+vitest.config.ts
+
+# Documentation (keep only README)
+docs-dev/
+.claude/
+
+# Development configs
+.eslintrc.json
+.prettierrc
+.editorconfig
+
+# Temporary files
+tmp/
+temp/
+*.tmp

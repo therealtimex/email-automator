@@ -1,8 +1,30 @@
 {
-  "name": "email-automator",
+  "name": "@realtimex/email-automator",
   "version": "2.0.0",
   "type": "module",
-  "main": "index.js",
+  "main": "api/server.ts",
+  "bin": {
+    "email-automator": "./bin/email-automator.js",
+    "email-automator-setup": "./bin/email-automator-setup.js",
+    "email-automator-deploy": "./bin/email-automator-deploy.js"
+  },
+  "files": [
+    "bin",
+    "api",
+    "src",
+    "supabase",
+    "scripts",
+    "public",
+    ".env.example",
+    "tsconfig.json",
+    "tsconfig.api.json",
+    "vite.config.ts",
+    "tailwind.config.ts",
+    "postcss.config.js",
+    "index.html",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "vite",
     "dev:api": "tsx watch api/server.ts",
@@ -17,10 +39,31 @@
     "lint": "eslint src api --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["email", "automation", "ai", "gmail", "outlook"],
-  "author": "RealTimeX",
+  "keywords": [
+    "email",
+    "automation",
+    "ai",
+    "gmail",
+    "outlook",
+    "realtimex",
+    "local-app",
+    "supabase",
+    "edge-functions"
+  ],
+  "author": "RealTimeX Team",
   "license": "MIT",
-  "description": "AI-powered email automation for Gmail and Outlook",
+  "description": "AI-powered email automation for Gmail and Outlook. Hybrid architecture with Supabase Edge Functions and local AI processing.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/therealtimex/email-automator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/therealtimex/email-automator/issues"
+  },
+  "homepage": "https://github.com/therealtimex/email-automator#readme",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@azure/msal-node": "^3.8.5",
     "@instructor-ai/instructor": "^1.7.0",

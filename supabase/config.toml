@@ -1,0 +1,45 @@
+# Supabase Configuration
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[functions]
+# Required environment variables for Edge Functions
+# These should be set in Supabase Dashboard > Project Settings > Edge Functions
+#
+# TOKEN_ENCRYPTION_KEY - 32-character encryption key for OAuth tokens
+# GMAIL_CLIENT_ID - Gmail OAuth Client ID
+# GMAIL_CLIENT_SECRET - Gmail OAuth Client Secret
+# GMAIL_REDIRECT_URI - Gmail OAuth Redirect URI (default: urn:ietf:wg:oauth:2.0:oob)
+# MS_GRAPH_CLIENT_ID - Microsoft Graph Client ID
+# MS_GRAPH_CLIENT_SECRET - Microsoft Graph Client Secret (optional)
+# MS_GRAPH_TENANT_ID - Microsoft Tenant ID (default: common)

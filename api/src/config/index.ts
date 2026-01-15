@@ -20,7 +20,8 @@ function parsePort(args: string[], envPort: string | undefined, defaultPort: num
 
 export const config = {
     // Server
-    port: parsePort(process.argv.slice(2), process.env.PORT, 3001),
+    // Default port 3004 (RealTimeX Desktop uses 3001/3002)
+    port: parsePort(process.argv.slice(2), process.env.PORT, 3004),
     nodeEnv: process.env.NODE_ENV || 'development',
     isProduction: process.env.NODE_ENV === 'production',
     
@@ -63,6 +64,7 @@ export const config = {
         corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3003', 'http://localhost:5173'],
         rateLimitWindowMs: 15 * 60 * 1000, // 15 minutes
         rateLimitMax: 100,
+        disableAuth: process.env.DISABLE_AUTH === 'true',
     },
     
     // Processing

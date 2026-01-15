@@ -1,58 +1,52 @@
-# System Architecture
+# Email Automator - Hybrid Architecture
 
 ## Overview
 
-The Email Automator is a hybrid application consisting of a React frontend (Vite) and a Node.js/Express backend. It leverages Supabase for data persistence and authentication state.
+Email Automator uses a **hybrid architecture** that combines Supabase Edge Functions with a Local Express API to provide a serverless, privacy-first email automation solution aligned with the RealTimeX Local Apps pattern.
 
-### Tech Stack
+## User Setup (Simple)
 
-- **Frontend**: React, Vite, TailwindCSS, Lucide Icons
-- **Backend**: Node.js, Express, TypeScript
-- **Database**: Supabase (PostgreSQL)
-- **AI**: OpenAI / Instructor (supports OpenAI-compatible Local LLMs like Ollama/LM Studio)
+Users only need to provide:
+- **Supabase Project URL**
+- **Supabase Publishable/Anon Key**
 
-## Core Components
+Edge Functions are deployed once to their project via RealTimeX Desktop or Supabase CLI.
 
-### 1. Frontend (`src/`)
+## Architecture Components
 
-- **`App.tsx`**: Main entry point, handles routing and initialization.
-- **`components/SetupWizard.tsx`**: Handles initial configuration and database migrations.
-- **`lib/supabase.ts`**: **Browser-side** Supabase client. Uses `localStorage` for caching and session persistence.
+```
+Frontend (React) → Edge Functions (Auth/DB) → Supabase Database
+                 ↘ Express API (Sync/AI)    ↗
+```
 
-### 2. Backend (`api/`)
+## Component Responsibilities
 
-- **`server.ts`**: Express server entry point. Initializes the **server-side** Supabase client.
-- **`src/core/auth.ts`**: Handles OAuth flows (Gmail, Outlook).
-- **`src/core/processor.ts`**: periodically fetches emails and runs AI analysis.
-- **`src/core/actions.ts`**: Executes actions (delete, draft, etc.) on email providers.
+### Edge Functions (Serverless)
+- OAuth Management (Gmail, Microsoft)
+- Secure Credential Storage
+- Database Proxy (CRUD with RLS)
 
-## Critical Design Decisions
+### Express API (Local App)
+- Email Sync from Gmail/Outlook
+- AI Processing (categorization, drafts)
+- Automation Execution
 
-### Browser vs. Server Supabase Clients
+## Deployment
 
-A key architectural distinction is the separation of Supabase clients:
+```bash
+# Deploy Edge Functions
+./scripts/deploy-functions.sh
 
-1.  **Browser Client (`src/lib/supabase.ts`)**:
-    -   Used by React components.
-    -   Persists sessions in `localStorage`.
-    -   Initialized dynamically using configuration stored in `localStorage` or `import.meta.env`.
+# Run Local App
+npm run dev:api
 
-2.  **Server Client (`api/server.ts`)**:
-    -   Used by the backend (API endpoints, background jobs).
-    -   **MUST NOT** import `src/lib/supabase.ts` (avoids `localStorage` ReferenceError).
-    -   Initialized using `process.env` variables.
-    -   Passes the client instance to core classes (`EmailProcessor`, `EmailActions`) via dependency injection.
+# Run Frontend
+npm run dev
+```
 
-### Supabase Backend Reuse
+## Benefits
 
-The project is designed to reuse the `atomic-crm` backend schema:
-
--   **Schema Sharing**: Uses the same `email_accounts` and related tables.
--   **Migration Strategy**: "Strategy B" (Separate Project, Same Schema). We use `supabase db push` to synchronize the schema without sharing the exact same project instance, allowing isolated development.
--   **Migrations**: Located in `supabase/migrations`. Applied via the `/api/migrate` endpoint which invokes the Supabase CLI.
-
-## Data Flow
-
-1.  **Auth**: User connects Gmail -> Backend handles OAuth -> Tokens saved to Supabase (encrypted/protected).
-2.  **Sync**: Backend `EmailProcessor` -> Fetches Email (Gmail API) -> Analyzes (LLM) -> Stores result in Supabase `emails` table.
-3.  **UI**: Frontend -> Subscriptions to `emails` table -> Real-time updates when new emails are processed.
+1. **Privacy** - AI processing happens locally
+2. **Cost Efficiency** - Heavy compute runs on user's hardware
+3. **Serverless Auth** - OAuth works even when local app is offline
+4. **Security** - OAuth secrets never leave Supabase

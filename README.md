@@ -24,37 +24,65 @@ The AI Email Automator is designed as a standalone "Agent" for the RealTimeX eco
 
 ### Production Features
 - **Security**: JWT auth, token encryption, rate limiting, input validation
-- **Modular Backend**: Express routes, middleware, services architecture
+- **Hybrid Architecture**: Edge Functions (serverless) + Local App (privacy)
 - **State Management**: React Context with centralized app state
 - **Error Handling**: Error boundaries, toast notifications, logging
 - **Analytics Dashboard**: Email stats, category breakdown, sync history
-- **Docker Ready**: Multi-stage builds, docker-compose, health checks
-- **CI/CD**: GitHub Actions pipeline with tests and Docker builds
+- **RealTimeX Integration**: Works with RealTimeX Desktop as Local App
 
 ## 🛠 Tech Stack
 
 | Layer | Technologies |
 |-------|-------------|
 | **Frontend** | React 19, Vite 7, TailwindCSS 4, Lucide Icons |
-| **Backend** | Node.js, Express 5, TypeScript |
+| **Edge Functions** | Deno, Supabase Functions (OAuth, DB proxy) |
+| **Local API** | Node.js, Express 5, TypeScript (Sync, AI) |
 | **AI** | OpenAI / Instructor-JS (supports Ollama, LM Studio) |
 | **Database** | Supabase (PostgreSQL) with RLS |
 | **Testing** | Vitest, Testing Library |
-| **DevOps** | Docker, GitHub Actions, nginx |
 
 ## 🏁 Quick Start
 
 ### Prerequisites
 - Node.js v20+
-- Supabase project
+- Supabase project with CLI access
 - LLM API key (OpenAI, Anthropic, or local)
 
-### Installation
+### Option 1: Using npx (Recommended)
+
+```bash
+# Interactive setup
+npx @realtimex/email-automator-setup
+
+# Deploy Edge Functions
+npx @realtimex/email-automator-deploy
+
+# Start Email Automator
+npx @realtimex/email-automator
+```
+
+### Option 2: Clone and Install
 
 ```bash
 git clone https://github.com/therealtimex/email-automator.git
 cd email-automator
 npm install
+```
+
+### Setup
+
+1. **Deploy Edge Functions to Supabase:**
+```bash
+supabase login
+./scripts/deploy-functions.sh
+```
+
+2. **Configure Edge Function Secrets in Supabase Dashboard:**
+   - Settings → Edge Functions → Add secrets
+   - Required: `TOKEN_ENCRYPTION_KEY`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, etc.
+
+3. **Configure Local Environment:**
+```bash
 cp .env.example .env
 # Edit .env with your credentials
 ```
@@ -62,65 +90,89 @@ cp .env.example .env
 ### Development
 
 ```bash
-# Terminal 1: Frontend
-npm run dev -- --port 3003
+# Terminal 1: Local API (Email Sync & AI Processing)
+# Default port: 3004 (RealTimeX Desktop uses 3001/3002)
+npm run dev:api
 
-# Terminal 2: Backend
-npm run serve -- --port 3002
+# Terminal 2: Frontend
+npm run dev
+
+# Optional: Specify custom ports
+npm run dev:api -- --port 3005
+npm run dev -- --port 5174
 ```
 
-### Production (Docker)
+**Note:** Email Automator uses port **3004** by default to avoid conflicts with RealTimeX Desktop (ports 3001/3002). You can change ports via command line arguments or environment variables.
+
+### Using npx
 
 ```bash
-# Build and run
-docker-compose up -d
+# Start with default port (3004)
+npx @realtimex/email-automator
 
-# Or build individually
-docker build -t email-automator-api .
-docker build -f Dockerfile.frontend -t email-automator-frontend .
+# Start with custom port
+npx @realtimex/email-automator --port 3005
 ```
+
+See [NPX Usage Guide](docs-dev/NPX-USAGE.md) for complete documentation.
 
 ## 📂 Project Structure
 
 ```
-├── api/
+├── api/                       # Local App (Express)
 │   ├── server.ts              # Express entry point
 │   └── src/
-│       ├── config/            # Environment configuration
-│       ├── middleware/        # Auth, rate limiting, validation
-│       ├── routes/            # API endpoints
-│       ├── services/          # Business logic
+│       ├── routes/            # Sync & Actions endpoints
+│       ├── services/          # Email sync, AI processing
 │       └── utils/             # Logger, crypto, helpers
-├── src/
+├── src/                       # Frontend (React)
 │   ├── components/            # React components
 │   ├── context/               # App state management
 │   ├── hooks/                 # Custom hooks (realtime)
-│   └── lib/                   # API client, types, utils
-├── supabase/
+│   └── lib/                   # Hybrid API client, types
+├── supabase/                  # Supabase Configuration
+│   ├── functions/             # Edge Functions (OAuth, DB)
+│   │   ├── _shared/           # Shared utilities
+│   │   ├── auth-gmail/        # Gmail OAuth
+│   │   ├── auth-microsoft/    # Microsoft OAuth
+│   │   ├── api-v1-accounts/   # Account management
+│   │   ├── api-v1-emails/     # Email operations
+│   │   ├── api-v1-rules/      # Rules CRUD
+│   │   └── api-v1-settings/   # Settings & stats
 │   └── migrations/            # Database schema
-├── tests/                     # Unit & integration tests
-├── Dockerfile                 # API container
-├── Dockerfile.frontend        # Frontend container
-└── docker-compose.yml         # Full stack deployment
+├── scripts/
+│   └── deploy-functions.sh    # Deploy Edge Functions
+└── tests/                     # Unit & integration tests
 ```
 
 ## 🔐 Environment Variables
 
+### Edge Functions (Supabase Dashboard)
 ```bash
-# Required
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-LLM_API_KEY=your-llm-key
-
-# OAuth (for email providers)
+TOKEN_ENCRYPTION_KEY=32-char-key
 GMAIL_CLIENT_ID=xxx
 GMAIL_CLIENT_SECRET=xxx
 MS_GRAPH_CLIENT_ID=xxx
+MS_GRAPH_CLIENT_SECRET=xxx
+```
 
-# Security (production)
-JWT_SECRET=min-32-char-secret
-TOKEN_ENCRYPTION_KEY=32-char-key
-CORS_ORIGINS=https://yourdomain.com
+### Local App (.env file)
+```bash
+# Supabase
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+
+# API Configuration (default port: 3004)
+VITE_API_URL=http://localhost:3004
+PORT=3004
+
+# LLM
+LLM_API_KEY=your-llm-key
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
+
+# Development
+DISABLE_AUTH=true
 ```
 
 ## 🧪 Testing
@@ -131,19 +183,26 @@ npm run test:run       # Single run
 npm run test:coverage  # With coverage
 ```
 
-## 📡 API Endpoints
+## 📡 API Architecture
 
+### Edge Functions (Supabase)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/auth/gmail/url` | Get Gmail OAuth URL |
-| POST | `/api/auth/gmail/callback` | Complete Gmail OAuth |
-| GET | `/api/auth/accounts` | List connected accounts |
+| GET | `/auth-gmail?action=url` | Get Gmail OAuth URL |
+| POST | `/auth-gmail` | Complete Gmail OAuth |
+| POST | `/auth-microsoft?action=device-flow` | Start Microsoft device flow |
+| GET | `/api-v1-accounts` | List connected accounts |
+| GET | `/api-v1-emails` | List processed emails |
+| GET | `/api-v1-rules` | List automation rules |
+| GET | `/api-v1-settings` | Get user settings |
+
+### Local App (Express)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | POST | `/api/sync` | Trigger email sync |
-| GET | `/api/emails` | List processed emails |
 | POST | `/api/actions/execute` | Execute email action |
-| GET | `/api/rules` | List automation rules |
-| GET | `/api/settings` | Get user settings |
+| POST | `/api/actions/draft/:id` | Generate draft reply |
+| GET | `/api/health` | Health check |
 
 ## 🤝 Contributing
 
@@ -156,3 +215,31 @@ npm run test:coverage  # With coverage
 ## 📄 License
 
 MIT License - Copyright (c) 2026 RealTimeX Team
+
+## 📦 NPX Commands
+
+Email Automator is fully compatible with npx for easy installation and execution:
+
+| Command | Description |
+|---------|-------------|
+| `npx @realtimex/email-automator` | Start the Email Automator API server |
+| `npx @realtimex/email-automator-setup` | Interactive setup wizard |
+| `npx @realtimex/email-automator-deploy` | Deploy Edge Functions to Supabase |
+
+### Examples
+
+```bash
+# First time setup
+npx @realtimex/email-automator-setup
+npx @realtimex/email-automator-deploy
+npx @realtimex/email-automator
+
+# Daily usage
+npx @realtimex/email-automator
+
+# Custom port
+npx @realtimex/email-automator --port 3005
+```
+
+See [NPX Usage Guide](docs-dev/NPX-USAGE.md) for complete documentation.
+

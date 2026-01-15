@@ -6,10 +6,10 @@ import { getSupabaseConfig } from './supabase-config';
 function createSupabaseClient(): SupabaseClient {
     const config = getSupabaseConfig();
 
-    if (!config) {
+    if (!config || !config.url?.startsWith('http')) {
         // Return a placeholder client that will never be used
         // (App.tsx will show setup wizard before this is accessed)
-        console.warn('[Supabase] No configuration found, using placeholder');
+        console.warn('[Supabase] No configuration found or invalid URL, using placeholder');
         return createClient('https://placeholder.supabase.co', 'placeholder-key');
     }
 

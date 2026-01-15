@@ -22,14 +22,36 @@ export async function authMiddleware(
     next: NextFunction
 ): Promise<void> {
     try {
+        // Development bypass: skip auth if DISABLE_AUTH=true in non-production
+        if (config.security.disableAuth && !config.isProduction) {
+            logger.warn('Auth disabled for development - creating mock user');
+
+            // Create a mock user for development
+            req.user = {
+                id: 'dev-user-id',
+                email: 'dev@local.test',
+                user_metadata: {},
+                app_metadata: {},
+                aud: 'authenticated',
+                created_at: new Date().toISOString(),
+            } as User;
+
+            // Create a regular Supabase client for development
+            if (config.supabase.url && config.supabase.anonKey) {
+                req.supabase = createClient(config.supabase.url, config.supabase.anonKey);
+            }
+
+            return next();
+        }
+
         const authHeader = req.headers.authorization;
-        
+
         if (!authHeader?.startsWith('Bearer ')) {
             throw new AuthenticationError('Missing or invalid authorization header');
         }
 
         const token = authHeader.substring(7);
-        
+
         if (!config.supabase.url || !config.supabase.anonKey) {
             throw new AuthenticationError('Supabase not configured');
         }
@@ -54,7 +76,7 @@ export async function authMiddleware(
         // Attach user and supabase client to request
         req.user = user;
         req.supabase = supabase;
-        
+
         next();
     } catch (error) {
         next(error);
