@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { AlertCircle, Database, Loader2 } from 'lucide-react';
 import { saveSupabaseConfig, validateSupabaseConnection } from '../lib/supabase-config';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card';
+import { ModeToggle } from './mode-toggle';
 
 interface SetupWizardProps {
     onComplete: () => void;
@@ -89,41 +93,39 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
     if (step === 'migrate') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-8">
-                <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-2xl w-full">
-                    <div className="text-center mb-8">
-                        <Database className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-                        <h1 className="text-3xl font-bold text-slate-900">Database Migration</h1>
-                        <p className="text-slate-500 mt-2">Setting up your email automator schema</p>
-                    </div>
+                    </div >
 
-                    <div className="space-y-4 mb-6">
-                        <input
-                            type="password"
-                            placeholder="Database Password (required for migration)"
-                            value={dbPassword}
-                            onChange={(e) => setDbPassword(e.target.value)}
-                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <p className="text-xs text-slate-500">
-                            💡 Enter the password you set when creating your Supabase project
-                        </p>
-                    </div>
+            <div className="space-y-4 mb-6">
+                <input
+                    type="password"
+                    placeholder="Database Password (required for migration)"
+                    value={dbPassword}
+                    onChange={(e) => setDbPassword(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-xs text-slate-500">
+                    💡 Enter the password you set when creating your Supabase project
+                </p>
+            </div>
 
-                    {migrationLogs.length > 0 && (
-                        <div className="bg-slate-900 text-green-400 p-4 rounded-xl font-mono text-sm max-h-64 overflow-y-auto mb-6">
-                            {migrationLogs.map((log, i) => (
-                                <div key={i}>{log}</div>
-                            ))}
-                        </div>
-                    )}
+        {
+            migrationLogs.length > 0 && (
+                <div className="bg-slate-900 text-green-400 p-4 rounded-xl font-mono text-sm max-h-64 overflow-y-auto mb-6">
+                    {migrationLogs.map((log, i) => (
+                        <div key={i}>{log}</div>
+                    ))}
+                </div>
+            )
+        }
 
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
-                            <AlertCircle className="w-5 h-5" />
-                            {error}
-                        </div>
-                    )}
+        {
+            error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    {error}
+                </div>
+            )
+        }
 
                     <button
                         onClick={handleMigrate}
@@ -146,8 +148,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     >
                         ← Back to Configuration
                     </button>
-                </div>
-            </div>
+                </div >
+            </div >
         );
     }
 

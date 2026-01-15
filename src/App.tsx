@@ -1,8 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 import { getSupabaseConfig } from './lib/supabase-config';
 import { SetupWizard } from './components/SetupWizard';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, AlertCircle } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw } from 'lucide-react';
+import { ThemeProvider } from './components/theme-provider';
+import { ModeToggle } from './components/mode-toggle';
+import { Button } from './components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from './components/ui/card';
 
 function App() {
     const [emails, setEmails] = useState<any[]>([]);
@@ -52,10 +56,14 @@ function App() {
     }
 
     if (needsSetup) {
-        return <SetupWizard onComplete={() => {
-            setNeedsSetup(false);
-            fetchEmails();
-        }} />;
+        return (
+            <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+                <SetupWizard onComplete={() => {
+                    setNeedsSetup(false);
+                    fetchEmails();
+                }} />
+            </ThemeProvider>
+        );
     }
 
     return (
