@@ -1,237 +1,258 @@
 import { useEffect, useState } from 'react';
-import { supabase } from './lib/supabase';
-import { getSupabaseConfig } from './lib/supabase-config';
-import { SetupWizard } from './components/SetupWizard';
-import { Configuration } from './components/Configuration';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, LayoutDashboard, Settings } from 'lucide-react';
+import { Mail, LayoutDashboard, Settings, BarChart3 } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/mode-toggle';
 import { Button } from './components/ui/button';
-import { Card } from './components/ui/card';
+import { AppProvider, useApp } from './context/AppContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastContainer } from './components/Toast';
+import { PageLoader } from './components/LoadingSpinner';
+import { SetupWizard } from './components/SetupWizard';
+import { Dashboard } from './components/Dashboard';
+import { Configuration } from "./components/Configuration";
+import { getSupabaseConfig } from './lib/supabase-config';
 
-function App() {
-    const [emails, setEmails] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+type TabType = 'dashboard' | 'config' | 'analytics';
+
+function AppContent() {
+    const { state, actions } = useApp();
     const [needsSetup, setNeedsSetup] = useState(false);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'config'>('dashboard');
+    const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+    const [checkingConfig, setCheckingConfig] = useState(true);
 
     useEffect(() => {
         const config = getSupabaseConfig();
         if (!config) {
             setNeedsSetup(true);
-            setLoading(false);
         } else {
-            fetchEmails();
+            // Load initial data
+            actions.fetchAccounts();
+            actions.fetchRules();
+            actions.fetchSettings();
         }
+        setCheckingConfig(false);
     }, []);
 
-    async function fetchEmails() {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('emails')
-            .select('*')
-            .order('date', { ascending: false });
-
-        if (error) console.error(error);
-        else setEmails(data || []);
-        setLoading(false);
-    }
-
-    async function handleSync() {
-        // In a real app, we'd select an accountId
-        const { data: accounts } = await supabase.from('email_accounts').select('id').limit(1);
-        if (!accounts || accounts.length === 0) {
-            alert('Please connect an email account first.');
-            return;
-        }
-
-        try {
-            await fetch('http://localhost:3001/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accountId: accounts[0].id })
-            });
-            alert('Sync started!');
-        } catch (e) {
-            alert('Failed to trigger sync');
-        }
+    if (checkingConfig || state.isLoading) {
+        return <PageLoader text="Initializing..." />;
     }
 
     if (needsSetup) {
         return (
-            <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-                <SetupWizard onComplete={() => {
-                    setNeedsSetup(false);
-                    fetchEmails();
-                }} />
-            </ThemeProvider>
+            <SetupWizard onComplete={() => {
+                setNeedsSetup(false);
+                window.location.reload();
+            }} />
         );
     }
 
     return (
-        <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-            <div className="min-h-screen bg-background font-sans text-foreground transition-colors duration-300">
-                <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                    <div className="max-w-6xl mx-auto flex h-16 items-center justify-between px-8">
-                        <div>
-                            <h1 className="text-xl font-bold flex items-center gap-2">
-                                <Mail className="w-5 h-5 text-primary" />
-                                RealTimeX Email Automator
-                            </h1>
-                        </div>
-                        <div className="flex gap-4 items-center">
-                            <nav className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
-                                <Button
-                                    variant={activeTab === 'dashboard' ? 'secondary' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setActiveTab('dashboard')}
-                                    className="gap-2"
-                                >
-                                    <LayoutDashboard className="w-4 h-4" />
-                                    Dashboard
-                                </Button>
-                                <Button
-                                    variant={activeTab === 'config' ? 'secondary' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setActiveTab('config')}
-                                    className="gap-2"
-                                >
-                                    <Settings className="w-4 h-4" />
-                                    Configuration
-                                </Button>
-                            </nav>
-                            <div className="h-6 w-px bg-border/50 mx-2"></div>
-                            <ModeToggle />
-                        </div>
+        <div className="min-h-screen bg-background font-sans text-foreground transition-colors duration-300">
+            {/* Header */}
+            <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-8">
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-xl font-bold flex items-center gap-2">
+                            <Mail className="w-5 h-5 text-primary" />
+                            <span className="hidden sm:inline">RealTimeX Email Automator</span>
+                            <span className="sm:hidden">Email AI</span>
+                        </h1>
                     </div>
-                </header>
+                    
+                    <div className="flex gap-4 items-center">
+                        <nav className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
+                            <Button
+                                variant={activeTab === 'dashboard' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                onClick={() => setActiveTab('dashboard')}
+                                className="gap-2"
+                            >
+                                <LayoutDashboard className="w-4 h-4" />
+                                <span className="hidden sm:inline">Dashboard</span>
+                            </Button>
+                            <Button
+                                variant={activeTab === 'analytics' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                onClick={() => setActiveTab('analytics')}
+                                className="gap-2"
+                            >
+                                <BarChart3 className="w-4 h-4" />
+                                <span className="hidden sm:inline">Analytics</span>
+                            </Button>
+                            <Button
+                                variant={activeTab === 'config' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                onClick={() => setActiveTab('config')}
+                                className="gap-2"
+                            >
+                                <Settings className="w-4 h-4" />
+                                <span className="hidden sm:inline">Configuration</span>
+                            </Button>
+                        </nav>
+                        <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block" />
+                        <ModeToggle />
+                    </div>
+                </div>
+            </header>
 
-                <main className="max-w-6xl mx-auto p-8 mt-4">
-                    {activeTab === 'dashboard' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-500">
-                            <section className="md:col-span-2 space-y-4">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                                        Recent Analysis
-                                    </h2>
-                                    <div className="flex gap-2">
-                                        <Button onClick={handleSync} size="sm" variant="outline" className="shadow-sm">
-                                            <RefreshCw className="w-3.5 h-3.5 mr-2" />
-                                            Sync Now
-                                        </Button>
-                                        <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-1 rounded-md border border-border flex items-center">
-                                            {emails.length} emails
-                                        </span>
-                                    </div>
-                                </div>
+            {/* Main Content */}
+            <main className="max-w-7xl mx-auto p-4 sm:p-8 mt-4">
+                {activeTab === 'dashboard' && <Dashboard />}
+                {activeTab === 'config' && <Configuration />}
+                {activeTab === 'analytics' && <AnalyticsPage />}
+            </main>
 
-                                {loading ? (
-                                    <Card className="p-12 border-dashed flex flex-col items-center justify-center text-muted-foreground">
-                                        <RefreshCw className="w-8 h-8 animate-spin mb-4" />
-                                        Loading your inbox...
-                                    </Card>
-                                ) : emails.length === 0 ? (
-                                    <Card className="p-20 text-center shadow-sm">
-                                        <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-6">
-                                            <Mail className="w-8 h-8" />
-                                        </div>
-                                        <h3 className="text-lg font-medium">No emails processed yet</h3>
-                                        <p className="text-muted-foreground mt-2 mb-6">Connect your account and trigger a sync to see AI in action.</p>
-                                    </Card>
-                                ) : (
-                                    emails.map(email => (
-                                        <Card key={email.id} className="hover:shadow-md transition-shadow group">
-                                            <div className="p-5">
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div className="flex gap-3">
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs ${email.category === 'spam' ? 'bg-destructive' : 'bg-primary'
-                                                            }`}>
-                                                            {email.sender[0].toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">{email.subject}</h3>
-                                                            <p className="text-xs text-muted-foreground">{email.sender}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-end gap-1">
-                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${email.category === 'spam' ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                                            }`}>
-                                                            {email.category}
-                                                        </span>
-                                                        <span className="text-[10px] text-muted-foreground">{new Date(email.date).toLocaleDateString()}</span>
-                                                    </div>
-                                                </div>
-                                                <p className="text-muted-foreground text-sm mb-4 line-clamp-2 leading-relaxed">
-                                                    {email.body_snippet}
-                                                </p>
-                                                <div className="bg-secondary/30 p-3 rounded-lg border border-border/50 flex justify-between items-center">
-                                                    <div className="flex items-center gap-2 text-xs font-medium">
-                                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                                        Suggested: <span className="text-foreground">{email.suggested_action}</span>
-                                                    </div>
-                                                    <div className="flex gap-1">
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive">
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-primary">
-                                                            <Send className="w-3.5 h-3.5" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Card>
-                                    ))
-                                )}
-                            </section>
-
-                            {/* Dashboard Sidebar - Analytics only now */}
-                            <aside className="space-y-6">
-                                <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 relative overflow-hidden">
-                                    <div className="relative z-10">
-                                        <h3 className="font-semibold text-primary mb-1">Supabase Sync</h3>
-                                        <p className="text-muted-foreground text-xs mb-3">
-                                            Real-time connection active
-                                        </p>
-                                        <div className="flex items-center gap-2 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 w-fit px-2 py-1 rounded-full border border-emerald-500/20">
-                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                            CONNECTED
-                                        </div>
-                                    </div>
-                                    <div className="absolute right-[-20px] bottom-[-20px] opacity-[0.03] dark:opacity-[0.08] text-primary rotate-12 pointer-events-none">
-                                        <DatabaseIcon className="w-32 h-32" />
-                                    </div>
-                                </div>
-                            </aside>
-                        </div>
-                    ) : (
-                        <Configuration />
-                    )}
-                </main>
-            </div>
-        </ThemeProvider>
+            {/* Error Display */}
+            {state.error && (
+                <div className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-50">
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg">
+                        <p className="text-sm">{state.error}</p>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 
-// Helper icon component
-function DatabaseIcon(props: any) {
+function AnalyticsPage() {
+    const { state, actions } = useApp();
+    
+    useEffect(() => {
+        actions.fetchStats();
+    }, []);
+
+    if (!state.stats) {
+        return <PageLoader text="Loading analytics..." />;
+    }
+
+    const { stats } = state;
+
     return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <ellipse cx="12" cy="5" rx="9" ry="3" />
-            <path d="M3 5V19A9 3 0 0 0 21 19V5" />
-            <path d="M3 12A9 3 0 0 0 21 12" />
-        </svg>
-    )
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+                <BarChart3 className="w-6 h-6 text-primary" />
+                Analytics Dashboard
+            </h2>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard 
+                    title="Total Emails" 
+                    value={stats.totalEmails} 
+                    color="primary"
+                />
+                <StatCard 
+                    title="Spam Caught" 
+                    value={stats.categoryCounts['spam'] || 0} 
+                    color="destructive"
+                />
+                <StatCard 
+                    title="Actions Taken" 
+                    value={Object.values(stats.actionCounts).reduce((a, b) => a + b, 0) - (stats.actionCounts['none'] || 0)} 
+                    color="emerald"
+                />
+                <StatCard 
+                    title="Accounts" 
+                    value={stats.accountCount} 
+                    color="blue"
+                />
+            </div>
+
+            {/* Category Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-card border rounded-xl p-6">
+                    <h3 className="font-semibold mb-4">Email Categories</h3>
+                    <div className="space-y-3">
+                        {Object.entries(stats.categoryCounts).map(([category, count]) => (
+                            <div key={category} className="flex items-center gap-3">
+                                <div className="flex-1">
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="capitalize">{category}</span>
+                                        <span className="text-muted-foreground">{count}</span>
+                                    </div>
+                                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-primary rounded-full transition-all"
+                                            style={{ width: `${(count / stats.totalEmails) * 100}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-card border rounded-xl p-6">
+                    <h3 className="font-semibold mb-4">Actions Taken</h3>
+                    <div className="space-y-3">
+                        {Object.entries(stats.actionCounts).map(([action, count]) => (
+                            <div key={action} className="flex items-center justify-between py-2 border-b last:border-0">
+                                <span className="capitalize">{action}</span>
+                                <span className="font-medium">{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Recent Syncs */}
+            <div className="bg-card border rounded-xl p-6">
+                <h3 className="font-semibold mb-4">Recent Sync Activity</h3>
+                {stats.recentSyncs.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No sync activity yet</p>
+                ) : (
+                    <div className="space-y-2">
+                        {stats.recentSyncs.map((log) => (
+                            <div key={log.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                                <div className="flex items-center gap-3">
+                                    <span className={`w-2 h-2 rounded-full ${
+                                        log.status === 'success' ? 'bg-emerald-500' :
+                                        log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500'
+                                    }`} />
+                                    <span className="text-sm">
+                                        {new Date(log.started_at).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    {log.emails_processed} processed
+                                    {log.emails_deleted > 0 && `, ${log.emails_deleted} deleted`}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function StatCard({ title, value, color }: { title: string; value: number; color: string }) {
+    const colorClasses: Record<string, string> = {
+        primary: 'bg-primary/10 text-primary',
+        destructive: 'bg-destructive/10 text-destructive',
+        emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        blue: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    };
+
+    return (
+        <div className="bg-card border rounded-xl p-6">
+            <p className="text-sm text-muted-foreground mb-1">{title}</p>
+            <p className={`text-3xl font-bold ${colorClasses[color] || ''}`}>{value}</p>
+        </div>
+    );
+}
+
+function App() {
+    return (
+        <ThemeProvider defaultTheme="system" storageKey="email-automator-theme">
+            <ErrorBoundary>
+                <AppProvider>
+                    <AppContent />
+                    <ToastContainer />
+                </AppProvider>
+            </ErrorBoundary>
+        </ThemeProvider>
+    );
 }
 
 export default App;

@@ -1,18 +1,26 @@
 {
   "name": "email-automator",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
+    "dev:api": "tsx watch api/server.ts",
     "build": "tsc && vite build",
+    "build:api": "tsc -p tsconfig.api.json",
     "preview": "vite preview",
-    "serve": "tsx api/server.ts"
+    "serve": "tsx api/server.ts",
+    "start": "node dist/api/server.js",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src api --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": ["email", "automation", "ai", "gmail", "outlook"],
+  "author": "RealTimeX",
+  "license": "MIT",
+  "description": "AI-powered email automation for Gmail and Outlook",
   "dependencies": {
     "@azure/msal-node": "^3.8.5",
     "@instructor-ai/instructor": "^1.7.0",
@@ -35,18 +43,23 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.8",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.23",
+    "jsdom": "^26.1.0",
     "postcss": "^8.5.6",
     "supabase": "^2.67.2",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4"
   }
 }
