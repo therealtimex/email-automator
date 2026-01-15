@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getSupabase } from './lib/supabase';
+import { supabase } from './lib/supabase';
 import { getSupabaseConfig } from './lib/supabase-config';
 import { SetupWizard } from './components/SetupWizard';
 import { Mail, ShieldCheck, Trash2, Send, RefreshCw, AlertCircle } from 'lucide-react';
@@ -21,12 +21,6 @@ function App() {
 
     async function fetchEmails() {
         setLoading(true);
-        const supabase = getSupabase();
-        if (!supabase) {
-            setNeedsSetup(true);
-            setLoading(false);
-            return;
-        }
         const { data, error } = await supabase
             .from('emails')
             .select('*')
@@ -38,12 +32,6 @@ function App() {
     }
 
     async function handleSync() {
-        const supabase = getSupabase();
-        if (!supabase) {
-            alert('Supabase not configured');
-            return;
-        }
-
         // In a real app, we'd select an accountId
         const { data: accounts } = await supabase.from('email_accounts').select('id').limit(1);
         if (!accounts || accounts.length === 0) {

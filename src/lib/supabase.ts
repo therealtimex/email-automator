@@ -1,31 +1,28 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseConfig } from './supabase-config';
 
-let cachedClient: SupabaseClient | null = null;
-
-export function getSupabase(): SupabaseClient | null {
-    // Try to get from cache first
-    if (cachedClient) return cachedClient;
-
-    // Try localStorage config
+// Create client immediately to ensure session restoration happens early
+// This is critical for auth session persistence across page refreshes
+function createSupabaseClient(): SupabaseClient {
     const config = getSupabaseConfig();
-    if (config?.url && config?.anonKey) {
-        cachedClient = createClient(config.url, config.anonKey);
-        return cachedClient;
+
+    if (!config) {
+        // Return a placeholder client that will never be used
+        // (App.tsx will show setup wizard before this is accessed)
+        console.warn('[Supabase] No configuration found, using placeholder');
+        return createClient('https://placeholder.supabase.co', 'placeholder-key');
     }
 
-    // Try environment variables as fallback
-    const envUrl = import.meta.env.VITE_SUPABASE_URL;
-    const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (envUrl && envKey) {
-        cachedClient = createClient(envUrl, envKey);
-        return cachedClient;
-    }
-
-    console.warn('Supabase client not configured');
-    return null;
+    return createClient(config.url, config.anonKey, {
+        auth: {
+            // Ensure session is persisted and restored from localStorage
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+        },
+    });
 }
 
-// For backwards compatibility
-export const supabase = getSupabase();
+// Create client immediately on module load (not lazy!)
+// This ensures session restoration from localStorage happens before any auth checks
+export const supabase = createSupabaseClient();

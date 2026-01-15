@@ -44,22 +44,68 @@ export function clearSupabaseConfig(): void {
     }
 }
 
-export async function validateSupabaseConnection(url: string, anonKey: string): Promise<boolean> {
+/**
+ * Validate Supabase connection
+ */
+export async function validateSupabaseConnection(
+    url: string,
+    anonKey: string
+): Promise<{ valid: boolean; error?: string }> {
     try {
-        // Check if it's a publishable key (these don't work with REST API but are valid)
-        if (anonKey.startsWith('sb_publishable_')) {
-            // For publishable keys, just verify the URL format and that we can create a client
-            const client = createClient(url, anonKey);
-            // If client creation doesn't throw, consider it valid
-            return true;
+        // Basic URL validation
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            return { valid: false, error: 'Invalid URL format' };
         }
 
-        // For regular anon keys, test with a simple query
-        const client = createClient(url, anonKey);
-        const { error } = await client.from('email_accounts').select('count', { count: 'exact', head: true });
-        return !error;
+        // Basic API key validation (supports both JWT anon keys and publishable keys)
+        const isJwtKey = anonKey.startsWith('eyJ');
+        const isPublishableKey = anonKey.startsWith('sb_publishable_');
+
+        if (!isJwtKey && !isPublishableKey) {
+            return { valid: false, error: 'Invalid API key format (must be anon or publishable key)' };
+        }
+
+        // Skip network validation for publishable keys as they might not be standard JWTs
+        // compatible with the Postgrest root endpoint check
+        if (isPublishableKey) {
+            return { valid: true };
+        }
+
+        // Test connection by making a simple request
+        const response = await fetch(`${url}/rest/v1/`, {
+            method: 'GET',
+            headers: {
+                apikey: anonKey,
+                Authorization: `Bearer ${anonKey}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return { valid: false, error: 'Invalid API key' };
+            }
+            return { valid: false, error: `Connection failed: ${response.statusText}` };
+        }
+
+        return { valid: true };
     } catch (error) {
-        console.error('Supabase validation error:', error);
-        return false;
+        return {
+            valid: false,
+            error: error instanceof Error ? error.message : 'Connection failed',
+        };
     }
+}
+
+/**
+ * Get Supabase config source (for display purposes)
+ */
+export function getConfigSource(): 'ui' | 'env' | 'none' {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return 'ui';
+
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (url && anonKey) return 'env';
+
+    return 'none';
 }

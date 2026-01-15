@@ -29,9 +29,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             setUrl(finalUrl);
         }
 
-        const isValid = await validateSupabaseConnection(finalUrl, anonKey);
+        const result = await validateSupabaseConnection(finalUrl, anonKey);
 
-        if (isValid) {
+        if (result.valid) {
             saveSupabaseConfig({ url: finalUrl, anonKey });
 
             // Extract project ref from URL
@@ -43,7 +43,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 setError('Could not extract project reference from URL');
             }
         } else {
-            setError('Invalid Supabase credentials or connection failed');
+            setError(result.error || 'Invalid Supabase credentials or connection failed');
         }
 
         setValidating(false);
