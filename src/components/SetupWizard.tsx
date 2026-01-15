@@ -76,7 +76,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             }
 
             setMigrating(false);
-            setTimeout(() => onComplete(), 2000);
+            // Reload page to reinitialize Supabase client with new config
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         } catch (err: any) {
             setError(`Migration failed: ${err.message}`);
             setMigrating(false);
