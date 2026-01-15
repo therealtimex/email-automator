@@ -1,13 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
+import { getSupabaseConfig } from './lib/supabase-config';
+import { SetupWizard } from './components/SetupWizard';
 import { Mail, ShieldCheck, Trash2, Send, RefreshCw, AlertCircle } from 'lucide-react';
 
 function App() {
     const [emails, setEmails] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [needsSetup, setNeedsSetup] = useState(false);
 
     useEffect(() => {
-        fetchEmails();
+        const config = getSupabaseConfig();
+        if (!config) {
+            setNeedsSetup(true);
+            setLoading(false);
+        } else {
+            fetchEmails();
+        }
     }, []);
 
     async function fetchEmails() {
@@ -40,6 +49,13 @@ function App() {
         } catch (e) {
             alert('Failed to trigger sync');
         }
+    }
+
+    if (needsSetup) {
+        return <SetupWizard onComplete={() => {
+            setNeedsSetup(false);
+            fetchEmails();
+        }} />;
     }
 
     return (

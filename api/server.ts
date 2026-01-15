@@ -1,9 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { supabase } from '../src/lib/supabase';
 import { EmailProcessor } from '../src/core/processor';
 import { EmailActions } from '../src/core/actions';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 dotenv.config();
 
@@ -55,6 +61,51 @@ app.post('/api/actions/execute', async (req, res) => {
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Database migration endpoint
+app.post('/api/migrate', async (req, res) => {
+    const { projectRef, dbPassword, accessToken } = req.body;
+
+    if (!projectRef) {
+        return res.status(400).json({ error: 'projectRef is required' });
+    }
+
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    const sendLog = (message: string) => {
+        res.write(message + '\n');
+    };
+
+    try {
+        sendLog('🔧 Starting migration...');
+        const scriptPath = join(__dirname, '..', 'scripts', 'migrate.sh');
+
+        const env = {
+            ...process.env,
+            SUPABASE_PROJECT_ID: projectRef,
+            SUPABASE_DB_PASSWORD: dbPassword || '',
+            SUPABASE_ACCESS_TOKEN: accessToken || ''
+        };
+
+        const child = spawn('bash', [scriptPath], { env, cwd: join(__dirname, '..') });
+
+        child.stdout.on('data', (data) => sendLog(data.toString().trim()));
+        child.stderr.on('data', (data) => sendLog(`⚠️  ${data.toString().trim()}`));
+
+        child.on('close', (code) => {
+            if (code === 0) {
+                sendLog('✅ Migration successful!');
+            } else {
+                sendLog(`❌ Migration failed with code ${code}`);
+            }
+            res.end();
+        });
+    } catch (error: any) {
+        sendLog(`❌ Server error: ${error.message}`);
+        res.end();
     }
 });
 
