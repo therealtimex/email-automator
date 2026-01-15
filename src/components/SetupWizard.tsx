@@ -100,11 +100,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     <div className="space-y-4 mb-6">
                         <input
                             type="password"
-                            placeholder="Database Password (optional)"
+                            placeholder="Service Role Key (for migrations)"
                             value={dbPassword}
                             onChange={(e) => setDbPassword(e.target.value)}
                             className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
+                        <p className="text-xs text-slate-500">
+                            💡 Find your service_role key in Supabase Dashboard → Settings → API
+                        </p>
                     </div>
 
                     {migrationLogs.length > 0 && (
@@ -167,11 +170,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     />
                     <input
                         type="password"
-                        placeholder="Supabase Anon Key"
+                        placeholder="Anon Key (starts with eyJ or sb_publishable_)"
                         value={anonKey}
                         onChange={(e) => setAnonKey(e.target.value)}
                         className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                    <p className="text-xs text-slate-500">
+                        💡 This is your public anon key, NOT the service_role key
+                    </p>
                 </div>
 
                 {error && (
