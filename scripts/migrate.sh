@@ -33,10 +33,21 @@ tar -xzf "$WORK_DIR/repo.tar.gz" -C "$WORK_DIR" --strip-components=1
 
 cd "$WORK_DIR"
 
-echo "🔗 Linking Project: $SUPABASE_PROJECT_ID"
-$SUPABASE_CMD link --project-ref "$SUPABASE_PROJECT_ID"
-
-echo "📂 Pushing Schema..."
-$SUPABASE_CMD db push
+if [ -n "$SUPABASE_DB_PASSWORD" ]; then
+    echo "� using DB Password authentication..."
+    # Construct connection string
+    # Format: postgresql://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres
+    DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${SUPABASE_PROJECT_ID}.supabase.co:5432/postgres"
+    
+    echo "📂 Pushing Schema via DB URL..."
+    $SUPABASE_CMD db push --db-url "$DB_URL"
+else
+    echo "�🔗 Linking Project: $SUPABASE_PROJECT_ID"
+    # This requires SUPABASE_ACCESS_TOKEN to be set
+    $SUPABASE_CMD link --project-ref "$SUPABASE_PROJECT_ID"
+    
+    echo "📂 Pushing Schema..."
+    $SUPABASE_CMD db push
+fi
 
 echo "✅ Migration Complete!"
