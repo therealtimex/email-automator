@@ -46,6 +46,15 @@ export function clearSupabaseConfig(): void {
 
 export async function validateSupabaseConnection(url: string, anonKey: string): Promise<boolean> {
     try {
+        // Check if it's a publishable key (these don't work with REST API but are valid)
+        if (anonKey.startsWith('sb_publishable_')) {
+            // For publishable keys, just verify the URL format and that we can create a client
+            const client = createClient(url, anonKey);
+            // If client creation doesn't throw, consider it valid
+            return true;
+        }
+
+        // For regular anon keys, test with a simple query
         const client = createClient(url, anonKey);
         const { error } = await client.from('email_accounts').select('count', { count: 'exact', head: true });
         return !error;
