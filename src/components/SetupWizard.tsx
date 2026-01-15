@@ -93,117 +93,134 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
     if (step === 'migrate') {
         return (
-                    </div >
-
-            <div className="space-y-4 mb-6">
-                <input
-                    type="password"
-                    placeholder="Database Password (required for migration)"
-                    value={dbPassword}
-                    onChange={(e) => setDbPassword(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <p className="text-xs text-slate-500">
-                    💡 Enter the password you set when creating your Supabase project
-                </p>
-            </div>
-
-        {
-            migrationLogs.length > 0 && (
-                <div className="bg-slate-900 text-green-400 p-4 rounded-xl font-mono text-sm max-h-64 overflow-y-auto mb-6">
-                    {migrationLogs.map((log, i) => (
-                        <div key={i}>{log}</div>
-                    ))}
+            <div className="min-h-screen bg-background flex items-center justify-center p-8 relative">
+                <div className="absolute top-4 right-4">
+                    <ModeToggle />
                 </div>
-            )
-        }
+                <Card className="w-full max-w-lg shadow-2xl">
+                    <CardHeader className="text-center">
+                        <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
+                            <Database className="w-8 h-8 text-primary" />
+                        </div>
+                        <CardTitle className="text-2xl">Database Migration</CardTitle>
+                        <CardDescription>Setting up your database schema</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Input
+                                type="password"
+                                placeholder="Database Password (required for migration)"
+                                value={dbPassword}
+                                onChange={(e) => setDbPassword(e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                💡 Enter the password you set when creating your Supabase project
+                            </p>
+                        </div>
 
-        {
-            error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    {error}
-                </div>
-            )
-        }
-
-                    <button
-                        onClick={handleMigrate}
-                        disabled={migrating}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {migrating ? (
-                            <>
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                                Running Migration...
-                            </>
-                        ) : (
-                            'Run Migration'
+                        {migrationLogs.length > 0 && (
+                            <div className="bg-slate-950 text-green-400 p-4 rounded-md font-mono text-xs max-h-64 overflow-y-auto">
+                                {migrationLogs.map((log, i) => (
+                                    <div key={i}>{log}</div>
+                                ))}
+                            </div>
                         )}
-                    </button>
 
-                    <button
-                        onClick={() => setStep('config')}
-                        className="w-full mt-4 text-slate-600 hover:text-slate-900"
-                    >
-                        ← Back to Configuration
-                    </button>
-                </div >
-            </div >
+                        {error && (
+                            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                {error}
+                            </div>
+                        )}
+                    </CardContent>
+                    <CardFooter className="flex flex-col gap-3">
+                        <Button
+                            onClick={handleMigrate}
+                            disabled={migrating || !dbPassword}
+                            className="w-full"
+                        >
+                            {migrating ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Running Migration...
+                                </>
+                            ) : (
+                                'Run Migration'
+                            )}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setStep('config')}
+                            className="w-full"
+                        >
+                            ← Back to Configuration
+                        </Button>
+                    </CardFooter>
+                </Card>
+            </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-8">
-            <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-2xl w-full">
-                <div className="text-center mb-8">
-                    <Database className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-                    <h1 className="text-3xl font-bold text-slate-900">Welcome to Email Automator</h1>
-                    <p className="text-slate-500 mt-2">Connect your Supabase database to get started</p>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                    <input
-                        type="text"
-                        placeholder="Project ID or URL (e.g., dphtysocoxwtohdsdbom)"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <input
-                        type="password"
-                        placeholder="Anon Key (starts with eyJ...)"
-                        value={anonKey}
-                        onChange={(e) => setAnonKey(e.target.value)}
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <p className="text-xs text-slate-500">
-                        💡 This is your public anon key found in Settings → API
-                    </p>
-                </div>
-
-                {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
-                        <AlertCircle className="w-5 h-5" />
-                        {error}
-                    </div>
-                )}
-
-                <button
-                    onClick={handleValidate}
-                    disabled={validating || !url || !anonKey}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                    {validating ? (
-                        <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            Validating...
-                        </>
-                    ) : (
-                        'Connect & Continue'
-                    )}
-                </button>
+        <div className="min-h-screen bg-background flex items-center justify-center p-8 relative">
+            <div className="absolute top-4 right-4">
+                <ModeToggle />
             </div>
+            <Card className="w-full max-w-lg shadow-2xl">
+                <CardHeader className="text-center">
+                    <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
+                        <Database className="w-8 h-8 text-primary" />
+                    </div>
+                    <CardTitle className="text-2xl">Welcome to Email Automator</CardTitle>
+                    <CardDescription>Connect your Supabase database to get started</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Project ID or URL</label>
+                        <Input
+                            type="text"
+                            placeholder="e.g., dphtysocoxwtohdsdbom"
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Anon Public Key</label>
+                        <Input
+                            type="password"
+                            placeholder="starts with eyJ..."
+                            value={anonKey}
+                            onChange={(e) => setAnonKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            💡 Found in Supabase Settings → API
+                        </p>
+                    </div>
+
+                    {error && (
+                        <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            {error}
+                        </div>
+                    )}
+                </CardContent>
+                <CardFooter>
+                    <Button
+                        onClick={handleValidate}
+                        disabled={validating || !url || !anonKey}
+                        className="w-full"
+                    >
+                        {validating ? (
+                            <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Validating...
+                            </>
+                        ) : (
+                            'Connect & Continue'
+                        )}
+                    </Button>
+                </CardFooter>
+            </Card>
         </div>
     );
 }
