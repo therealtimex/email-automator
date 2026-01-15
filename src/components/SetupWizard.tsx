@@ -21,13 +21,21 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         setValidating(true);
         setError('');
 
-        const isValid = await validateSupabaseConnection(url, anonKey);
+        // Auto-construct URL if user entered a project ID instead
+        let finalUrl = url;
+        if (!url.startsWith('http')) {
+            // Assume it's a project ID
+            finalUrl = `https://${url}.supabase.co`;
+            setUrl(finalUrl);
+        }
+
+        const isValid = await validateSupabaseConnection(finalUrl, anonKey);
 
         if (isValid) {
-            saveSupabaseConfig({ url, anonKey });
+            saveSupabaseConfig({ url: finalUrl, anonKey });
 
             // Extract project ref from URL
-            const match = url.match(/https:\/\/([a-zA-Z0-9_-]+)\.supabase\.co/);
+            const match = finalUrl.match(/https:\/\/([a-zA-Z0-9_-]+)\.supabase\.co/);
             if (match) {
                 setProjectRef(match[1]);
                 setStep('migrate');
@@ -147,8 +155,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
                 <div className="space-y-4 mb-6">
                     <input
-                        type="url"
-                        placeholder="Supabase URL (e.g., https://xxx.supabase.co)"
+                        type="text"
+                        placeholder="Project ID or URL (e.g., dphtysocoxwtohdsdbom)"
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
