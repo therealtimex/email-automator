@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { supabase } from '../src/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { EmailProcessor } from '../src/core/processor';
 import { EmailActions } from '../src/core/actions';
 
@@ -28,6 +28,12 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Create Supabase client for server-side operations (if configured)
+let supabase = null;
+if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+    supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+}
 
 const processor = new EmailProcessor();
 const actions = new EmailActions();
