@@ -9,7 +9,7 @@ The Email Automator is a hybrid application consisting of a React frontend (Vite
 - **Frontend**: React, Vite, TailwindCSS, Lucide Icons
 - **Backend**: Node.js, Express, TypeScript
 - **Database**: Supabase (PostgreSQL)
-- **AI**: OpenAI / Instructor (for email analysis)
+- **AI**: OpenAI / Instructor (supports OpenAI-compatible Local LLMs like Ollama/LM Studio)
 
 ## Core Components
 

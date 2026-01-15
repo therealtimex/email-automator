@@ -37,6 +37,24 @@ cp .env.example .env
 - `GMAIL_CLIENT_ID`: OAuth Client ID for Gmail.
 - `GMAIL_CLIENT_SECRET`: OAuth Client Secret for Gmail.
 
+### Local LLM Support (Ollama / LM Studio)
+
+The system supports OpenAI-compatible local LLMs. Configure the following in your `.env`:
+
+```bash
+# Example for Ollama
+LLM_BASE_URL="http://localhost:11434/v1"
+LLM_API_KEY="ollama" # Can be any string for Ollama
+LLM_MODEL="llama3"   # Or your loaded model name
+```
+
+```bash
+# Example for LM Studio
+LLM_BASE_URL="http://localhost:1234/v1"
+LLM_API_KEY="lm-studio"
+LLM_MODEL="local-model"
+```
+
 ## 3. Database Setup (Supabase)
 
 The project requires specific tables in Supabase (`email_accounts`, `emails`). You can set this up automatically using the built-in Setup Wizard.
