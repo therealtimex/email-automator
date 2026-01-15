@@ -1,4 +1,3 @@
-```typescript
 import { google } from 'googleapis';
 
 export class EmailActions {
@@ -10,7 +9,7 @@ export class EmailActions {
 
     async executeAction(emailId: string, action: 'delete' | 'archive' | 'draft', draftContent?: string) {
         if (!this.supabase) throw new Error('Supabase client not configured');
-        
+
         // 1. Fetch email and account details
         const { data: email, error: emailError } = await this.supabase
             .from('emails')
@@ -63,11 +62,11 @@ export class EmailActions {
                     message: {
                         threadId: threadId,
                         raw: Buffer.from(
-                            `To: ${ original.data.payload?.headers?.find(h => h.name === 'From')?.value || '' } \r\n` +
-                            `Subject: Re: ${ original.data.payload?.headers?.find(h => h.name === 'Subject')?.value || '' } \r\n` +
-                            `In - Reply - To: ${ messageId } \r\n` +
-                            `References: ${ messageId } \r\n\r\n` +
-                            `${ draftContent } `
+                            `To: ${original.data.payload?.headers?.find(h => h.name === 'From')?.value || ''} \r\n` +
+                            `Subject: Re: ${original.data.payload?.headers?.find(h => h.name === 'Subject')?.value || ''} \r\n` +
+                            `In - Reply - To: ${messageId} \r\n` +
+                            `References: ${messageId} \r\n\r\n` +
+                            `${draftContent} `
                         ).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
                     }
                 }
