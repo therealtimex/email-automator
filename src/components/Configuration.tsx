@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,6 +8,14 @@ import { api } from '../lib/api';
 import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
 import { EmailAccount, Rule, UserSettings } from '../lib/types';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from './ui/dialog';
 
 export function Configuration() {
     const { state, actions } = useApp();
@@ -22,6 +30,23 @@ export function Configuration() {
     const [savingSettings, setSavingSettings] = useState(false);
     const [localSettings, setLocalSettings] = useState<Partial<UserSettings>>({});
 
+    // Gmail credentials modal state
+    const [showGmailModal, setShowGmailModal] = useState(false);
+    const [gmailModalStep, setGmailModalStep] = useState<'credentials' | 'code'>('credentials');
+    const [credentialsJson, setCredentialsJson] = useState('');
+    const [gmailClientId, setGmailClientId] = useState('');
+    const [gmailClientSecret, setGmailClientSecret] = useState('');
+    const [gmailAuthCode, setGmailAuthCode] = useState('');
+    const [savingCredentials, setSavingCredentials] = useState(false);
+    const [connectingGmail, setConnectingGmail] = useState(false);
+
+    // Outlook credentials modal state
+    const [showOutlookModal, setShowOutlookModal] = useState(false);
+    const [outlookModalStep, setOutlookModalStep] = useState<'credentials' | 'device-code'>('credentials');
+    const [outlookClientId, setOutlookClientId] = useState('');
+    const [outlookTenantId, setOutlookTenantId] = useState('');
+    const [savingOutlookCredentials, setSavingOutlookCredentials] = useState(false);
+
     useEffect(() => {
         actions.fetchAccounts();
         actions.fetchRules();
@@ -34,15 +59,19 @@ export function Configuration() {
         }
     }, [state.settings]);
 
-    const handleConnectGmail = async () => {
+    // Ref for scrolling
+    const credentialsRef = useRef<HTMLDivElement>(null);
+
+    // Start OAuth flow (called after credentials are saved)
+    const startGmailOAuth = async () => {
         setIsConnecting(true);
         try {
             const response = await api.getGmailAuthUrl();
             if (response.data?.url) {
                 // Open OAuth popup
                 const popup = window.open(response.data.url, 'gmail-auth', 'width=600,height=700');
-                
-                // Listen for callback (in production, use proper OAuth callback handling)
+
+                // Listen for callback
                 const checkPopup = setInterval(() => {
                     if (popup?.closed) {
                         clearInterval(checkPopup);
@@ -50,6 +79,10 @@ export function Configuration() {
                         actions.fetchAccounts();
                     }
                 }, 1000);
+            } else if (response.error) {
+                const errMsg = typeof response.error === 'string' ? response.error : response.error.message;
+                toast.error(errMsg || 'Failed to start connection');
+                setIsConnecting(false);
             }
         } catch (error) {
             toast.error('Failed to start Gmail connection');
@@ -57,7 +90,168 @@ export function Configuration() {
         }
     };
 
-    const handleConnectOutlook = async () => {
+    // Handle "Connect Gmail" button click - show modal
+    const handleConnectGmail = () => {
+        // Reset modal state
+        setGmailModalStep('credentials');
+        setCredentialsJson('');
+        setGmailClientId('');
+        setGmailClientSecret('');
+        setGmailAuthCode('');
+        setShowGmailModal(true);
+    };
+
+    // Parse credentials.json and extract client_id/secret
+    const handleCredentialsJsonChange = (json: string) => {
+        setCredentialsJson(json);
+        try {
+            const parsed = JSON.parse(json);
+            // Handle both formats: { installed: {...} } or { web: {...} } or direct
+            const creds = parsed.installed || parsed.web || parsed;
+            if (creds.client_id) {
+                setGmailClientId(creds.client_id);
+            }
+            if (creds.client_secret) {
+                setGmailClientSecret(creds.client_secret);
+            }
+            // Also show the app type for user awareness
+            if (parsed.installed) {
+                toast.success('Detected Desktop app credentials');
+            } else if (parsed.web) {
+                toast.info('Detected Web app - make sure redirect URI is configured in Google Cloud Console');
+            }
+        } catch {
+            // Invalid JSON, ignore - user might be typing
+        }
+    };
+
+    // Save credentials and start OAuth
+    const handleSaveAndConnect = async () => {
+        if (!gmailClientId || !gmailClientSecret) {
+            toast.error('Please provide both Client ID and Client Secret');
+            return;
+        }
+
+        setSavingCredentials(true);
+        try {
+            // Save credentials to user_settings
+            const success = await actions.updateSettings({
+                ...localSettings,
+                google_client_id: gmailClientId,
+                google_client_secret: gmailClientSecret,
+            });
+
+            if (success) {
+                // Update local state
+                setLocalSettings(s => ({
+                    ...s,
+                    google_client_id: gmailClientId,
+                    google_client_secret: gmailClientSecret,
+                }));
+
+                // Get OAuth URL and open popup
+                const response = await api.getGmailAuthUrl();
+                if (response.data?.url) {
+                    // Open OAuth in new tab (popup might be blocked)
+                    window.open(response.data.url, '_blank');
+
+                    // Move to step 2 - paste code
+                    setGmailModalStep('code');
+                    toast.success('Please authorize in the opened tab, then paste the code here');
+                } else {
+                    const errMsg = typeof response.error === 'string' ? response.error : response.error?.message;
+                    toast.error(errMsg || 'Failed to get OAuth URL');
+                }
+            } else {
+                toast.error('Failed to save credentials');
+            }
+        } catch (error) {
+            toast.error('Failed to save credentials');
+        } finally {
+            setSavingCredentials(false);
+        }
+    };
+
+    // Submit authorization code to complete Gmail connection
+    const handleSubmitAuthCode = async () => {
+        if (!gmailAuthCode.trim()) {
+            toast.error('Please paste the authorization code');
+            return;
+        }
+
+        setConnectingGmail(true);
+        try {
+            const response = await api.connectGmail(gmailAuthCode.trim());
+            if (response.data?.success) {
+                toast.success('Gmail account connected successfully!');
+                setShowGmailModal(false);
+                actions.fetchAccounts();
+            } else {
+                const errMsg = typeof response.error === 'string' ? response.error : response.error?.message;
+                toast.error(errMsg || 'Failed to connect Gmail');
+            }
+        } catch (error) {
+            toast.error('Failed to connect Gmail');
+        } finally {
+            setConnectingGmail(false);
+        }
+    };
+
+    // Handle "Connect Outlook" button click - show modal
+    const handleConnectOutlook = () => {
+        // Reset modal state
+        setOutlookModalStep('credentials');
+        setOutlookClientId('');
+        setOutlookTenantId('');
+        setShowOutlookModal(true);
+    };
+
+    // Save Outlook credentials and start device flow
+    const handleSaveOutlookAndConnect = async () => {
+        if (!outlookClientId) {
+            toast.error('Please provide the Client ID');
+            return;
+        }
+
+        setSavingOutlookCredentials(true);
+        try {
+            // Save credentials to user_settings
+            const success = await actions.updateSettings({
+                ...localSettings,
+                microsoft_client_id: outlookClientId,
+                microsoft_tenant_id: outlookTenantId || 'common',
+            });
+
+            if (success) {
+                // Update local state
+                setLocalSettings(s => ({
+                    ...s,
+                    microsoft_client_id: outlookClientId,
+                    microsoft_tenant_id: outlookTenantId || 'common',
+                }));
+
+                // Start device flow
+                const response = await api.startMicrosoftDeviceFlow();
+                if (response.data) {
+                    setOutlookDeviceCode(response.data);
+                    setOutlookModalStep('device-code');
+                    pollOutlookLogin(response.data.deviceCode, response.data.interval);
+                } else {
+                    const errMsg = typeof response.error === 'string' ? response.error : response.error?.message;
+                    toast.error(errMsg || 'Failed to start device flow');
+                }
+            } else {
+                toast.error('Failed to save credentials');
+            }
+        } catch (error) {
+            toast.error('Failed to save credentials');
+        } finally {
+            setSavingOutlookCredentials(false);
+        }
+    };
+
+    // Original device flow start (used after credentials saved)
+    const startOutlookDeviceFlow = async () => {
         setIsOutlookConnecting(true);
         try {
             const response = await api.startMicrosoftDeviceFlow();
@@ -82,37 +276,35 @@ export function Configuration() {
                     clearInterval(pollInterval);
                     setOutlookDeviceCode(null);
                     setIsOutlookConnecting(false);
+                    setShowOutlookModal(false); // Close modal on success
                     toast.success('Outlook account connected');
                     actions.fetchAccounts();
                 } else if (response.error) {
                     // Only stop if it's a hard error, not pending
-                    // The API returns 'authorization_pending' as part of the error or status check usually,
-                    // but our client might wrap it. Let's assume standard behavior.
-                    // If the API wrapper returns it as an error string:
-                     if (typeof response.error === 'object' && response.error.code !== 'authorization_pending') {
-                         // Stop polling on real errors
-                         // However, wait, our API client might treat 400 as error.
-                         // Let's rely on the fact that if it's pending, we keep going.
-                     }
+                    if (typeof response.error === 'object' && response.error.code !== 'authorization_pending') {
+                        // Stop polling on real errors
+                    }
                 }
             } catch (e) {
                 // Network glitches shouldn't kill polling immediately
             }
         }, interval * 1000);
-        
+
         // Safety timeout after 15 minutes
         setTimeout(() => {
             clearInterval(pollInterval);
-             if (isOutlookConnecting) { // Check state using a ref if needed, but for now this is okay-ish closure wise 
+            if (isOutlookConnecting) {
                 setOutlookDeviceCode(null);
                 setIsOutlookConnecting(false);
-             }
+                setShowOutlookModal(false);
+                toast.error('Connection timed out. Please try again.');
+            }
         }, 15 * 60 * 1000);
     };
 
     const handleDisconnect = async (accountId: string) => {
         if (!confirm('Are you sure you want to disconnect this account?')) return;
-        
+
         const success = await actions.disconnectAccount(accountId);
         if (success) {
             toast.success('Account disconnected');
@@ -123,7 +315,7 @@ export function Configuration() {
         setSavingSettings(true);
         const success = await actions.updateSettings(localSettings);
         setSavingSettings(false);
-        
+
         if (success) {
             toast.success('Settings saved');
         }
@@ -150,6 +342,136 @@ export function Configuration() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Gmail Credentials Modal */}
+            <Dialog open={showGmailModal} onOpenChange={setShowGmailModal}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-sm">
+                                G
+                            </div>
+                            Connect Gmail Account
+                        </DialogTitle>
+                        <DialogDescription>
+                            {gmailModalStep === 'credentials'
+                                ? 'Enter your Google OAuth credentials to connect your Gmail account.'
+                                : 'Paste the authorization code from Google to complete the connection.'}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {gmailModalStep === 'credentials' ? (
+                    <>
+                        <div className="space-y-4 py-4">
+                            {/* Paste JSON option */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium flex items-center gap-2">
+                                    <Upload className="w-4 h-4" />
+                                    Paste credentials.json
+                                </label>
+                                <textarea
+                                    className="w-full h-24 p-3 text-xs font-mono border rounded-lg bg-secondary/30 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                                    placeholder='{"installed":{"client_id":"...","client_secret":"..."}}'
+                                    value={credentialsJson}
+                                    onChange={(e) => handleCredentialsJsonChange(e.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Download from Google Cloud Console → APIs & Services → Credentials
+                                </p>
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-background px-2 text-muted-foreground">or enter manually</span>
+                                </div>
+                            </div>
+
+                            {/* Manual entry */}
+                            <div className="space-y-3">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Client ID</label>
+                                    <Input
+                                        placeholder="xxx.apps.googleusercontent.com"
+                                        value={gmailClientId}
+                                        onChange={(e) => setGmailClientId(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Client Secret</label>
+                                    <Input
+                                        type="password"
+                                        placeholder="GOCSPX-..."
+                                        value={gmailClientSecret}
+                                        onChange={(e) => setGmailClientSecret(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setShowGmailModal(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleSaveAndConnect}
+                                disabled={savingCredentials || !gmailClientId || !gmailClientSecret}
+                            >
+                                {savingCredentials ? (
+                                    <LoadingSpinner size="sm" className="mr-2" />
+                                ) : (
+                                    <Check className="w-4 h-4 mr-2" />
+                                )}
+                                Save & Connect
+                            </Button>
+                        </DialogFooter>
+                    </>
+                    ) : (
+                    <>
+                        {/* Step 2: Paste Authorization Code */}
+                        <div className="space-y-4 py-4">
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <p className="text-sm text-blue-800 dark:text-blue-200">
+                                    1. A new tab opened with Google Sign-In<br />
+                                    2. Sign in and authorize the app<br />
+                                    3. Copy the authorization code shown<br />
+                                    4. Paste it below
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Authorization Code</label>
+                                <Input
+                                    placeholder="4/0AQlEd8x..."
+                                    value={gmailAuthCode}
+                                    onChange={(e) => setGmailAuthCode(e.target.value)}
+                                    className="font-mono"
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setGmailModalStep('credentials')}>
+                                Back
+                            </Button>
+                            <Button
+                                onClick={handleSubmitAuthCode}
+                                disabled={connectingGmail || !gmailAuthCode.trim()}
+                            >
+                                {connectingGmail ? (
+                                    <LoadingSpinner size="sm" className="mr-2" />
+                                ) : (
+                                    <Check className="w-4 h-4 mr-2" />
+                                )}
+                                Connect
+                            </Button>
+                        </DialogFooter>
+                    </>
+                    )}
+                </DialogContent>
+            </Dialog>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Email Accounts Section */}
                 <Card>
@@ -167,7 +489,7 @@ export function Configuration() {
                             </p>
                         ) : (
                             state.accounts.map((account: EmailAccount) => (
-                                <div 
+                                <div
                                     key={account.id}
                                     className="flex items-center justify-between p-4 border rounded-lg bg-card"
                                 >
@@ -190,9 +512,9 @@ export function Configuration() {
                                                 Inactive
                                             </span>
                                         )}
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             className="text-destructive hover:text-destructive"
                                             onClick={() => handleDisconnect(account.id)}
                                         >
@@ -204,8 +526,8 @@ export function Configuration() {
                         )}
 
                         <div className="flex flex-col gap-2">
-                            <Button 
-                                className="w-full border-dashed" 
+                            <Button
+                                className="w-full border-dashed"
                                 variant="outline"
                                 onClick={handleConnectGmail}
                                 disabled={isConnecting || isOutlookConnecting}
@@ -218,8 +540,8 @@ export function Configuration() {
                                 Connect Gmail Account
                             </Button>
 
-                            <Button 
-                                className="w-full border-dashed" 
+                            <Button
+                                className="w-full border-dashed"
                                 variant="outline"
                                 onClick={handleConnectOutlook}
                                 disabled={isConnecting || isOutlookConnecting}
@@ -247,8 +569,8 @@ export function Configuration() {
                                             {outlookDeviceCode.userCode}
                                         </code>
                                     </div>
-                                    <Button 
-                                        variant="default" 
+                                    <Button
+                                        variant="default"
                                         className="w-full bg-blue-600 hover:bg-blue-700"
                                         onClick={() => window.open(outlookDeviceCode.verificationUri, '_blank')}
                                     >
@@ -291,7 +613,7 @@ export function Configuration() {
                                 {localSettings.auto_trash_spam ? 'On' : 'Off'}
                             </Button>
                         </div>
-                        
+
                         <div className="flex justify-between items-center py-3 border-b border-border">
                             <div>
                                 <h4 className="font-medium text-sm">Smart Drafts</h4>
@@ -314,7 +636,7 @@ export function Configuration() {
                             <div className="pt-2">
                                 <h4 className="text-sm font-medium mb-2">Custom Rules</h4>
                                 {state.rules.map((rule: Rule) => (
-                                    <div 
+                                    <div
                                         key={rule.id}
                                         className="flex justify-between items-center py-2 px-3 bg-secondary/30 rounded-lg mb-2"
                                     >
@@ -366,15 +688,15 @@ export function Configuration() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Model Name</label>
-                            <Input 
-                                placeholder="gpt-4o-mini" 
+                            <Input
+                                placeholder="gpt-4o-mini"
                                 value={localSettings.llm_model || ''}
                                 onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
                             />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Base URL</label>
-                            <Input 
+                            <Input
                                 placeholder="https://api.openai.com/v1"
                                 value={localSettings.llm_base_url || ''}
                                 onChange={(e) => setLocalSettings(s => ({ ...s, llm_base_url: e.target.value }))}
@@ -385,14 +707,14 @@ export function Configuration() {
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Sync Interval (minutes)</label>
-                            <Input 
+                            <Input
                                 type="number"
                                 min={1}
                                 max={60}
                                 value={localSettings.sync_interval_minutes || 5}
-                                onChange={(e) => setLocalSettings(s => ({ 
-                                    ...s, 
-                                    sync_interval_minutes: parseInt(e.target.value, 10) || 5 
+                                onChange={(e) => setLocalSettings(s => ({
+                                    ...s,
+                                    sync_interval_minutes: parseInt(e.target.value, 10) || 5
                                 }))}
                             />
                         </div>
@@ -409,6 +731,95 @@ export function Configuration() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Provider Credentials (BYOK) Section */}
+            <div ref={credentialsRef}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <ShieldCheck className="w-5 h-5 text-orange-500" />
+                            Provider Credentials (Advanced)
+                        </CardTitle>
+                        <CardDescription>
+                            Bring Your Own Keys (BYOK). Configure your own OAuth credentials here.
+                            Leave empty to use system defaults.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        {/* Google */}
+                        <div className="space-y-4 border-b pb-4">
+                            <h4 className="font-medium flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-500" /> Google / Gmail
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Client ID</label>
+                                    <Input
+                                        type="password"
+                                        placeholder="...apps.googleusercontent.com"
+                                        value={localSettings.google_client_id || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, google_client_id: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Client Secret</label>
+                                    <Input
+                                        type="password"
+                                        placeholder="GOCSPX-..."
+                                        value={localSettings.google_client_secret || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, google_client_secret: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Microsoft */}
+                        <div className="space-y-4">
+                            <h4 className="font-medium flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" /> Microsoft / Outlook
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Client ID</label>
+                                    <Input
+                                        type="password"
+                                        value={localSettings.microsoft_client_id || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_client_id: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Client Secret (Optional)</label>
+                                    <Input
+                                        type="password"
+                                        value={localSettings.microsoft_client_secret || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_client_secret: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Tenant ID</label>
+                                    <Input
+                                        placeholder="common"
+                                        value={localSettings.microsoft_tenant_id || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_tenant_id: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end mt-4">
+                            <Button onClick={handleSaveSettings} disabled={savingSettings} variant="secondary">
+                                {savingSettings ? (
+                                    <LoadingSpinner size="sm" className="mr-2" />
+                                ) : (
+                                    <Check className="w-4 h-4 mr-2" />
+                                )}
+                                Save Credentials
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 }
+

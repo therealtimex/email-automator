@@ -52,6 +52,12 @@ export interface UserSettings {
     auto_trash_spam: boolean;
     smart_drafts: boolean;
     sync_interval_minutes: number;
+    // BYOK Credentials
+    google_client_id?: string;
+    google_client_secret?: string;
+    microsoft_client_id?: string;
+    microsoft_client_secret?: string;
+    microsoft_tenant_id?: string;
 }
 
 export interface ProcessingLog {

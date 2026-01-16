@@ -100,10 +100,8 @@ Deno.serve(async (req) => {
       const settings = data || {
         user_id: user.id,
         sync_interval_minutes: 5,
-        auto_categorize: true,
-        auto_archive_spam: false,
-        auto_reply_enabled: false,
-        notification_enabled: true,
+        auto_trash_spam: false,
+        smart_drafts: false,
       };
 
       return createSuccessResponse({ settings });

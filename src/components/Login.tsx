@@ -60,10 +60,10 @@ export function Login({ onSuccess, onConfigure }: LoginProps) {
             // The "Update Connection" button is still available if they need to change config.
 
             // Clear blocking error to allow UI to render Login form
-            if (err.message?.includes('Invalid API key')) {
-                // Keep the error visible so they know to check settings, but show Login form
-                // actually, if we show Login form, 'error' state might be confusing?
-                // Let's just log it. Login form has its own error display if login fails.
+            if (err.message?.includes('Invalid API key') || err.status === 401) {
+                console.warn('[Login] API Key invalid for REST check (likely Publishable Key). defaulting to Setup Mode (isInitialized=false).');
+                setIsInitialized(false);
+                return;
             }
             setIsInitialized(true);
         } finally {
@@ -88,7 +88,14 @@ export function Login({ onSuccess, onConfigure }: LoginProps) {
                     }
                 });
 
-                if (error || !data) throw new Error(error?.message || 'Failed to create admin account');
+                if (error || !data) {
+                    if (error?.message?.includes('First user already exists')) {
+                        toast.info('System already initialized. Please log in.');
+                        setIsInitialized(true);
+                        return;
+                    }
+                    throw new Error(error?.message || 'Failed to create admin account');
+                }
 
                 toast.success('Admin account created! Signing you in...');
 
@@ -263,7 +270,7 @@ export function Login({ onSuccess, onConfigure }: LoginProps) {
 
                         <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex flex-col gap-2">
                             <p>{error}</p>
-                            {error.includes('configuration') && onConfigure && (
+                            {error.includes('configuration') || error.includes('Invalid API key') || error.includes('API key') && onConfigure && (
                                 <Button
                                     type="button"
                                     variant="outline"

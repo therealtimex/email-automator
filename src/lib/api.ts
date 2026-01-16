@@ -89,7 +89,7 @@ class HybridApiClient {
             ...(options?.headers || {}),
             apikey: this.anonKey,
         };
-        
+
         return this.request<T>(this.edgeFunctionsUrl, endpoint, {
             ...options,
             headers,
@@ -108,7 +108,6 @@ class HybridApiClient {
     async getGmailAuthUrl() {
         return this.edgeRequest<{ url: string }>('/auth-gmail?action=url', {
             method: 'GET',
-            auth: false,
         });
     }
 

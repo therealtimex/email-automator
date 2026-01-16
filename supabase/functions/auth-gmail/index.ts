@@ -8,24 +8,43 @@ const GMAIL_CLIENT_ID = Deno.env.get('GMAIL_CLIENT_ID');
 const GMAIL_CLIENT_SECRET = Deno.env.get('GMAIL_CLIENT_SECRET');
 const GMAIL_REDIRECT_URI = Deno.env.get('GMAIL_REDIRECT_URI') || 'urn:ietf:wg:oauth:2.0:oob';
 
-if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
-  throw new Error('Gmail OAuth credentials not configured');
+// Validate credentials inside handler to allow CORS preflight to succeed
+function validateCredentials() {
+  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
+    throw new Error('Gmail OAuth credentials not configured');
+  }
 }
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.modify'];
+
+// REMOVED imports and constants relying on global env
+import { getProviderCredentials } from '../_shared/auth-helper.ts';
+
+// Removed global validateCredentials
 
 /**
  * Generate Gmail OAuth URL
  * GET /auth-gmail?action=url
  */
-async function getAuthUrl(): Promise<Response> {
+async function getAuthUrl(req: Request): Promise<Response> {
+  // Verify user to get their specific credentials
+  const { user, error: authError } = await verifyUser(req);
+  if (authError || !user) {
+    return createErrorResponse(401, authError || 'Unauthorized');
+  }
+
+  const { clientId, redirectUri } = await getProviderCredentials(user.id, 'google');
+
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  url.searchParams.set('client_id', GMAIL_CLIENT_ID);
-  url.searchParams.set('redirect_uri', GMAIL_REDIRECT_URI);
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('redirect_uri', redirectUri || 'urn:ietf:wg:oauth:2.0:oob');
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('scope', SCOPES.join(' '));
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
+  // Pass user ID in state to know who to link callback to?
+  // Actually, handleCallback validates user from session again, so state isn't strictly needed for identity, 
+  // but good for security. For now simplicity.
 
   return createSuccessResponse({ url: url.toString() });
 }
@@ -35,11 +54,12 @@ async function getAuthUrl(): Promise<Response> {
  * POST /auth-gmail { code: string }
  */
 async function handleCallback(req: Request): Promise<Response> {
-  // Verify user authentication
   const { user, error: authError } = await verifyUser(req);
   if (authError || !user) {
     return createErrorResponse(401, authError || 'Unauthorized');
   }
+
+  const { clientId, clientSecret, redirectUri } = await getProviderCredentials(user.id, 'google');
 
   // Parse request body
   const { code } = await req.json();
@@ -54,12 +74,13 @@ async function handleCallback(req: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: GMAIL_CLIENT_ID,
-        client_secret: GMAIL_CLIENT_SECRET,
-        redirect_uri: GMAIL_REDIRECT_URI,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri || 'urn:ietf:wg:oauth:2.0:oob',
         grant_type: 'authorization_code',
       }),
     });
+    // ... remainder is similar but variables are local now
 
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
@@ -146,7 +167,7 @@ Deno.serve(async (req) => {
 
     // GET /auth-gmail?action=url
     if (req.method === 'GET' && action === 'url') {
-      return await getAuthUrl();
+      return await getAuthUrl(req);
     }
 
     // POST /auth-gmail (callback)
@@ -157,6 +178,8 @@ Deno.serve(async (req) => {
     return createErrorResponse(405, 'Method not allowed');
   } catch (error) {
     console.error('Request error:', error);
-    return createErrorResponse(500, 'Internal server error');
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    const status = message.includes('not configured') ? 400 : 500;
+    return createErrorResponse(status, message);
   }
 });

@@ -1,53 +1,177 @@
 #!/bin/bash
 
-# RealTimeX Email Automator Migration Script
+# ==============================================================================
+# REALTIMEX-EMAIL-AUTOMATOR MIGRATION & UPDATE UTILITY
+# ==============================================================================
+#
+# DESCRIPTION:
+#   This script automates the backend update process for RealtimeX Email Automator.
+#   It performs the following actions without requiring the user to clone git:
+#   1. Creates a temporary, invisible workspace on your system.
+#   2. Downloads the latest code/migrations from the official GitHub repository.
+#   3. Links your local environment to your remote Supabase project.
+#   4. Applies the latest Database Schema changes (Tables, Columns, etc).
+#   5. Pushes the latest Project Configuration (Auth, Storage, etc).
+#   6. Deploys the latest Edge Functions (API Logic).
+#   7. Cleans up all temporary files automatically.
+#
+# PREREQUISITES:
+#   1. Supabase CLI installed (global or local via npm).
+#   2. You must be logged in (run: 'supabase login').
+#   3. You need your Supabase Project Reference ID (e.g., 'abcdefghijklm').
+#   4. You need your Database Password (to type when prompted if needed).
+#
+# HOW TO USE:
+#   1. Download this file to your computer.
+#   2. Open your terminal and navigate to the folder where you saved it.
+#   3. Make the script executable:
+#      chmod +x migrate.sh
+#   4. Run the script:
+#      ./migrate.sh
+#
+# ==============================================================================
+
+# Exit immediately if any command fails
 set -e
 
+# --- CONFIGURATION ---
 GITHUB_ORG="therealtimex"
 REPO_NAME="email-automator"
 BRANCH="main"
 
-echo "🚀 Starting Email Automator Migration..."
+echo "🚀 Starting RealtimeX Email Automator Migration Tool..."
+
+# ------------------------------------------------------------------------------
+# 1. PRE-FLIGHT CHECKS
+# ------------------------------------------------------------------------------
 
 SUPABASE_CMD="supabase"
-if ! command -v supabase &> /dev/null; then
-    SUPABASE_CMD="npx supabase"
-fi
 
-# Use provided Project ID
-if [ -z "$SUPABASE_PROJECT_ID" ]; then
-    echo "❌ Error: SUPABASE_PROJECT_ID is required."
+# Check if global Supabase CLI is installed
+if command -v supabase &> /dev/null; then
+    echo "✅ Found global Supabase CLI."
+elif command -v npx &> /dev/null; then
+    # Fallback to npx if available
+    echo "ℹ️  Global 'supabase' not found. Trying local via npx..."
+    SUPABASE_CMD="npx supabase"
+else
+    echo "❌ Error: 'supabase' CLI is not installed and 'npx' is not available."
+    echo "   Please install it via: brew install supabase/tap/supabase"
+    echo "   Or visit: https://supabase.com/docs/guides/cli"
     exit 1
 fi
 
+# ------------------------------------------------------------------------------
+# 2. GATHER CREDENTIALS
+# ------------------------------------------------------------------------------
+
+# If the Project ID wasn't set as an env var, ask the user for it now.
+if [ -z "$SUPABASE_PROJECT_ID" ]; then
+    echo "---------------------------------------------------------"
+    echo "👉 Enter your Supabase Project Reference ID:"
+    echo "   (Found in Supabase Dashboard > Project Settings > General)"
+    read -p "   Project ID: " SUPABASE_PROJECT_ID
+fi
+
+if [ -z "$SUPABASE_PROJECT_ID" ]; then
+    echo "❌ Error: Project ID is required to proceed."
+    exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# 3. PREPARE TEMPORARY WORKSPACE
+# ------------------------------------------------------------------------------
+
+# Create a safe, random directory in the system temp folder (e.g., /tmp/tmp.XyZ123)
+# This ensures we don't mess with existing files on the user's desktop.
 WORK_DIR=$(mktemp -d)
+echo "🧹 Working in temporary system directory..."
+
+# Define a cleanup function that runs automatically when the script exits
+# (Whether it finishes successfully or crashes)
 cleanup() {
     rm -rf "$WORK_DIR"
-    echo "🧹 Cleaned up."
+    echo "🧹 Temporary files cleaned up."
 }
 trap cleanup EXIT
 
-echo "📥 Downloading migrations..."
+# ------------------------------------------------------------------------------
+# 4. DOWNLOAD & EXTRACT LATEST CODE
+# ------------------------------------------------------------------------------
+
+echo "📥 Downloading latest source from GitHub ($BRANCH)..."
+# Download the repository archive as a compressed file
 curl -L -s "https://github.com/$GITHUB_ORG/$REPO_NAME/archive/refs/heads/$BRANCH.tar.gz" -o "$WORK_DIR/repo.tar.gz"
+
+echo "📦 Extracting configuration files..."
+# Extract the files, stripping the root folder so they sit directly in WORK_DIR
 tar -xzf "$WORK_DIR/repo.tar.gz" -C "$WORK_DIR" --strip-components=1
 
+# ------------------------------------------------------------------------------
+# 5. EXECUTE MIGRATION
+# ------------------------------------------------------------------------------
+
+# Move into the temp directory to run Supabase commands
 cd "$WORK_DIR"
 
-if [ -n "$SUPABASE_DB_PASSWORD" ]; then
-    echo "� using DB Password authentication..."
-    # Construct connection string
-    # Format: postgresql://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres
-    DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${SUPABASE_PROJECT_ID}.supabase.co:5432/postgres"
-    
-    echo "📂 Pushing Schema via DB URL..."
-    $SUPABASE_CMD db push --db-url "$DB_URL"
+echo "---------------------------------------------------------"
+echo "🔗 Linking to Supabase Project: $SUPABASE_PROJECT_ID"
+echo "🔑 NOTE: If asked, please enter your DATABASE PASSWORD."
+# This connects the CLI to the remote project. 
+# It will pause and ask for the password if not found in env vars.
+$SUPABASE_CMD link --project-ref "$SUPABASE_PROJECT_ID"
+
+echo "---------------------------------------------------------"
+echo "📂 Pushing Database Schema Changes..."
+# This compares local SQL migrations with the remote DB and applies differences.
+$SUPABASE_CMD db push
+
+echo "---------------------------------------------------------"
+echo "⚙️  Pushing Project Configuration..."
+# Pushes Auth, Storage, and other project settings from config.toml
+$SUPABASE_CMD config push
+
+echo "---------------------------------------------------------"
+echo "🔐 Setting up Edge Function secrets..."
+# Generate TOKEN_ENCRYPTION_KEY if not already set
+# This key is used to encrypt OAuth tokens before storing in the database
+if $SUPABASE_CMD secrets list 2>/dev/null | grep -q "TOKEN_ENCRYPTION_KEY"; then
+    echo "   TOKEN_ENCRYPTION_KEY already exists, skipping..."
 else
-    echo "�🔗 Linking Project: $SUPABASE_PROJECT_ID"
-    # This requires SUPABASE_ACCESS_TOKEN to be set
-    $SUPABASE_CMD link --project-ref "$SUPABASE_PROJECT_ID"
-    
-    echo "📂 Pushing Schema..."
-    $SUPABASE_CMD db push
+    echo "   Generating TOKEN_ENCRYPTION_KEY..."
+    ENCRYPTION_KEY=$(openssl rand -base64 24)
+    $SUPABASE_CMD secrets set TOKEN_ENCRYPTION_KEY="$ENCRYPTION_KEY"
+    echo "   ✅ TOKEN_ENCRYPTION_KEY has been set"
 fi
 
-echo "✅ Migration Complete!"
+echo "---------------------------------------------------------"
+echo "⚡ Deploying Edge Functions..."
+# Deploys API logic explicitly for each function to ensure they are all deployed
+# We skip _shared and hidden folders
+if [ -d "supabase/functions" ]; then
+    for func in supabase/functions/*; do
+        if [ -d "$func" ]; then
+            func_name=$(basename "$func")
+            # Skip _shared and hidden folders
+            if [[ "$func_name" != "_shared" && "$func_name" != .* ]]; then
+                echo "   Deploying $func_name..."
+                if ! $SUPABASE_CMD functions deploy "$func_name" --no-verify-jwt; then
+                    echo "❌ Error: Failed to deploy function '$func_name'."
+                    exit 1
+                fi
+            fi
+        fi
+    done
+else
+    echo "⚠️ Warning: supabase/functions directory not found. Skipping function deployment."
+fi
+
+
+# ------------------------------------------------------------------------------
+# 6. COMPLETION
+# ------------------------------------------------------------------------------
+
+echo "---------------------------------------------------------"
+echo "✅ SUCCESS: Backend updated successfully!"
+echo "   You can now run the application!"
+echo "---------------------------------------------------------"

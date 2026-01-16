@@ -18,27 +18,27 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
-  // Verify user authentication
-  const { user, error: authError } = await verifyUser(req);
-  if (authError || !user) {
-    return createErrorResponse(401, authError || 'Unauthorized');
-  }
-
   try {
+    // Verify user authentication
+    const { user, error: authError } = await verifyUser(req);
+    if (authError || !user) {
+      return createErrorResponse(401, authError || 'Unauthorized');
+    }
+
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
 
     // GET /api-v1-rules - List rules
     if (req.method === 'GET' && pathParts.length === 1) {
       const { data, error } = await supabaseAdmin
-        .from('automation_rules')
+        .from('rules')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Database error:', error);
-        return createErrorResponse(500, 'Failed to fetch rules');
+        console.error('Database error fetching rules:', error);
+        return createErrorResponse(500, `Failed to fetch rules: ${error.message}`);
       }
 
       return createSuccessResponse({ rules: data || [] });
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       }
 
       const { data, error } = await supabaseAdmin
-        .from('automation_rules')
+        .from('rules')
         .insert({
           user_id: user.id,
           name,
@@ -66,8 +66,8 @@ Deno.serve(async (req) => {
         .single();
 
       if (error) {
-        console.error('Database error:', error);
-        return createErrorResponse(500, 'Failed to create rule');
+        console.error('Database error creating rule:', error);
+        return createErrorResponse(500, `Failed to create rule: ${error.message}`);
       }
 
       return createSuccessResponse({ rule: data }, 201);
@@ -78,20 +78,20 @@ Deno.serve(async (req) => {
       const ruleId = pathParts[1];
 
       // Get current state
-      const { data: currentRule } = await supabaseAdmin
-        .from('automation_rules')
+      const { data: currentRule, error: fetchError } = await supabaseAdmin
+        .from('rules')
         .select('is_enabled')
         .eq('id', ruleId)
         .eq('user_id', user.id)
         .single();
 
-      if (!currentRule) {
+      if (fetchError || !currentRule) {
         return createErrorResponse(404, 'Rule not found');
       }
 
       // Toggle
       const { data, error } = await supabaseAdmin
-        .from('automation_rules')
+        .from('rules')
         .update({ is_enabled: !currentRule.is_enabled })
         .eq('id', ruleId)
         .eq('user_id', user.id)
@@ -99,8 +99,8 @@ Deno.serve(async (req) => {
         .single();
 
       if (error) {
-        console.error('Database error:', error);
-        return createErrorResponse(500, 'Failed to toggle rule');
+        console.error('Database error toggling rule:', error);
+        return createErrorResponse(500, `Failed to toggle rule: ${error.message}`);
       }
 
       return createSuccessResponse({ rule: data });
@@ -112,19 +112,19 @@ Deno.serve(async (req) => {
       const updates = await req.json();
 
       // Verify ownership
-      const { data: rule } = await supabaseAdmin
-        .from('automation_rules')
+      const { data: rule, error: fetchError } = await supabaseAdmin
+        .from('rules')
         .select('id')
         .eq('id', ruleId)
         .eq('user_id', user.id)
         .single();
 
-      if (!rule) {
+      if (fetchError || !rule) {
         return createErrorResponse(404, 'Rule not found');
       }
 
       const { data, error } = await supabaseAdmin
-        .from('automation_rules')
+        .from('rules')
         .update(updates)
         .eq('id', ruleId)
         .eq('user_id', user.id)
@@ -132,8 +132,8 @@ Deno.serve(async (req) => {
         .single();
 
       if (error) {
-        console.error('Database error:', error);
-        return createErrorResponse(500, 'Failed to update rule');
+        console.error('Database error updating rule:', error);
+        return createErrorResponse(500, `Failed to update rule: ${error.message}`);
       }
 
       return createSuccessResponse({ rule: data });
@@ -144,26 +144,26 @@ Deno.serve(async (req) => {
       const ruleId = pathParts[1];
 
       // Verify ownership
-      const { data: rule } = await supabaseAdmin
-        .from('automation_rules')
+      const { data: rule, error: fetchError } = await supabaseAdmin
+        .from('rules')
         .select('id')
         .eq('id', ruleId)
         .eq('user_id', user.id)
         .single();
 
-      if (!rule) {
+      if (fetchError || !rule) {
         return createErrorResponse(404, 'Rule not found');
       }
 
       const { error } = await supabaseAdmin
-        .from('automation_rules')
+        .from('rules')
         .delete()
         .eq('id', ruleId)
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Database error:', error);
-        return createErrorResponse(500, 'Failed to delete rule');
+        console.error('Database error deleting rule:', error);
+        return createErrorResponse(500, `Failed to delete rule: ${error.message}`);
       }
 
       return createSuccessResponse({ success: true });
@@ -172,6 +172,6 @@ Deno.serve(async (req) => {
     return createErrorResponse(405, 'Method not allowed');
   } catch (error) {
     console.error('Request error:', error);
-    return createErrorResponse(500, 'Internal server error');
+    return createErrorResponse(500, `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 });

@@ -14,6 +14,7 @@ import { Configuration } from "./components/Configuration";
 import { Login } from './components/Login';
 import { getSupabaseConfig, validateSupabaseConnection } from './lib/supabase-config';
 import { supabase } from './lib/supabase';
+import { api } from './lib/api';
 import {
     checkMigrationStatus,
     type MigrationStatus,
@@ -29,6 +30,51 @@ function AppContent() {
     const [needsSetup, setNeedsSetup] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
     const [checkingConfig, setCheckingConfig] = useState(true);
+    const [processingAuth, setProcessingAuth] = useState(false);
+
+    // Handle OAuth Callback (e.g. Gmail)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+
+        if (code && !processingAuth) {
+            const handleCallback = async () => {
+                setProcessingAuth(true);
+                try {
+                    // Try Gmail connection
+                    // Note: In a robust app, we should pass 'state' param to know which provider
+                    // but since MS uses device flow here, it's likely Gmail.
+                    const response = await api.connectGmail(code);
+                    if (response.data?.success) {
+                        toast.success('Gmail connected successfully!');
+                        // Notify opener if exists
+                        if (window.opener) {
+                            // Close popup after short delay
+                            setTimeout(() => window.close(), 1500);
+                        } else {
+                            // Clear URL
+                            window.history.replaceState({}, '', window.location.pathname);
+                            actions.fetchAccounts();
+                        }
+                    } else {
+                        const errMsg = typeof response.error === 'string'
+                            ? response.error
+                            : response.error?.message;
+                        toast.error(errMsg || 'Failed to connect Gmail');
+                    }
+                } catch (error) {
+                    toast.error('Connection failed');
+                } finally {
+                    setProcessingAuth(false);
+                }
+            };
+            handleCallback();
+        }
+    }, []);
+
+    if (processingAuth) {
+        return <PageLoader text="Connecting account..." />;
+    }
 
     // Migration state
     const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);

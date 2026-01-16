@@ -3,23 +3,7 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { handleCors, createErrorResponse, createSuccessResponse } from '../_shared/cors.ts';
 import { verifyUser } from '../_shared/auth.ts';
 import { encrypt } from '../_shared/encryption.ts';
-
-const MS_CLIENT_ID = Deno.env.get('MS_GRAPH_CLIENT_ID');
-const MS_TENANT_ID = Deno.env.get('MS_GRAPH_TENANT_ID') || 'common';
-const MS_CLIENT_SECRET = Deno.env.get('MS_GRAPH_CLIENT_SECRET');
-
-if (!MS_CLIENT_ID) {
-  throw new Error('Microsoft OAuth credentials not configured');
-}
-
-const SCOPES = [
-  'https://graph.microsoft.com/Mail.Read',
-  'https://graph.microsoft.com/Mail.ReadWrite',
-  'https://graph.microsoft.com/User.Read',
-  'offline_access',
-];
-
-const AUTHORITY = `https://login.microsoftonline.com/${MS_TENANT_ID}`;
+import { getProviderCredentials } from '../_shared/auth-helper.ts';
 
 /**
  * Initiate Device Code Flow
@@ -32,6 +16,15 @@ async function initiateDeviceFlow(req: Request): Promise<Response> {
     return createErrorResponse(401, authError || 'Unauthorized');
   }
 
+  const { clientId, tenantId } = await getProviderCredentials(user.id, 'microsoft');
+  const SCOPES = [
+    'https://graph.microsoft.com/Mail.Read',
+    'https://graph.microsoft.com/Mail.ReadWrite',
+    'https://graph.microsoft.com/User.Read',
+    'offline_access',
+  ];
+  const AUTHORITY = `https://login.microsoftonline.com/${tenantId || 'common'}`;
+
   try {
     // Request device code
     const response = await fetch(
@@ -40,7 +33,7 @@ async function initiateDeviceFlow(req: Request): Promise<Response> {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          client_id: MS_CLIENT_ID,
+          client_id: clientId,
           scope: SCOPES.join(' '),
         }),
       }
@@ -84,17 +77,19 @@ async function pollDeviceCode(req: Request): Promise<Response> {
     return createErrorResponse(400, 'Missing device code');
   }
 
+  const { clientId, clientSecret, tenantId } = await getProviderCredentials(user.id, 'microsoft');
+  const AUTHORITY = `https://login.microsoftonline.com/${tenantId || 'common'}`;
+
   try {
     // Poll for token
     const body: Record<string, string> = {
       grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-      client_id: MS_CLIENT_ID,
+      client_id: clientId,
       device_code: deviceCode,
     };
 
-    // Add client secret if available (confidential client)
-    if (MS_CLIENT_SECRET) {
-      body.client_secret = MS_CLIENT_SECRET;
+    if (clientSecret) {
+      body.client_secret = clientSecret;
     }
 
     const response = await fetch(
@@ -114,7 +109,7 @@ async function pollDeviceCode(req: Request): Promise<Response> {
     }
 
     if (data.error) {
-      console.error('Token polling error:', data.error_description);
+      console.error('Token polling error:', data.error_description || data.error);
       return createErrorResponse(400, data.error_description || data.error);
     }
 
@@ -151,6 +146,8 @@ async function pollDeviceCode(req: Request): Promise<Response> {
       ? new Date(Date.now() + data.expires_in * 1000).toISOString()
       : null;
 
+    const SCOPES = data.scope?.split(' ') || [];
+
     // Save to database
     const { data: account, error: dbError } = await supabaseAdmin
       .from('email_accounts')
@@ -162,7 +159,7 @@ async function pollDeviceCode(req: Request): Promise<Response> {
           access_token: encryptedAccessToken,
           refresh_token: encryptedRefreshToken,
           token_expires_at: tokenExpiresAt,
-          scopes: data.scope?.split(' ') || SCOPES,
+          scopes: SCOPES,
           is_active: true,
           updated_at: new Date().toISOString(),
         },
@@ -211,6 +208,8 @@ Deno.serve(async (req) => {
     return createErrorResponse(405, 'Method not allowed');
   } catch (error) {
     console.error('Request error:', error);
-    return createErrorResponse(500, 'Internal server error');
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    const status = message.includes('not configured') ? 400 : 500;
+    return createErrorResponse(status, message);
   }
 });
