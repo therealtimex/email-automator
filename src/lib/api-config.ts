@@ -7,6 +7,7 @@ import { getSupabaseConfig } from './supabase-config';
 export interface ApiConfig {
     edgeFunctionsUrl: string;
     expressApiUrl: string;
+    anonKey: string;
 }
 
 export function getApiConfig(): ApiConfig {
@@ -16,6 +17,8 @@ export function getApiConfig(): ApiConfig {
     const edgeFunctionsUrl = supabaseConfig
         ? `${supabaseConfig.url}/functions/v1`
         : '';
+    
+    const anonKey = supabaseConfig ? supabaseConfig.anonKey : '';
 
     // Express API URL: http://localhost:3004 (Local App)
     // Note: RealTimeX Desktop uses ports 3001/3002
@@ -24,5 +27,6 @@ export function getApiConfig(): ApiConfig {
     return {
         edgeFunctionsUrl,
         expressApiUrl,
+        anonKey,
     };
 }

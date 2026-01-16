@@ -20,12 +20,14 @@ interface ApiResponse<T> {
 class HybridApiClient {
     private edgeFunctionsUrl: string;
     private expressApiUrl: string;
+    private anonKey: string;
     private token: string | null = null;
 
     constructor() {
         const config = getApiConfig();
         this.edgeFunctionsUrl = config.edgeFunctionsUrl;
         this.expressApiUrl = config.expressApiUrl;
+        this.anonKey = config.anonKey;
     }
 
     setToken(token: string | null) {
@@ -82,7 +84,16 @@ class HybridApiClient {
 
     // Edge Functions requests
     private edgeRequest<T>(endpoint: string, options?: ApiOptions) {
-        return this.request<T>(this.edgeFunctionsUrl, endpoint, options);
+        // Supabase Gateway requires 'apikey' header for all requests
+        const headers = {
+            ...(options?.headers || {}),
+            apikey: this.anonKey,
+        };
+        
+        return this.request<T>(this.edgeFunctionsUrl, endpoint, {
+            ...options,
+            headers,
+        });
     }
 
     // Express API requests

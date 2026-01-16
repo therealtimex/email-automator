@@ -2,6 +2,14 @@ import { createContext, useContext, useReducer, useEffect, ReactNode } from 'rea
 import { supabase } from '../lib/supabase';
 import { api, initializeApi } from '../lib/api';
 import { Email, EmailAccount, Rule, UserSettings, Stats } from '../lib/types';
+import { getSupabaseConfig } from '../lib/supabase-config';
+
+// Helper to extract error message from API response error
+function getErrorMessage(error: { message?: string; code?: string } | string | undefined, fallback: string): string {
+    if (!error) return fallback;
+    if (typeof error === 'string') return error;
+    return error.message || fallback;
+}
 
 // State
 interface AppState {
@@ -18,6 +26,7 @@ interface AppState {
     
     // UI
     isLoading: boolean;
+    isInitialized: boolean;
     error: string | null;
     selectedEmailId: string | null;
     
@@ -35,6 +44,7 @@ const initialState: AppState = {
     settings: null,
     stats: null,
     isLoading: true,
+    isInitialized: false,
     error: null,
     selectedEmailId: null,
     emailsTotal: 0,
@@ -45,6 +55,7 @@ const initialState: AppState = {
 type Action =
     | { type: 'SET_USER'; payload: any }
     | { type: 'SET_LOADING'; payload: boolean }
+    | { type: 'SET_INITIALIZED'; payload: boolean }
     | { type: 'SET_ERROR'; payload: string | null }
     | { type: 'SET_EMAILS'; payload: { emails: Email[]; total: number; offset: number } }
     | { type: 'UPDATE_EMAIL'; payload: Email }
@@ -71,6 +82,8 @@ function reducer(state: AppState, action: Action): AppState {
             };
         case 'SET_LOADING':
             return { ...state, isLoading: action.payload };
+        case 'SET_INITIALIZED':
+            return { ...state, isInitialized: action.payload };
         case 'SET_ERROR':
             return { ...state, error: action.payload, isLoading: false };
         case 'SET_EMAILS':
@@ -153,11 +166,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Initialize auth
     useEffect(() => {
         async function init() {
+            // Check if we have valid Supabase config
+            const config = getSupabaseConfig();
+            if (!config) {
+                // No config - mark as initialized but not authenticated
+                // App.tsx will show SetupWizard
+                dispatch({ type: 'SET_INITIALIZED', payload: true });
+                return;
+            }
+
             try {
                 await initializeApi(supabase);
-                
+
                 const { data: { session } } = await supabase.auth.getSession();
                 dispatch({ type: 'SET_USER', payload: session?.user || null });
+                dispatch({ type: 'SET_INITIALIZED', payload: true });
 
                 // Listen for auth changes
                 const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -171,7 +194,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
                 return () => subscription.unsubscribe();
             } catch (error) {
+                console.error('[AppContext] Init error:', error);
                 dispatch({ type: 'SET_ERROR', payload: 'Failed to initialize' });
+                dispatch({ type: 'SET_INITIALIZED', payload: true });
             }
         }
         init();
@@ -239,16 +264,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 }
                 return true;
             }
-            dispatch({ type: 'SET_ERROR', payload: response.error?.message || 'Action failed' });
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Action failed') });
             return false;
         },
 
         triggerSync: async (accountId?: string) => {
-            const response = accountId 
+            const response = accountId
                 ? await api.triggerSync(accountId)
                 : await api.syncAll();
             if (response.error) {
-                dispatch({ type: 'SET_ERROR', payload: response.error.message });
+                dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Sync failed') });
                 return false;
             }
             return true;
@@ -260,7 +285,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 dispatch({ type: 'REMOVE_ACCOUNT', payload: accountId });
                 return true;
             }
-            dispatch({ type: 'SET_ERROR', payload: response.error?.message || 'Failed to disconnect' });
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to disconnect') });
             return false;
         },
 
@@ -270,7 +295,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 dispatch({ type: 'SET_SETTINGS', payload: response.data.settings });
                 return true;
             }
-            dispatch({ type: 'SET_ERROR', payload: response.error?.message || 'Failed to update settings' });
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update settings') });
             return false;
         },
 
@@ -280,7 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 dispatch({ type: 'ADD_RULE', payload: response.data.rule });
                 return true;
             }
-            dispatch({ type: 'SET_ERROR', payload: response.error?.message || 'Failed to create rule' });
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to create rule') });
             return false;
         },
 
@@ -290,7 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 dispatch({ type: 'REMOVE_RULE', payload: ruleId });
                 return true;
             }
-            dispatch({ type: 'SET_ERROR', payload: response.error?.message || 'Failed to delete rule' });
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to delete rule') });
             return false;
         },
 
@@ -300,7 +325,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 dispatch({ type: 'UPDATE_RULE', payload: response.data.rule });
                 return true;
             }
-            dispatch({ type: 'SET_ERROR', payload: response.error?.message || 'Failed to toggle rule' });
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to toggle rule') });
             return false;
         },
     };

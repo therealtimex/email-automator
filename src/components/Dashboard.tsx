@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -8,6 +8,7 @@ import { toast } from './Toast';
 import { LoadingSpinner, CardLoader } from './LoadingSpinner';
 import { Email, EmailCategory } from '../lib/types';
 import { cn } from '../lib/utils';
+import { useRealtimeEmails } from '../hooks/useRealtimeEmails';
 
 const CATEGORY_COLORS: Record<string, string> = {
     spam: 'bg-destructive/10 text-destructive',
@@ -28,16 +29,46 @@ const ACTION_ICONS = {
 };
 
 export function Dashboard() {
-    const { state, actions } = useApp();
+    const { state, actions, dispatch } = useApp();
     const [isLoading, setIsLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+    const [actionLoading, setActionLoading] = useState<Record<string, string>>({});
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+    // Realtime subscription for live email updates
+    const handleRealtimeInsert = useCallback((email: Email) => {
+        dispatch({ type: 'UPDATE_EMAIL', payload: email });
+        toast.info('New email received');
+    }, [dispatch]);
+
+    const handleRealtimeUpdate = useCallback((email: Email) => {
+        dispatch({ type: 'UPDATE_EMAIL', payload: email });
+    }, [dispatch]);
+
+    const handleRealtimeDelete = useCallback((emailId: string) => {
+        // Refresh the list when an email is deleted
+        loadEmails(state.emailsOffset);
+    }, [state.emailsOffset]);
+
+    const { isSubscribed } = useRealtimeEmails({
+        userId: state.user?.id,
+        onInsert: handleRealtimeInsert,
+        onUpdate: handleRealtimeUpdate,
+        onDelete: handleRealtimeDelete,
+        enabled: state.isAuthenticated,
+    });
 
     useEffect(() => {
-        loadEmails();
-    }, [selectedCategory]);
+        // Only fetch emails if user is authenticated
+        if (state.isAuthenticated) {
+            loadEmails();
+        } else {
+            setIsLoading(false);
+        }
+    }, [selectedCategory, state.isAuthenticated]);
 
     const loadEmails = async (offset = 0) => {
         setIsLoading(true);
@@ -63,10 +94,38 @@ export function Dashboard() {
     };
 
     const handleAction = async (email: Email, action: string) => {
+        // For delete, require confirmation
+        if (action === 'delete' && deleteConfirm !== email.id) {
+            setDeleteConfirm(email.id);
+            return;
+        }
+
+        // Clear delete confirmation
+        setDeleteConfirm(null);
+
+        // Set loading state for this specific email+action
+        setActionLoading(prev => ({ ...prev, [email.id]: action }));
+
         const success = await actions.executeAction(email.id, action);
+
+        // Clear loading state
+        setActionLoading(prev => {
+            const updated = { ...prev };
+            delete updated[email.id];
+            return updated;
+        });
+
         if (success) {
             toast.success(`Email ${action === 'delete' ? 'deleted' : action === 'archive' ? 'archived' : 'updated'}`);
+            // Refresh list after delete to remove the email
+            if (action === 'delete') {
+                loadEmails(state.emailsOffset);
+            }
         }
+    };
+
+    const cancelDelete = () => {
+        setDeleteConfirm(null);
     };
 
     const handleSearch = (e: React.FormEvent) => {
@@ -168,12 +227,15 @@ export function Dashboard() {
                 ) : (
                     <>
                         {state.emails.map(email => (
-                            <EmailCard 
-                                key={email.id} 
-                                email={email} 
+                            <EmailCard
+                                key={email.id}
+                                email={email}
                                 onAction={handleAction}
                                 onSelect={() => setSelectedEmail(email)}
                                 isSelected={selectedEmail?.id === email.id}
+                                loadingAction={actionLoading[email.id]}
+                                isDeletePending={deleteConfirm === email.id}
+                                onCancelDelete={cancelDelete}
                             />
                         ))}
 
@@ -210,14 +272,27 @@ export function Dashboard() {
             {/* Sidebar */}
             <aside className="space-y-6">
                 {/* Connection Status */}
-                <Card className="p-6 border-primary/20 bg-primary/5">
-                    <h3 className="font-semibold text-primary mb-1">Supabase Sync</h3>
+                <Card className={cn(
+                    "p-6 border-primary/20",
+                    isSubscribed ? "bg-primary/5" : "bg-muted/50"
+                )}>
+                    <h3 className="font-semibold text-primary mb-1">Realtime Sync</h3>
                     <p className="text-muted-foreground text-xs mb-3">
-                        Real-time connection active
+                        {isSubscribed
+                            ? "Live updates enabled"
+                            : "Waiting for connection..."}
                     </p>
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 w-fit px-2 py-1 rounded-full border border-emerald-500/20">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                        CONNECTED
+                    <div className={cn(
+                        "flex items-center gap-2 text-[10px] font-mono w-fit px-2 py-1 rounded-full border",
+                        isSubscribed
+                            ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                            : "text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
+                    )}>
+                        <div className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            isSubscribed ? "bg-emerald-500 animate-pulse" : "bg-yellow-500"
+                        )} />
+                        {isSubscribed ? "CONNECTED" : "DISCONNECTED"}
                     </div>
                 </Card>
 
@@ -284,10 +359,14 @@ interface EmailCardProps {
     onAction: (email: Email, action: string) => void;
     onSelect: () => void;
     isSelected: boolean;
+    loadingAction?: string;
+    isDeletePending?: boolean;
+    onCancelDelete?: () => void;
 }
 
-function EmailCard({ email, onAction, onSelect, isSelected }: EmailCardProps) {
+function EmailCard({ email, onAction, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
+    const isLoading = !!loadingAction;
     
     return (
         <Card 
@@ -337,34 +416,81 @@ function EmailCard({ email, onAction, onSelect, isSelected }: EmailCardProps) {
                             </span>
                         )}
                     </div>
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 hover:text-destructive"
-                            onClick={() => onAction(email, 'delete')}
-                            title="Delete"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 hover:text-blue-500"
-                            onClick={() => onAction(email, 'archive')}
-                            title="Archive"
-                        >
-                            <Archive className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 hover:text-primary"
-                            onClick={() => onAction(email, 'flag')}
-                            title="Flag"
-                        >
-                            <Flag className="w-3.5 h-3.5" />
-                        </Button>
+                    <div className="flex gap-1 items-center" onClick={(e) => e.stopPropagation()}>
+                        {isDeletePending ? (
+                            // Delete confirmation UI
+                            <div className="flex items-center gap-1 animate-in fade-in duration-200">
+                                <span className="text-xs text-destructive mr-1">Delete?</span>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => onAction(email, 'delete')}
+                                    disabled={isLoading}
+                                >
+                                    {loadingAction === 'delete' ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                        'Yes'
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={onCancelDelete}
+                                    disabled={isLoading}
+                                >
+                                    No
+                                </Button>
+                            </div>
+                        ) : (
+                            // Normal action buttons
+                            <>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 hover:text-destructive"
+                                    onClick={() => onAction(email, 'delete')}
+                                    disabled={isLoading}
+                                    title="Delete"
+                                >
+                                    {loadingAction === 'delete' ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 hover:text-blue-500"
+                                    onClick={() => onAction(email, 'archive')}
+                                    disabled={isLoading}
+                                    title="Archive"
+                                >
+                                    {loadingAction === 'archive' ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <Archive className="w-3.5 h-3.5" />
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 hover:text-primary"
+                                    onClick={() => onAction(email, 'flag')}
+                                    disabled={isLoading}
+                                    title="Flag"
+                                >
+                                    {loadingAction === 'flag' ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <Flag className="w-3.5 h-3.5" />
+                                    )}
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

@@ -21,7 +21,13 @@ export function getSupabaseConfig(): SupabaseConfig | null {
     const url = import.meta.env.VITE_SUPABASE_URL;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    if (url && anonKey) {
+    if (
+        url && 
+        anonKey && 
+        url !== 'your_supabase_url' && 
+        anonKey !== 'your_supabase_anon_key' &&
+        url.startsWith('http')
+    ) {
         return { url, anonKey };
     }
 

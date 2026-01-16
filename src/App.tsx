@@ -1,16 +1,26 @@
 import { useEffect, useState } from 'react';
-import { Mail, LayoutDashboard, Settings, BarChart3 } from 'lucide-react';
+import { Mail, LayoutDashboard, Settings, BarChart3, LogOut } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/mode-toggle';
 import { Button } from './components/ui/button';
 import { AppProvider, useApp } from './context/AppContext';
+import { MigrationProvider } from './context/MigrationContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { ToastContainer } from './components/Toast';
+import { ToastContainer, toast } from './components/Toast';
 import { PageLoader } from './components/LoadingSpinner';
 import { SetupWizard } from './components/SetupWizard';
 import { Dashboard } from './components/Dashboard';
 import { Configuration } from "./components/Configuration";
+import { Login } from './components/Login';
 import { getSupabaseConfig } from './lib/supabase-config';
+import { supabase } from './lib/supabase';
+import {
+    checkMigrationStatus,
+    type MigrationStatus,
+    isMigrationReminderDismissed
+} from './lib/migration-check';
+import { MigrationBanner } from './components/migration/MigrationBanner';
+import { MigrationModal } from './components/migration/MigrationModal';
 
 type TabType = 'dashboard' | 'config' | 'analytics';
 
@@ -20,21 +30,50 @@ function AppContent() {
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
     const [checkingConfig, setCheckingConfig] = useState(true);
 
+    // Migration state
+    const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
+    const [showMigrationBanner, setShowMigrationBanner] = useState(false);
+    const [showMigrationModal, setShowMigrationModal] = useState(false);
+    const [suppressMigrationBanner, setSuppressMigrationBanner] = useState(false);
+
+    // Initial Config Check
     useEffect(() => {
         const config = getSupabaseConfig();
         if (!config) {
             setNeedsSetup(true);
-        } else {
-            // Load initial data
+        } else if (state.isInitialized && state.isAuthenticated) {
+            // Load initial data only after initialization and auth
             actions.fetchAccounts();
             actions.fetchRules();
             actions.fetchSettings();
+
+            // Check migration status
+            checkMigrationStatus(supabase).then((status) => {
+                setMigrationStatus(status);
+                if (status.needsMigration && !isMigrationReminderDismissed()) {
+                    setShowMigrationBanner(true);
+                }
+            });
         }
         setCheckingConfig(false);
-    }, []);
+    }, [state.isInitialized, state.isAuthenticated]);
 
-    if (checkingConfig || state.isLoading) {
-        return <PageLoader text="Initializing..." />;
+    const handleOpenMigrationModal = () => {
+        setShowMigrationModal(true);
+        setShowMigrationBanner(false);
+    };
+
+    const migrationContextValue = {
+        migrationStatus,
+        showMigrationBanner,
+        showMigrationModal,
+        openMigrationModal: handleOpenMigrationModal,
+        suppressMigrationBanner,
+        setSuppressMigrationBanner,
+    };
+
+    if (checkingConfig) {
+        return <PageLoader text="Checking configuration..." />;
     }
 
     if (needsSetup) {
@@ -46,77 +85,119 @@ function AppContent() {
         );
     }
 
+    if (!state.isInitialized) {
+        return <PageLoader text="Initializing..." />;
+    }
+
+    // Show login if not authenticated
+    if (!state.isAuthenticated) {
+        return <Login />;
+    }
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        toast.success('Logged out successfully');
+    };
+
     return (
-        <div className="min-h-screen bg-background font-sans text-foreground transition-colors duration-300">
-            {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-8">
-                    <div className="flex items-center gap-4">
-                        <h1 className="text-xl font-bold flex items-center gap-2">
-                            <Mail className="w-5 h-5 text-primary" />
-                            <span className="hidden sm:inline">RealTimeX Email Automator</span>
-                            <span className="sm:hidden">Email AI</span>
-                        </h1>
-                    </div>
-                    
-                    <div className="flex gap-4 items-center">
-                        <nav className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
-                            <Button
-                                variant={activeTab === 'dashboard' ? 'secondary' : 'ghost'}
-                                size="sm"
-                                onClick={() => setActiveTab('dashboard')}
-                                className="gap-2"
-                            >
-                                <LayoutDashboard className="w-4 h-4" />
-                                <span className="hidden sm:inline">Dashboard</span>
-                            </Button>
-                            <Button
-                                variant={activeTab === 'analytics' ? 'secondary' : 'ghost'}
-                                size="sm"
-                                onClick={() => setActiveTab('analytics')}
-                                className="gap-2"
-                            >
-                                <BarChart3 className="w-4 h-4" />
-                                <span className="hidden sm:inline">Analytics</span>
-                            </Button>
-                            <Button
-                                variant={activeTab === 'config' ? 'secondary' : 'ghost'}
-                                size="sm"
-                                onClick={() => setActiveTab('config')}
-                                className="gap-2"
-                            >
-                                <Settings className="w-4 h-4" />
-                                <span className="hidden sm:inline">Configuration</span>
-                            </Button>
-                        </nav>
-                        <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block" />
-                        <ModeToggle />
-                    </div>
-                </div>
-            </header>
+        <MigrationProvider value={migrationContextValue}>
+            <div className="min-h-screen bg-background font-sans text-foreground transition-colors duration-300">
+                {/* Header */}
+                <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                    <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-8">
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-xl font-bold flex items-center gap-2">
+                                <Mail className="w-5 h-5 text-primary" />
+                                <span className="hidden sm:inline">RealTimeX Email Automator</span>
+                                <span className="sm:hidden">Email AI</span>
+                            </h1>
+                        </div>
 
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto p-4 sm:p-8 mt-4">
-                {activeTab === 'dashboard' && <Dashboard />}
-                {activeTab === 'config' && <Configuration />}
-                {activeTab === 'analytics' && <AnalyticsPage />}
-            </main>
-
-            {/* Error Display */}
-            {state.error && (
-                <div className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-50">
-                    <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg">
-                        <p className="text-sm">{state.error}</p>
+                        <div className="flex gap-4 items-center">
+                            <nav className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
+                                <Button
+                                    variant={activeTab === 'dashboard' ? 'secondary' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setActiveTab('dashboard')}
+                                    className="gap-2"
+                                >
+                                    <LayoutDashboard className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Dashboard</span>
+                                </Button>
+                                <Button
+                                    variant={activeTab === 'analytics' ? 'secondary' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setActiveTab('analytics')}
+                                    className="gap-2"
+                                >
+                                    <BarChart3 className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Analytics</span>
+                                </Button>
+                                <Button
+                                    variant={activeTab === 'config' ? 'secondary' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setActiveTab('config')}
+                                    className="gap-2"
+                                >
+                                    <Settings className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Configuration</span>
+                                </Button>
+                            </nav>
+                            <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block" />
+                            <ModeToggle />
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleLogout}
+                                className="text-muted-foreground hover:text-foreground"
+                                title="Sign out"
+                            >
+                                <LogOut className="w-4 h-4" />
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                </header>
+
+                {/* Main Content */}
+                <main className="max-w-7xl mx-auto p-4 sm:p-8 mt-4">
+                    {activeTab === 'dashboard' && <Dashboard />}
+                    {activeTab === 'config' && <Configuration />}
+                    {activeTab === 'analytics' && <AnalyticsPage />}
+                </main>
+
+                {/* Error Display */}
+                {state.error && (
+                    <div className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-50">
+                        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg">
+                            <p className="text-sm">{state.error}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Migration UI */}
+                {migrationStatus && showMigrationBanner && !suppressMigrationBanner && (
+                    <MigrationBanner
+                        status={migrationStatus}
+                        onDismiss={() => setShowMigrationBanner(false)}
+                        onLearnMore={handleOpenMigrationModal}
+                    />
+                )}
+
+                {migrationStatus && (
+                    <MigrationModal
+                        open={showMigrationModal}
+                        onOpenChange={setShowMigrationModal}
+                        status={migrationStatus}
+                    />
+                )}
+            </div>
+        </MigrationProvider>
     );
 }
 
 function AnalyticsPage() {
     const { state, actions } = useApp();
-    
+
     useEffect(() => {
         actions.fetchStats();
     }, []);
@@ -136,24 +217,24 @@ function AnalyticsPage() {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard 
-                    title="Total Emails" 
-                    value={stats.totalEmails} 
+                <StatCard
+                    title="Total Emails"
+                    value={stats.totalEmails}
                     color="primary"
                 />
-                <StatCard 
-                    title="Spam Caught" 
-                    value={stats.categoryCounts['spam'] || 0} 
+                <StatCard
+                    title="Spam Caught"
+                    value={stats.categoryCounts['spam'] || 0}
                     color="destructive"
                 />
-                <StatCard 
-                    title="Actions Taken" 
-                    value={Object.values(stats.actionCounts).reduce((a, b) => a + b, 0) - (stats.actionCounts['none'] || 0)} 
+                <StatCard
+                    title="Actions Taken"
+                    value={Object.values(stats.actionCounts).reduce((a, b) => a + b, 0) - (stats.actionCounts['none'] || 0)}
                     color="emerald"
                 />
-                <StatCard 
-                    title="Accounts" 
-                    value={stats.accountCount} 
+                <StatCard
+                    title="Accounts"
+                    value={stats.accountCount}
                     color="blue"
                 />
             </div>
@@ -171,7 +252,7 @@ function AnalyticsPage() {
                                         <span className="text-muted-foreground">{count}</span>
                                     </div>
                                     <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                                        <div 
+                                        <div
                                             className="h-full bg-primary rounded-full transition-all"
                                             style={{ width: `${(count / stats.totalEmails) * 100}%` }}
                                         />
@@ -205,10 +286,9 @@ function AnalyticsPage() {
                         {stats.recentSyncs.map((log) => (
                             <div key={log.id} className="flex items-center justify-between py-2 border-b last:border-0">
                                 <div className="flex items-center gap-3">
-                                    <span className={`w-2 h-2 rounded-full ${
-                                        log.status === 'success' ? 'bg-emerald-500' :
-                                        log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500'
-                                    }`} />
+                                    <span className={`w-2 h-2 rounded-full ${log.status === 'success' ? 'bg-emerald-500' :
+                                            log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500'
+                                        }`} />
                                     <span className="text-sm">
                                         {new Date(log.started_at).toLocaleString()}
                                     </span>

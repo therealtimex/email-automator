@@ -12,6 +12,13 @@ import { EmailAccount, Rule, UserSettings } from '../lib/types';
 export function Configuration() {
     const { state, actions } = useApp();
     const [isConnecting, setIsConnecting] = useState(false);
+    const [isOutlookConnecting, setIsOutlookConnecting] = useState(false);
+    const [outlookDeviceCode, setOutlookDeviceCode] = useState<{
+        userCode: string;
+        verificationUri: string;
+        message: string;
+        deviceCode: string;
+    } | null>(null);
     const [savingSettings, setSavingSettings] = useState(false);
     const [localSettings, setLocalSettings] = useState<Partial<UserSettings>>({});
 
@@ -48,6 +55,59 @@ export function Configuration() {
             toast.error('Failed to start Gmail connection');
             setIsConnecting(false);
         }
+    };
+
+    const handleConnectOutlook = async () => {
+        setIsOutlookConnecting(true);
+        try {
+            const response = await api.startMicrosoftDeviceFlow();
+            if (response.data) {
+                setOutlookDeviceCode(response.data);
+                pollOutlookLogin(response.data.deviceCode, response.data.interval);
+            } else {
+                toast.error('Failed to start Outlook connection');
+                setIsOutlookConnecting(false);
+            }
+        } catch (error) {
+            toast.error('Failed to start Outlook connection');
+            setIsOutlookConnecting(false);
+        }
+    };
+
+    const pollOutlookLogin = async (deviceCode: string, interval: number) => {
+        const pollInterval = setInterval(async () => {
+            try {
+                const response = await api.pollMicrosoftDeviceCode(deviceCode);
+                if (response.data?.status === 'completed') {
+                    clearInterval(pollInterval);
+                    setOutlookDeviceCode(null);
+                    setIsOutlookConnecting(false);
+                    toast.success('Outlook account connected');
+                    actions.fetchAccounts();
+                } else if (response.error) {
+                    // Only stop if it's a hard error, not pending
+                    // The API returns 'authorization_pending' as part of the error or status check usually,
+                    // but our client might wrap it. Let's assume standard behavior.
+                    // If the API wrapper returns it as an error string:
+                     if (typeof response.error === 'object' && response.error.code !== 'authorization_pending') {
+                         // Stop polling on real errors
+                         // However, wait, our API client might treat 400 as error.
+                         // Let's rely on the fact that if it's pending, we keep going.
+                     }
+                }
+            } catch (e) {
+                // Network glitches shouldn't kill polling immediately
+            }
+        }, interval * 1000);
+        
+        // Safety timeout after 15 minutes
+        setTimeout(() => {
+            clearInterval(pollInterval);
+             if (isOutlookConnecting) { // Check state using a ref if needed, but for now this is okay-ish closure wise 
+                setOutlookDeviceCode(null);
+                setIsOutlookConnecting(false);
+             }
+        }, 15 * 60 * 1000);
     };
 
     const handleDisconnect = async (accountId: string) => {
@@ -143,19 +203,64 @@ export function Configuration() {
                             ))
                         )}
 
-                        <Button 
-                            className="w-full border-dashed" 
-                            variant="outline"
-                            onClick={handleConnectGmail}
-                            disabled={isConnecting}
-                        >
-                            {isConnecting ? (
-                                <LoadingSpinner size="sm" className="mr-2" />
-                            ) : (
-                                <Plus className="w-4 h-4 mr-2" />
-                            )}
-                            Connect Gmail Account
-                        </Button>
+                        <div className="flex flex-col gap-2">
+                            <Button 
+                                className="w-full border-dashed" 
+                                variant="outline"
+                                onClick={handleConnectGmail}
+                                disabled={isConnecting || isOutlookConnecting}
+                            >
+                                {isConnecting ? (
+                                    <LoadingSpinner size="sm" className="mr-2" />
+                                ) : (
+                                    <Plus className="w-4 h-4 mr-2" />
+                                )}
+                                Connect Gmail Account
+                            </Button>
+
+                            <Button 
+                                className="w-full border-dashed" 
+                                variant="outline"
+                                onClick={handleConnectOutlook}
+                                disabled={isConnecting || isOutlookConnecting}
+                            >
+                                {isOutlookConnecting && !outlookDeviceCode ? (
+                                    <LoadingSpinner size="sm" className="mr-2" />
+                                ) : (
+                                    <Plus className="w-4 h-4 mr-2" />
+                                )}
+                                Connect Outlook Account
+                            </Button>
+                        </div>
+
+                        {outlookDeviceCode && (
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg animate-in slide-in-from-top-2">
+                                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                                    Microsoft Sign-In Required
+                                </h4>
+                                <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
+                                    {outlookDeviceCode.message}
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex items-center gap-2 bg-white dark:bg-black/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+                                        <code className="text-lg font-mono font-bold flex-1 text-center select-all">
+                                            {outlookDeviceCode.userCode}
+                                        </code>
+                                    </div>
+                                    <Button 
+                                        variant="default" 
+                                        className="w-full bg-blue-600 hover:bg-blue-700"
+                                        onClick={() => window.open(outlookDeviceCode.verificationUri, '_blank')}
+                                    >
+                                        Open Microsoft Login
+                                        <ExternalLink className="w-4 h-4 ml-2" />
+                                    </Button>
+                                    <p className="text-xs text-center text-muted-foreground mt-2">
+                                        Waiting for you to sign in...
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

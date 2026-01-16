@@ -9,7 +9,7 @@ function createSupabaseClient(): SupabaseClient {
     if (!config || !config.url?.startsWith('http')) {
         // Return a placeholder client that will never be used
         // (App.tsx will show setup wizard before this is accessed)
-        console.warn('[Supabase] No configuration found or invalid URL, using placeholder');
+        console.info('[Supabase] Setup required: Waiting for configuration...');
         return createClient('https://placeholder.supabase.co', 'placeholder-key');
     }
 
