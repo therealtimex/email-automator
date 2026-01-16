@@ -2,7 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { handleCors, createErrorResponse, createSuccessResponse } from '../_shared/cors.ts';
 import { verifyUser } from '../_shared/auth.ts';
-import { encrypt } from '../_shared/encryption.ts';
+// Tokens are stored without encryption, protected by Supabase RLS
 import { getProviderCredentials } from '../_shared/auth-helper.ts';
 
 /**
@@ -135,11 +135,9 @@ async function pollDeviceCode(req: Request): Promise<Response> {
       return createErrorResponse(400, 'Could not determine user email address');
     }
 
-    // Encrypt tokens
-    const encryptedAccessToken = await encrypt(data.access_token);
-    const encryptedRefreshToken = data.refresh_token
-      ? await encrypt(data.refresh_token)
-      : null;
+    // Store tokens directly (protected by Supabase RLS)
+    const accessToken = data.access_token;
+    const refreshToken = data.refresh_token || null;
 
     // Calculate token expiry
     const tokenExpiresAt = data.expires_in
@@ -156,8 +154,8 @@ async function pollDeviceCode(req: Request): Promise<Response> {
           user_id: user.id,
           email_address: emailAddress,
           provider: 'microsoft',
-          access_token: encryptedAccessToken,
-          refresh_token: encryptedRefreshToken,
+          access_token: accessToken,
+          refresh_token: refreshToken,
           token_expires_at: tokenExpiresAt,
           scopes: SCOPES,
           is_active: true,

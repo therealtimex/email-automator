@@ -2,7 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { handleCors, createErrorResponse, createSuccessResponse } from '../_shared/cors.ts';
 import { verifyUser } from '../_shared/auth.ts';
-import { encrypt } from '../_shared/encryption.ts';
+// Tokens are stored without encryption, protected by Supabase RLS
 
 const GMAIL_CLIENT_ID = Deno.env.get('GMAIL_CLIENT_ID');
 const GMAIL_CLIENT_SECRET = Deno.env.get('GMAIL_CLIENT_SECRET');
@@ -62,10 +62,22 @@ async function handleCallback(req: Request): Promise<Response> {
   const { clientId, clientSecret, redirectUri } = await getProviderCredentials(user.id, 'google');
 
   // Parse request body
-  const { code } = await req.json();
+  const body = await req.json();
+  let code = body.code;
   if (!code) {
     return createErrorResponse(400, 'Missing authorization code');
   }
+  
+  // Clean the code - remove whitespace and decode if URL-encoded
+  code = code.trim();
+  if (code.includes('%')) {
+    try {
+      code = decodeURIComponent(code);
+    } catch {
+      // Already decoded
+    }
+  }
+  console.log('Auth code length:', code.length, 'starts with:', code.substring(0, 10));
 
   try {
     // Exchange code for tokens
@@ -107,11 +119,9 @@ async function handleCallback(req: Request): Promise<Response> {
     const profile = await profileResponse.json();
     const emailAddress = profile.emailAddress;
 
-    // Encrypt tokens
-    const encryptedAccessToken = await encrypt(tokens.access_token);
-    const encryptedRefreshToken = tokens.refresh_token
-      ? await encrypt(tokens.refresh_token)
-      : null;
+    // Store tokens directly (protected by Supabase RLS)
+    const accessToken = tokens.access_token;
+    const refreshToken = tokens.refresh_token || null;
 
     // Calculate token expiry
     const tokenExpiresAt = tokens.expires_in
@@ -126,8 +136,8 @@ async function handleCallback(req: Request): Promise<Response> {
           user_id: user.id,
           email_address: emailAddress,
           provider: 'gmail',
-          access_token: encryptedAccessToken,
-          refresh_token: encryptedRefreshToken,
+          access_token: accessToken,
+          refresh_token: refreshToken,
           token_expires_at: tokenExpiresAt,
           scopes: tokens.scope?.split(' ') || SCOPES,
           is_active: true,

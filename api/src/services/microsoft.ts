@@ -2,7 +2,7 @@ import * as msal from '@azure/msal-node';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { config } from '../config/index.js';
 import { createLogger } from '../utils/logger.js';
-import { encryptToken, decryptToken } from '../utils/crypto.js';
+// Tokens are stored without encryption, protected by Supabase RLS
 import { EmailAccount } from './supabase.js';
 
 const logger = createLogger('MicrosoftService');
@@ -108,7 +108,7 @@ export class MicrosoftService {
                 user_id: userId,
                 email_address: emailAddress,
                 provider: 'outlook',
-                access_token: encryptToken(authResult.accessToken),
+                access_token: authResult.accessToken,
                 refresh_token: null, // MSAL handles token cache internally
                 token_expires_at: authResult.expiresOn?.toISOString() || null,
                 scopes: authResult.scopes,
@@ -152,7 +152,7 @@ export class MicrosoftService {
         account: EmailAccount,
         options: { top?: number; skip?: number; filter?: string } = {}
     ): Promise<{ messages: OutlookMessage[]; hasMore: boolean }> {
-        const accessToken = decryptToken(account.access_token || '');
+        const accessToken = account.access_token || '';
         const { top = 20, skip = 0, filter } = options;
 
         let url = `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime desc`;
@@ -195,7 +195,7 @@ export class MicrosoftService {
     }
 
     async trashMessage(account: EmailAccount, messageId: string): Promise<void> {
-        const accessToken = decryptToken(account.access_token || '');
+        const accessToken = account.access_token || '';
 
         const response = await fetch(
             `https://graph.microsoft.com/v1.0/me/messages/${messageId}/move`,
@@ -216,7 +216,7 @@ export class MicrosoftService {
     }
 
     async archiveMessage(account: EmailAccount, messageId: string): Promise<void> {
-        const accessToken = decryptToken(account.access_token || '');
+        const accessToken = account.access_token || '';
 
         const response = await fetch(
             `https://graph.microsoft.com/v1.0/me/messages/${messageId}/move`,
@@ -237,7 +237,7 @@ export class MicrosoftService {
     }
 
     async markAsRead(account: EmailAccount, messageId: string): Promise<void> {
-        const accessToken = decryptToken(account.access_token || '');
+        const accessToken = account.access_token || '';
 
         await fetch(
             `https://graph.microsoft.com/v1.0/me/messages/${messageId}`,
@@ -254,7 +254,7 @@ export class MicrosoftService {
     }
 
     async flagMessage(account: EmailAccount, messageId: string): Promise<void> {
-        const accessToken = decryptToken(account.access_token || '');
+        const accessToken = account.access_token || '';
 
         await fetch(
             `https://graph.microsoft.com/v1.0/me/messages/${messageId}`,
@@ -275,7 +275,7 @@ export class MicrosoftService {
         originalMessageId: string,
         replyContent: string
     ): Promise<string> {
-        const accessToken = decryptToken(account.access_token || '');
+        const accessToken = account.access_token || '';
 
         // Get original message
         const originalResponse = await fetch(
@@ -329,7 +329,7 @@ export class MicrosoftService {
     }
 
     async getProfile(account: EmailAccount): Promise<{ emailAddress: string; displayName: string }> {
-        const accessToken = decryptToken(account.access_token || '');
+        const accessToken = account.access_token || '';
 
         const response = await fetch('https://graph.microsoft.com/v1.0/me', {
             headers: {

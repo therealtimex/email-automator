@@ -89,7 +89,9 @@ export function Dashboard() {
         const success = await actions.triggerSync();
         setIsSyncing(false);
         if (success) {
-            toast.success('Sync started! Emails will appear shortly.');
+            toast.success('Sync completed! Check your emails.');
+        } else {
+            toast.error('Sync failed. Check account status for details.');
         }
     };
 

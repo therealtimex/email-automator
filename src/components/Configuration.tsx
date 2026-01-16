@@ -90,7 +90,8 @@ export function Configuration() {
                 }, 1000);
             } else if (response.error) {
                 const errMsg = typeof response.error === 'string' ? response.error : response.error.message;
-                toast.error(errMsg || 'Failed to start connection');
+                console.error('[Configuration] Gmail auth error:', response.error);
+                toast.error(errMsg || 'Failed to start connection. Please ensure you are logged in.');
                 setIsConnecting(false);
             }
         } catch (error) {

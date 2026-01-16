@@ -2,7 +2,7 @@ import { google, gmail_v1, Auth } from 'googleapis';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { config } from '../config/index.js';
 import { createLogger } from '../utils/logger.js';
-import { encryptToken, decryptToken } from '../utils/crypto.js';
+// Tokens are stored without encryption, protected by Supabase RLS
 import { EmailAccount } from './supabase.js';
 
 const logger = createLogger('GmailService');
@@ -18,13 +18,45 @@ export interface GmailMessage {
     snippet: string;
 }
 
+export interface OAuthCredentials {
+    clientId: string;
+    clientSecret: string;
+    redirectUri?: string;
+}
+
 export class GmailService {
-    private createOAuth2Client(): Auth.OAuth2Client {
+    private createOAuth2Client(credentials?: OAuthCredentials): Auth.OAuth2Client {
         return new google.auth.OAuth2(
-            config.gmail.clientId,
-            config.gmail.clientSecret,
-            config.gmail.redirectUri
+            credentials?.clientId || config.gmail.clientId,
+            credentials?.clientSecret || config.gmail.clientSecret,
+            credentials?.redirectUri || config.gmail.redirectUri
         );
+    }
+
+    async getProviderCredentials(supabase: SupabaseClient, userId: string): Promise<OAuthCredentials> {
+        const { data: settings } = await supabase
+            .from('user_settings')
+            .select('google_client_id, google_client_secret')
+            .eq('user_id', userId)
+            .single();
+
+        if (settings?.google_client_id && settings?.google_client_secret) {
+            return {
+                clientId: settings.google_client_id,
+                clientSecret: settings.google_client_secret,
+                redirectUri: config.gmail.redirectUri
+            };
+        }
+
+        if (config.gmail.clientId && config.gmail.clientSecret) {
+            return {
+                clientId: config.gmail.clientId,
+                clientSecret: config.gmail.clientSecret,
+                redirectUri: config.gmail.redirectUri
+            };
+        }
+
+        throw new Error('Gmail OAuth credentials not configured (Database or Env)');
     }
 
     getAuthUrl(scopes: string[] = ['https://www.googleapis.com/auth/gmail.modify']): string {
@@ -64,8 +96,8 @@ export class GmailService {
                 user_id: userId,
                 email_address: emailAddress,
                 provider: 'gmail',
-                access_token: encryptToken(tokens.access_token),
-                refresh_token: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
+                access_token: tokens.access_token,
+                refresh_token: tokens.refresh_token || null,
                 token_expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
                 scopes: tokens.scope?.split(' ') || [],
                 is_active: true,
@@ -79,8 +111,8 @@ export class GmailService {
     }
 
     private async getAuthenticatedClient(account: EmailAccount): Promise<gmail_v1.Gmail> {
-        const accessToken = decryptToken(account.access_token || '');
-        const refreshToken = decryptToken(account.refresh_token || '');
+        const accessToken = account.access_token || '';
+        const refreshToken = account.refresh_token || '';
         const client = this.createOAuth2Client();
 
         client.setCredentials({
@@ -108,21 +140,22 @@ export class GmailService {
 
         logger.info('Refreshing Gmail token', { accountId: account.id });
 
-        const refreshToken = decryptToken(account.refresh_token || '');
+        const refreshToken = account.refresh_token;
         if (!refreshToken) {
             throw new Error('No refresh token available');
         }
 
-        const client = this.createOAuth2Client();
+        const credentials = await this.getProviderCredentials(supabase, account.user_id);
+        const client = this.createOAuth2Client(credentials);
         client.setCredentials({ refresh_token: refreshToken });
-        const { credentials } = await client.refreshAccessToken();
+        const { credentials: newTokens } = await client.refreshAccessToken();
 
         const { data, error } = await supabase
             .from('email_accounts')
             .update({
-                access_token: encryptToken(credentials.access_token!),
-                token_expires_at: credentials.expiry_date
-                    ? new Date(credentials.expiry_date).toISOString()
+                access_token: newTokens.access_token!,
+                token_expires_at: newTokens.expiry_date
+                    ? new Date(newTokens.expiry_date).toISOString()
                     : null,
                 updated_at: new Date().toISOString(),
             })

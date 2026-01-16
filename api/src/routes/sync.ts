@@ -36,22 +36,25 @@ router.post('/',
             return res.status(404).json({ error: 'Account not found' });
         }
 
-        // Start sync in background
+        // Run sync and wait for result
         const processor = new EmailProcessorService(req.supabase!);
 
-        // Don't await - run in background
-        processor.syncAccount(accountId, userId)
-            .then(result => {
-                logger.info('Background sync completed', { accountId, ...result });
-            })
-            .catch(err => {
-                logger.error('Background sync failed', err, { accountId });
+        try {
+            const result = await processor.syncAccount(accountId, userId);
+            logger.info('Sync completed', { accountId, ...result });
+            res.json({
+                message: 'Sync completed',
+                accountId,
+                ...result,
             });
-
-        res.json({
-            message: 'Sync started',
-            accountId,
-        });
+        } catch (err) {
+            logger.error('Sync failed', err, { accountId });
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            res.status(500).json({
+                error: errorMessage,
+                accountId,
+            });
+        }
     })
 );
 
@@ -82,20 +85,41 @@ router.post('/all',
 
         const processor = new EmailProcessorService(req.supabase!);
 
-        // Start syncs in background
-        for (const account of accounts) {
-            processor.syncAccount(account.id, userId)
-                .then(result => {
-                    logger.info('Background sync completed', { accountId: account.id, ...result });
-                })
-                .catch(err => {
-                    logger.error('Background sync failed', err, { accountId: account.id });
-                });
+        // Sync all accounts and collect results
+        const results = await Promise.allSettled(
+            accounts.map(account => processor.syncAccount(account.id, userId))
+        );
+
+        const summary = {
+            total: accounts.length,
+            success: 0,
+            failed: 0,
+            errors: [] as { accountId: string; error: string }[],
+        };
+
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                summary.success++;
+                logger.info('Sync completed', { accountId: accounts[index].id, ...result.value });
+            } else {
+                summary.failed++;
+                const errorMessage = result.reason instanceof Error ? result.reason.message : 'Unknown error';
+                summary.errors.push({ accountId: accounts[index].id, error: errorMessage });
+                logger.error('Sync failed', result.reason, { accountId: accounts[index].id });
+            }
+        });
+
+        // Return error status if all syncs failed
+        if (summary.failed === summary.total) {
+            return res.status(500).json({
+                message: 'All syncs failed',
+                ...summary,
+            });
         }
 
         res.json({
-            message: 'Sync started for all accounts',
-            accountCount: accounts.length,
+            message: summary.failed > 0 ? 'Sync completed with errors' : 'Sync completed',
+            ...summary,
         });
     })
 );

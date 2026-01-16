@@ -297,6 +297,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const response = accountId
                 ? await api.triggerSync(accountId)
                 : await api.syncAll();
+            
+            // Always refresh accounts to show updated sync status
+            await actions.fetchAccounts();
+            
             if (response.error) {
                 dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Sync failed') });
                 return false;
