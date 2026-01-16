@@ -6,37 +6,63 @@ const logger = createLogger('SupabaseService');
 
 let serverClient: SupabaseClient | null = null;
 
+export function isValidUrl(url: string): boolean {
+    try {
+        return url.startsWith('http://') || url.startsWith('https://');
+    } catch {
+        return false;
+    }
+}
+
 export function getServerSupabase(): SupabaseClient | null {
     if (serverClient) return serverClient;
 
-    if (!config.supabase.url || !config.supabase.anonKey) {
-        logger.warn('Supabase not configured - URL or ANON_KEY missing');
+    const url = config.supabase.url;
+    const key = config.supabase.anonKey;
+
+    if (!url || !key || !isValidUrl(url)) {
+        logger.warn('Supabase not configured or invalid URL - skipping client initialization', {
+            url: url || 'missing'
+        });
         return null;
     }
 
-    serverClient = createClient(config.supabase.url, config.supabase.anonKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-        },
-    });
+    try {
+        serverClient = createClient(url, key, {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false,
+            },
+        });
 
-    logger.info('Server Supabase client initialized');
-    return serverClient;
+        logger.info('Server Supabase client initialized');
+        return serverClient;
+    } catch (error) {
+        logger.error('Failed to initialize Supabase client', error);
+        return null;
+    }
 }
 
 export function getServiceRoleSupabase(): SupabaseClient | null {
-    if (!config.supabase.url || !config.supabase.serviceRoleKey) {
-        logger.warn('Service role Supabase not configured');
+    const url = config.supabase.url;
+    const key = config.supabase.serviceRoleKey;
+
+    if (!url || !key || !isValidUrl(url)) {
+        logger.warn('Service role Supabase not configured or invalid URL');
         return null;
     }
 
-    return createClient(config.supabase.url, config.supabase.serviceRoleKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-        },
-    });
+    try {
+        return createClient(url, key, {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false,
+            },
+        });
+    } catch (error) {
+        logger.error('Failed to initialize Service Role Supabase client', error);
+        return null;
+    }
 }
 
 // Database types (expand as needed)

@@ -6,6 +6,8 @@ import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('AuthMiddleware');
 
+import { getServerSupabase, isValidUrl } from '../services/supabase.js';
+
 // Extend Express Request to include user
 declare global {
     namespace Express {
@@ -16,19 +18,51 @@ declare global {
     }
 }
 
+// Check if anon key looks valid (JWT or publishable key format)
+function isValidAnonKey(key: string): boolean {
+    if (!key) return false;
+    // JWT anon keys start with eyJ, publishable keys start with sb_publishable_
+    return key.startsWith('eyJ') || key.startsWith('sb_publishable_');
+}
+
+// Helper to get Supabase config from request headers (frontend passes these)
+function getSupabaseConfigFromRequest(req: Request): { url: string; anonKey: string } | null {
+    const url = req.headers['x-supabase-url'] as string;
+    const anonKey = req.headers['x-supabase-anon-key'] as string;
+
+    if (url && anonKey && isValidUrl(url) && isValidAnonKey(anonKey)) {
+        return { url, anonKey };
+    }
+    return null;
+}
+
 export async function authMiddleware(
     req: Request,
     _res: Response,
     next: NextFunction
 ): Promise<void> {
     try {
+        // Get Supabase config: prefer env vars, fallback to request headers
+        const headerConfig = getSupabaseConfigFromRequest(req);
+        
+        const envUrl = config.supabase.url;
+        const envKey = config.supabase.anonKey;
+
+        // Basic validation: URL must start with http(s)
+        // This prevents using placeholders like "CHANGE_ME" or empty strings
+        const isEnvUrlValid = envUrl && (envUrl.startsWith('http://') || envUrl.startsWith('https://'));
+        const isEnvKeyValid = !!envKey && envKey.length > 0;
+        
+        const supabaseUrl = isEnvUrlValid ? envUrl : (headerConfig?.url || '');
+        const supabaseAnonKey = isEnvKeyValid ? envKey : (headerConfig?.anonKey || '');
+
         // Development bypass: skip auth if DISABLE_AUTH=true in non-production
         if (config.security.disableAuth && !config.isProduction) {
             logger.warn('Auth disabled for development - creating mock user');
 
             // Create a mock user for development
             req.user = {
-                id: 'dev-user-id',
+                id: '00000000-0000-0000-0000-000000000000',
                 email: 'dev@local.test',
                 user_metadata: {},
                 app_metadata: {},
@@ -36,9 +70,18 @@ export async function authMiddleware(
                 created_at: new Date().toISOString(),
             } as User;
 
-            // Create a regular Supabase client for development
-            if (config.supabase.url && config.supabase.anonKey) {
-                req.supabase = createClient(config.supabase.url, config.supabase.anonKey);
+            // Use the shared Supabase client, or create one from request headers
+            let supabase = getServerSupabase();
+            if (!supabase && supabaseUrl && supabaseAnonKey) {
+                supabase = createClient(supabaseUrl, supabaseAnonKey, {
+                    auth: { autoRefreshToken: false, persistSession: false },
+                });
+            }
+
+            if (supabase) {
+                req.supabase = supabase;
+            } else {
+                throw new AuthenticationError('Supabase not configured. Please set up Supabase in the app or provide SUPABASE_URL/ANON_KEY in .env');
             }
 
             return next();
@@ -52,12 +95,12 @@ export async function authMiddleware(
 
         const token = authHeader.substring(7);
 
-        if (!config.supabase.url || !config.supabase.anonKey) {
-            throw new AuthenticationError('Supabase not configured');
+        if (!supabaseUrl || !supabaseAnonKey) {
+            throw new AuthenticationError('Supabase not configured. Please set up Supabase in the app or provide SUPABASE_URL/ANON_KEY in .env');
         }
 
         // Create a Supabase client with the user's token
-        const supabase = createClient(config.supabase.url, config.supabase.anonKey, {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
             global: {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -79,6 +122,7 @@ export async function authMiddleware(
 
         next();
     } catch (error) {
+        logger.error('Auth middleware error', error);
         next(error);
     }
 }
@@ -89,7 +133,7 @@ export function optionalAuth(
     next: NextFunction
 ): void {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader?.startsWith('Bearer ')) {
         // No auth provided, continue without user
         return next();
@@ -107,7 +151,7 @@ export function requireRole(roles: string[]) {
 
         // Check user metadata for role (customize based on your auth setup)
         const userRole = req.user.user_metadata?.role || 'user';
-        
+
         if (!roles.includes(userRole)) {
             return next(new AuthorizationError(`Requires one of: ${roles.join(', ')}`));
         }

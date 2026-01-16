@@ -127,9 +127,20 @@ class HybridApiClient {
         });
     }
 
-    // Express API requests
+    // Express API requests - include Supabase config for backend to use
     private expressRequest<T>(endpoint: string, options?: ApiOptions) {
-        return this.request<T>(this.expressApiUrl, endpoint, options);
+        const config = getApiConfig();
+        const headers = {
+            ...(options?.headers || {}),
+            // Pass Supabase config so backend can connect dynamically
+            'X-Supabase-Url': config.edgeFunctionsUrl.replace('/functions/v1', ''),
+            'X-Supabase-Anon-Key': config.anonKey,
+        };
+
+        return this.request<T>(this.expressApiUrl, endpoint, {
+            ...options,
+            headers,
+        });
     }
 
     // ============================================================================

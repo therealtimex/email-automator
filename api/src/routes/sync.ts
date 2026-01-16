@@ -18,6 +18,12 @@ router.post('/',
         const { accountId } = req.body;
         const userId = req.user!.id;
 
+        if (!req.supabase) {
+            return res.status(503).json({
+                error: 'Supabase service is not configured. Please set your SUPABASE_URL and SUPABASE_ANON_KEY in the .env file and restart the server.'
+            });
+        }
+
         // Verify account ownership
         const { data: account, error } = await req.supabase!
             .from('email_accounts')
@@ -32,7 +38,7 @@ router.post('/',
 
         // Start sync in background
         const processor = new EmailProcessorService(req.supabase!);
-        
+
         // Don't await - run in background
         processor.syncAccount(accountId, userId)
             .then(result => {
@@ -42,7 +48,7 @@ router.post('/',
                 logger.error('Background sync failed', err, { accountId });
             });
 
-        res.json({ 
+        res.json({
             message: 'Sync started',
             accountId,
         });
@@ -55,6 +61,12 @@ router.post('/all',
     authMiddleware,
     asyncHandler(async (req, res) => {
         const userId = req.user!.id;
+
+        if (!req.supabase) {
+            return res.status(503).json({
+                error: 'Supabase service is not configured. Please set your SUPABASE_URL and SUPABASE_ANON_KEY in the .env file and restart the server.'
+            });
+        }
 
         const { data: accounts, error } = await req.supabase!
             .from('email_accounts')
@@ -93,6 +105,12 @@ router.get('/logs',
     authMiddleware,
     asyncHandler(async (req, res) => {
         const { limit = '10' } = req.query;
+
+        if (!req.supabase) {
+            return res.status(503).json({
+                error: 'Supabase service is not configured. Please set your SUPABASE_URL and SUPABASE_ANON_KEY in the .env file and restart the server.'
+            });
+        }
 
         const { data, error } = await req.supabase!
             .from('processing_logs')
