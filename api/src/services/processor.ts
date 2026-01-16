@@ -56,6 +56,15 @@ export class EmailProcessorService {
                 refreshedAccount = await this.gmailService.refreshTokenIfNeeded(this.supabase, account);
             }
 
+            // Update status to syncing
+            await this.supabase
+                .from('email_accounts')
+                .update({
+                    last_sync_status: 'syncing',
+                    last_sync_at: new Date().toISOString()
+                })
+                .eq('id', accountId);
+
             // Fetch user's rules
             const { data: rules } = await this.supabase
                 .from('rules')
@@ -77,7 +86,7 @@ export class EmailProcessorService {
                 await this.processOutlookAccount(refreshedAccount, rules || [], settings, result);
             }
 
-            // Update log on success
+            // Update log and account on success
             if (log) {
                 await this.supabase
                     .from('processing_logs')
@@ -90,6 +99,14 @@ export class EmailProcessorService {
                     })
                     .eq('id', log.id);
             }
+
+            await this.supabase
+                .from('email_accounts')
+                .update({
+                    last_sync_status: 'success',
+                    last_sync_error: null
+                })
+                .eq('id', accountId);
 
             logger.info('Sync completed', { accountId, ...result });
         } catch (error) {
@@ -106,6 +123,14 @@ export class EmailProcessorService {
                     .eq('id', log.id);
             }
 
+            await this.supabase
+                .from('email_accounts')
+                .update({
+                    last_sync_status: 'error',
+                    last_sync_error: error instanceof Error ? error.message : 'Unknown error'
+                })
+                .eq('id', accountId);
+
             throw error;
         }
 
@@ -118,17 +143,50 @@ export class EmailProcessorService {
         settings: any,
         result: ProcessingResult
     ): Promise<void> {
+        const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
+
+        // Construct query
+        let query = '';
+        if (account.last_sync_checkpoint) {
+            const lastSyncSeconds = Math.floor(parseInt(account.last_sync_checkpoint) / 1000);
+            query = `after:${lastSyncSeconds}`;
+        } else if (account.sync_start_date) {
+            const startSeconds = Math.floor(new Date(account.sync_start_date).getTime() / 1000);
+            query = `after:${startSeconds}`;
+        }
+
         const { messages } = await this.gmailService.fetchMessages(account, {
-            maxResults: config.processing.batchSize,
+            maxResults: batchSize,
+            query: query || undefined,
         });
+
+        let maxInternalDate = account.last_sync_checkpoint ? parseInt(account.last_sync_checkpoint) : 0;
 
         for (const message of messages) {
             try {
+                // Get internalDate from Gmail message if possible
+                // We need to fetch details again or modify GmailService to return it
+                // For now, we'll use the date from headers which is what parseMessage returns
+                // But internalDate is more reliable for checkpoints.
+                // Re-viewing parseMessage shows it doesn't return internalDate.
                 await this.processMessage(account, message, rules, settings, result);
+
+                // Track progress for checkpoint (simplified: using Date.now() for next time, 
+                // or better: the date of the message)
+                const msgDate = new Date(message.date).getTime();
+                if (msgDate > maxInternalDate) maxInternalDate = msgDate;
             } catch (error) {
                 logger.error('Failed to process Gmail message', error, { messageId: message.id });
                 result.errors++;
             }
+        }
+
+        // Update checkpoint
+        if (maxInternalDate > (account.last_sync_checkpoint ? parseInt(account.last_sync_checkpoint) : 0)) {
+            await this.supabase
+                .from('email_accounts')
+                .update({ last_sync_checkpoint: maxInternalDate.toString() })
+                .eq('id', account.id);
         }
     }
 
@@ -138,17 +196,42 @@ export class EmailProcessorService {
         settings: any,
         result: ProcessingResult
     ): Promise<void> {
+        const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
+
+        // Construct filter
+        let filter = '';
+        if (account.last_sync_checkpoint) {
+            filter = `receivedDateTime gt ${account.last_sync_checkpoint}`;
+        } else if (account.sync_start_date) {
+            filter = `receivedDateTime ge ${new Date(account.sync_start_date).toISOString()}`;
+        }
+
         const { messages } = await this.microsoftService.fetchMessages(account, {
-            top: config.processing.batchSize,
+            top: batchSize,
+            filter: filter || undefined,
         });
+
+        let latestCheckpoint = account.last_sync_checkpoint || '';
 
         for (const message of messages) {
             try {
                 await this.processMessage(account, message, rules, settings, result);
+
+                if (!latestCheckpoint || message.date > latestCheckpoint) {
+                    latestCheckpoint = message.date;
+                }
             } catch (error) {
                 logger.error('Failed to process Outlook message', error, { messageId: message.id });
                 result.errors++;
             }
+        }
+
+        // Update checkpoint
+        if (latestCheckpoint && latestCheckpoint !== account.last_sync_checkpoint) {
+            await this.supabase
+                .from('email_accounts')
+                .update({ last_sync_checkpoint: latestCheckpoint })
+                .eq('id', account.id);
         }
     }
 

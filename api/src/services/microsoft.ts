@@ -150,13 +150,18 @@ export class MicrosoftService {
 
     async fetchMessages(
         account: EmailAccount,
-        options: { top?: number; skip?: number } = {}
+        options: { top?: number; skip?: number; filter?: string } = {}
     ): Promise<{ messages: OutlookMessage[]; hasMore: boolean }> {
         const accessToken = decryptToken(account.access_token || '');
-        const { top = 20, skip = 0 } = options;
+        const { top = 20, skip = 0, filter } = options;
+
+        let url = `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime desc`;
+        if (filter) {
+            url += `&$filter=${encodeURIComponent(filter)}`;
+        }
 
         const response = await fetch(
-            `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime desc`,
+            url,
             {
                 headers: {
                     Authorization: `Bearer ${accessToken}`,

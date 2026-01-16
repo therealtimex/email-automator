@@ -7,6 +7,7 @@
  */
 
 import { getApiConfig } from './api-config';
+import { EmailAccount } from './types';
 
 interface ApiOptions extends RequestInit {
     auth?: boolean;
@@ -152,6 +153,13 @@ class HybridApiClient {
     async disconnectAccount(accountId: string) {
         return this.edgeRequest<{ success: boolean }>(`/api-v1-accounts/${accountId}`, {
             method: 'DELETE',
+        });
+    }
+
+    async updateAccount(accountId: string, updates: Partial<EmailAccount>) {
+        return this.edgeRequest<{ account: EmailAccount }>(`/api-v1-accounts/${accountId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates),
         });
     }
 

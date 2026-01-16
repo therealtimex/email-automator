@@ -5,6 +5,12 @@ export interface EmailAccount {
     provider: 'gmail' | 'outlook';
     email_address: string;
     is_active: boolean;
+    last_sync_checkpoint?: string | null;
+    sync_start_date?: string | null;
+    sync_max_emails_per_run?: number;
+    last_sync_at?: string | null;
+    last_sync_status?: 'idle' | 'syncing' | 'success' | 'error';
+    last_sync_error?: string | null;
     created_at: string;
     updated_at: string;
 }

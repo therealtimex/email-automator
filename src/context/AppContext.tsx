@@ -152,6 +152,7 @@ interface AppContextType {
         triggerSync: (accountId?: string) => Promise<boolean>;
         disconnectAccount: (accountId: string) => Promise<boolean>;
         updateSettings: (settings: Partial<UserSettings>) => Promise<boolean>;
+        updateAccount: (accountId: string, updates: Partial<EmailAccount>) => Promise<boolean>;
         createRule: (rule: Omit<Rule, 'id' | 'user_id' | 'created_at'>) => Promise<boolean>;
         deleteRule: (ruleId: string) => Promise<boolean>;
         toggleRule: (ruleId: string) => Promise<boolean>;
@@ -320,6 +321,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 return true;
             }
             dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update settings') });
+            return false;
+        },
+
+        updateAccount: async (accountId: string, updates: Partial<EmailAccount>) => {
+            const response = await api.updateAccount(accountId, updates);
+            if (response.data) {
+                dispatch({
+                    type: 'SET_ACCOUNTS',
+                    payload: state.accounts.map(a => a.id === accountId ? { ...a, ...updates } : a)
+                });
+                return true;
+            }
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update account') });
             return false;
         },
 

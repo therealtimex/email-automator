@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { useApp } from '../context/AppContext';
 import { toast } from './Toast';
 import { LoadingSpinner, CardLoader } from './LoadingSpinner';
-import { Email, EmailCategory } from '../lib/types';
+import { EmailAccount, Email, UserSettings } from '../lib/types';
 import { cn } from '../lib/utils';
 import { useRealtimeEmails } from '../hooks/useRealtimeEmails';
 
@@ -134,8 +134,8 @@ export function Dashboard() {
     };
 
     const handlePageChange = (direction: 'prev' | 'next') => {
-        const newOffset = direction === 'next' 
-            ? state.emailsOffset + 20 
+        const newOffset = direction === 'next'
+            ? state.emailsOffset + 20
             : Math.max(0, state.emailsOffset - 20);
         loadEmails(newOffset);
     };
@@ -151,10 +151,10 @@ export function Dashboard() {
                         Recent Analysis
                     </h2>
                     <div className="flex gap-2 w-full sm:w-auto">
-                        <Button 
-                            onClick={handleSync} 
-                            size="sm" 
-                            variant="outline" 
+                        <Button
+                            onClick={handleSync}
+                            size="sm"
+                            variant="outline"
                             className="shadow-sm"
                             disabled={isSyncing}
                         >
@@ -213,7 +213,7 @@ export function Dashboard() {
                         </div>
                         <h3 className="text-lg font-medium">No emails found</h3>
                         <p className="text-muted-foreground mt-2 mb-6">
-                            {state.accounts.length === 0 
+                            {state.accounts.length === 0
                                 ? 'Connect your email account to get started.'
                                 : 'Try syncing or adjusting your filters.'}
                         </p>
@@ -296,6 +296,15 @@ export function Dashboard() {
                     </div>
                 </Card>
 
+                {/* Sync Settings per Account */}
+                <SyncSettings
+                    accounts={state.accounts}
+                    onUpdate={actions.updateAccount}
+                    onSync={actions.triggerSync}
+                    settings={state.settings}
+                    onUpdateSettings={actions.updateSettings}
+                />
+
                 {/* Quick Stats */}
                 <Card className="p-6">
                     <h3 className="font-semibold mb-4">Quick Stats</h3>
@@ -354,6 +363,133 @@ export function Dashboard() {
     );
 }
 
+interface SyncSettingsProps {
+    accounts: EmailAccount[];
+    onUpdate: (accountId: string, updates: Partial<EmailAccount>) => Promise<boolean>;
+    onSync: (accountId: string) => void;
+    settings: UserSettings | null;
+    onUpdateSettings: (updates: Partial<UserSettings>) => Promise<boolean>;
+}
+
+function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings }: SyncSettingsProps) {
+    const [updating, setUpdating] = useState<string | null>(null);
+    const [updatingSettings, setUpdatingSettings] = useState(false);
+
+    const handleUpdate = async (accountId: string, updates: Partial<EmailAccount>) => {
+        setUpdating(accountId);
+        await onUpdate(accountId, updates);
+        setUpdating(null);
+    };
+
+    if (accounts.length === 0) return null;
+
+    return (
+        <Card className="p-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-primary" />
+                Sync Scope
+            </h3>
+
+            <div className="mb-6 p-3 bg-muted/30 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                    <label className="text-[11px] font-medium flex items-center gap-1">
+                        Sync Interval (min)
+                    </label>
+                    {updatingSettings && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
+                </div>
+                <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    className="h-8 text-xs"
+                    value={settings?.sync_interval_minutes || 5}
+                    onChange={async (e) => {
+                        const val = parseInt(e.target.value, 10) || 5;
+                        setUpdatingSettings(true);
+                        await onUpdateSettings({ sync_interval_minutes: val });
+                        setUpdatingSettings(false);
+                    }}
+                />
+                <p className="text-[9px] text-muted-foreground">
+                    Background sync frequency for all accounts.
+                </p>
+            </div>
+            <div className="space-y-6">
+                {accounts.map(account => (
+                    <div key={account.id} className="space-y-3 pb-4 border-b last:border-0 last:pb-0">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-medium truncate max-w-[150px]" title={account.email_address}>
+                                {account.email_address}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                {account.last_sync_status === 'syncing' ? (
+                                    <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                                ) : account.last_sync_status === 'success' ? (
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                ) : account.last_sync_status === 'error' ? (
+                                    <span title={account.last_sync_error || 'Error'}>
+                                        <AlertCircle className="w-3 h-3 text-destructive" />
+                                    </span>
+                                ) : null}
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => onSync(account.id)}
+                                    disabled={account.last_sync_status === 'syncing'}
+                                >
+                                    <RefreshCw className={cn("w-3 h-3", account.last_sync_status === 'syncing' && "animate-spin")} />
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                    <Calendar className="w-2.5 h-2.5" /> Sync From
+                                </label>
+                                <Input
+                                    type="datetime-local"
+                                    className="h-7 text-[10px] px-2 py-0"
+                                    value={account.sync_start_date ? account.sync_start_date.substring(0, 16) : ''}
+                                    onChange={(e) => handleUpdate(account.id, {
+                                        sync_start_date: e.target.value ? new Date(e.target.value).toISOString() : null
+                                    })}
+                                    disabled={updating === account.id}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                    <Hash className="w-2.5 h-2.5" /> Max Emails
+                                </label>
+                                <Input
+                                    type="number"
+                                    className="h-7 text-[10px] px-2 py-0"
+                                    value={account.sync_max_emails_per_run || 50}
+                                    onChange={(e) => handleUpdate(account.id, {
+                                        sync_max_emails_per_run: parseInt(e.target.value, 10) || 50
+                                    })}
+                                    disabled={updating === account.id}
+                                />
+                            </div>
+                        </div>
+                        {account.last_sync_at && (
+                            <p className="text-[9px] text-muted-foreground">
+                                Last sync: {new Date(account.last_sync_at).toLocaleString()}
+                            </p>
+                        )}
+                        {account.last_sync_error && (
+                            <p className="text-[9px] text-destructive italic line-clamp-1" title={account.last_sync_error}>
+                                Error: {account.last_sync_error}
+                            </p>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </Card>
+    );
+}
+
 interface EmailCardProps {
     email: Email;
     onAction: (email: Email, action: string) => void;
@@ -367,9 +503,9 @@ interface EmailCardProps {
 function EmailCard({ email, onAction, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
     const isLoading = !!loadingAction;
-    
+
     return (
-        <Card 
+        <Card
             className={cn(
                 "hover:shadow-md transition-shadow group cursor-pointer",
                 isSelected && "ring-2 ring-primary"
@@ -401,11 +537,11 @@ function EmailCard({ email, onAction, onSelect, isSelected, loadingAction, isDel
                         </span>
                     </div>
                 </div>
-                
+
                 <p className="text-muted-foreground text-sm mb-4 line-clamp-2 leading-relaxed">
                     {email.body_snippet}
                 </p>
-                
+
                 <div className="bg-secondary/30 p-3 rounded-lg border border-border/50 flex justify-between items-center">
                     <div className="flex items-center gap-2 text-xs font-medium">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />

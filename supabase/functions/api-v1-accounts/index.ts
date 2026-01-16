@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && pathParts.length === 1) {
       const { data, error } = await supabaseAdmin
         .from('email_accounts')
-        .select('id, provider, email_address, is_active, created_at, updated_at')
+        .select('id, provider, email_address, is_active, last_sync_checkpoint, sync_start_date, sync_max_emails_per_run, last_sync_at, last_sync_status, last_sync_error, created_at, updated_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -39,6 +39,37 @@ Deno.serve(async (req) => {
       }
 
       return createSuccessResponse({ accounts: data || [] });
+    }
+
+    // PATCH /api-v1-accounts/:id - Update account settings
+    if (req.method === 'PATCH' && pathParts.length === 2) {
+      const accountId = pathParts[1];
+      const updates = await req.json();
+
+      // Only allow updating specific fields
+      const allowedUpdates: Record<string, any> = {};
+      if (updates.sync_start_date !== undefined) allowedUpdates.sync_start_date = updates.sync_start_date;
+      if (updates.sync_max_emails_per_run !== undefined) allowedUpdates.sync_max_emails_per_run = updates.sync_max_emails_per_run;
+      if (updates.is_active !== undefined) allowedUpdates.is_active = updates.is_active;
+
+      const { data, error } = await supabaseAdmin
+        .from('email_accounts')
+        .update(allowedUpdates)
+        .eq('id', accountId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database error:', error);
+        return createErrorResponse(500, 'Failed to update account');
+      }
+
+      if (!data) {
+        return createErrorResponse(404, 'Account not found');
+      }
+
+      return createSuccessResponse({ account: data });
     }
 
     // DELETE /api-v1-accounts/:id - Disconnect account

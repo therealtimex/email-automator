@@ -321,7 +321,7 @@ export function Configuration() {
             const success = await actions.createRule({
                 name: newRuleName,
                 condition,
-                action: newRuleAction,
+                action: newRuleAction as any,
                 is_enabled: true
             });
 
@@ -947,7 +947,7 @@ export function Configuration() {
                     <CardDescription>Configure Local LLM or API settings</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Model Name</label>
                             <Input
@@ -966,19 +966,6 @@ export function Configuration() {
                             <p className="text-[10px] text-muted-foreground">
                                 Use http://localhost:11434/v1 for Ollama
                             </p>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Sync Interval (minutes)</label>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={60}
-                                value={localSettings.sync_interval_minutes || 5}
-                                onChange={(e) => setLocalSettings(s => ({
-                                    ...s,
-                                    sync_interval_minutes: parseInt(e.target.value, 10) || 5
-                                }))}
-                            />
                         </div>
                     </div>
                     <div className="flex justify-end mt-4">
