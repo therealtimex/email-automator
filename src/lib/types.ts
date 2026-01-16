@@ -32,7 +32,7 @@ export interface Rule {
     user_id: string;
     name: string;
     condition: RuleCondition;
-    action: 'delete' | 'archive' | 'draft';
+    action: 'delete' | 'archive' | 'draft' | 'read' | 'star';
     is_enabled: boolean;
     created_at: string;
 }

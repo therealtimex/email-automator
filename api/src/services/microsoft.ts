@@ -68,7 +68,7 @@ export class MicrosoftService {
         };
 
         const response = await this.pca.acquireTokenByDeviceCode(deviceCodeRequest);
-        
+
         // The device code flow returns tokens directly after user completes auth
         // For now, we return the device code info for the frontend to display
         return {
@@ -191,7 +191,7 @@ export class MicrosoftService {
 
     async trashMessage(account: EmailAccount, messageId: string): Promise<void> {
         const accessToken = decryptToken(account.access_token || '');
-        
+
         const response = await fetch(
             `https://graph.microsoft.com/v1.0/me/messages/${messageId}/move`,
             {
@@ -212,7 +212,7 @@ export class MicrosoftService {
 
     async archiveMessage(account: EmailAccount, messageId: string): Promise<void> {
         const accessToken = decryptToken(account.access_token || '');
-        
+
         const response = await fetch(
             `https://graph.microsoft.com/v1.0/me/messages/${messageId}/move`,
             {
@@ -229,6 +229,40 @@ export class MicrosoftService {
             throw new Error('Failed to archive message');
         }
         logger.debug('Outlook message archived', { messageId });
+    }
+
+    async markAsRead(account: EmailAccount, messageId: string): Promise<void> {
+        const accessToken = decryptToken(account.access_token || '');
+
+        await fetch(
+            `https://graph.microsoft.com/v1.0/me/messages/${messageId}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ isRead: true }),
+            }
+        );
+        logger.debug('Outlook message marked as read', { messageId });
+    }
+
+    async flagMessage(account: EmailAccount, messageId: string): Promise<void> {
+        const accessToken = decryptToken(account.access_token || '');
+
+        await fetch(
+            `https://graph.microsoft.com/v1.0/me/messages/${messageId}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ flag: { flagStatus: 'flagged' } }),
+            }
+        );
+        logger.debug('Outlook message flagged', { messageId });
     }
 
     async createDraft(

@@ -47,6 +47,14 @@ export function Configuration() {
     const [outlookTenantId, setOutlookTenantId] = useState('');
     const [savingOutlookCredentials, setSavingOutlookCredentials] = useState(false);
 
+    // Rule creation state
+    const [showRuleModal, setShowRuleModal] = useState(false);
+    const [newRuleName, setNewRuleName] = useState('');
+    const [newRuleKey, setNewRuleKey] = useState('category');
+    const [newRuleValue, setNewRuleValue] = useState('newsletter');
+    const [newRuleAction, setNewRuleAction] = useState('archive');
+    const [savingRule, setSavingRule] = useState(false);
+
     useEffect(() => {
         actions.fetchAccounts();
         actions.fetchRules();
@@ -280,7 +288,6 @@ export function Configuration() {
                     toast.success('Outlook account connected');
                     actions.fetchAccounts();
                 } else if (response.error) {
-                    // Only stop if it's a hard error, not pending
                     if (typeof response.error === 'object' && response.error.code !== 'authorization_pending') {
                         // Stop polling on real errors
                     }
@@ -300,6 +307,37 @@ export function Configuration() {
                 toast.error('Connection timed out. Please try again.');
             }
         }, 15 * 60 * 1000);
+    };
+
+    const handleCreateRule = async () => {
+        if (!newRuleName) {
+            toast.error('Please name your rule');
+            return;
+        }
+
+        setSavingRule(true);
+        try {
+            const condition: Record<string, string> = { [newRuleKey]: newRuleValue };
+            const success = await actions.createRule({
+                name: newRuleName,
+                condition,
+                action: newRuleAction,
+                is_enabled: true
+            });
+
+            if (success) {
+                toast.success('Rule created');
+                setShowRuleModal(false);
+                setNewRuleName('');
+                actions.fetchRules();
+            } else {
+                toast.error('Failed to create rule');
+            }
+        } catch (error) {
+            toast.error('Failed to create rule');
+        } finally {
+            setSavingRule(false);
+        }
     };
 
     const handleDisconnect = async (accountId: string) => {
@@ -360,115 +398,328 @@ export function Configuration() {
                     </DialogHeader>
 
                     {gmailModalStep === 'credentials' ? (
-                    <>
-                        <div className="space-y-4 py-4">
-                            {/* Paste JSON option */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium flex items-center gap-2">
-                                    <Upload className="w-4 h-4" />
-                                    Paste credentials.json
-                                </label>
-                                <textarea
-                                    className="w-full h-24 p-3 text-xs font-mono border rounded-lg bg-secondary/30 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                                    placeholder='{"installed":{"client_id":"...","client_secret":"..."}}'
-                                    value={credentialsJson}
-                                    onChange={(e) => handleCredentialsJsonChange(e.target.value)}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Download from Google Cloud Console → APIs & Services → Credentials
-                                </p>
-                            </div>
-
-                            <div className="relative">
-                                <div className="absolute inset-0 flex items-center">
-                                    <span className="w-full border-t" />
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-background px-2 text-muted-foreground">or enter manually</span>
-                                </div>
-                            </div>
-
-                            {/* Manual entry */}
-                            <div className="space-y-3">
+                        <>
+                            <div className="space-y-4 py-4">
+                                {/* Paste JSON option */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Client ID</label>
-                                    <Input
-                                        placeholder="xxx.apps.googleusercontent.com"
-                                        value={gmailClientId}
-                                        onChange={(e) => setGmailClientId(e.target.value)}
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <Upload className="w-4 h-4" />
+                                        Paste credentials.json
+                                    </label>
+                                    <textarea
+                                        className="w-full h-24 p-3 text-xs font-mono border rounded-lg bg-secondary/30 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                                        placeholder='{"installed":{"client_id":"...","client_secret":"..."}}'
+                                        value={credentialsJson}
+                                        onChange={(e) => handleCredentialsJsonChange(e.target.value)}
                                     />
+                                    <p className="text-xs text-muted-foreground">
+                                        Download from Google Cloud Console → APIs & Services → Credentials
+                                    </p>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Client Secret</label>
-                                    <Input
-                                        type="password"
-                                        placeholder="GOCSPX-..."
-                                        value={gmailClientSecret}
-                                        onChange={(e) => setGmailClientSecret(e.target.value)}
-                                    />
+
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <span className="w-full border-t" />
+                                    </div>
+                                    <div className="relative flex justify-center text-xs uppercase">
+                                        <span className="bg-background px-2 text-muted-foreground">or enter manually</span>
+                                    </div>
+                                </div>
+
+                                {/* Manual entry */}
+                                <div className="space-y-3">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Client ID</label>
+                                        <Input
+                                            placeholder="xxx.apps.googleusercontent.com"
+                                            value={gmailClientId}
+                                            onChange={(e) => setGmailClientId(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Client Secret</label>
+                                        <Input
+                                            type="password"
+                                            placeholder="GOCSPX-..."
+                                            value={gmailClientSecret}
+                                            onChange={(e) => setGmailClientSecret(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setShowGmailModal(false)}>
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={handleSaveAndConnect}
-                                disabled={savingCredentials || !gmailClientId || !gmailClientSecret}
-                            >
-                                {savingCredentials ? (
-                                    <LoadingSpinner size="sm" className="mr-2" />
-                                ) : (
-                                    <Check className="w-4 h-4 mr-2" />
-                                )}
-                                Save & Connect
-                            </Button>
-                        </DialogFooter>
-                    </>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setShowGmailModal(false)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={handleSaveAndConnect}
+                                    disabled={savingCredentials || !gmailClientId || !gmailClientSecret}
+                                >
+                                    {savingCredentials ? (
+                                        <LoadingSpinner size="sm" className="mr-2" />
+                                    ) : (
+                                        <Check className="w-4 h-4 mr-2" />
+                                    )}
+                                    Save & Connect
+                                </Button>
+                            </DialogFooter>
+                        </>
                     ) : (
-                    <>
-                        {/* Step 2: Paste Authorization Code */}
-                        <div className="space-y-4 py-4">
-                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                <p className="text-sm text-blue-800 dark:text-blue-200">
-                                    1. A new tab opened with Google Sign-In<br />
-                                    2. Sign in and authorize the app<br />
-                                    3. Copy the authorization code shown<br />
-                                    4. Paste it below
-                                </p>
+                        <>
+                            {/* Step 2: Paste Authorization Code */}
+                            <div className="space-y-4 py-4">
+                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                                        1. A new tab opened with Google Sign-In<br />
+                                        2. Sign in and authorize the app<br />
+                                        3. Copy the authorization code shown<br />
+                                        4. Paste it below
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Authorization Code</label>
+                                    <Input
+                                        placeholder="4/0AQlEd8x..."
+                                        value={gmailAuthCode}
+                                        onChange={(e) => setGmailAuthCode(e.target.value)}
+                                        className="font-mono"
+                                    />
+                                </div>
                             </div>
 
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setGmailModalStep('credentials')}>
+                                    Back
+                                </Button>
+                                <Button
+                                    onClick={handleSubmitAuthCode}
+                                    disabled={connectingGmail || !gmailAuthCode.trim()}
+                                >
+                                    {connectingGmail ? (
+                                        <LoadingSpinner size="sm" className="mr-2" />
+                                    ) : (
+                                        <Check className="w-4 h-4 mr-2" />
+                                    )}
+                                    Connect
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Outlook Credentials Modal */}
+            <Dialog open={showOutlookModal} onOpenChange={setShowOutlookModal}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
+                                O
+                            </div>
+                            Connect Outlook Account
+                        </DialogTitle>
+                        <DialogDescription>
+                            {outlookModalStep === 'credentials'
+                                ? 'Enter your Microsoft Azure App credentials to connect your Outlook account.'
+                                : 'Follow the instructions to authorize the application.'}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {outlookModalStep === 'credentials' ? (
+                        <>
+                            <div className="space-y-4 py-4">
+                                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                                        Note: You need an Azure App Registration for this to work.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Client ID (Application ID)</label>
+                                        <Input
+                                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                                            value={outlookClientId}
+                                            onChange={(e) => setOutlookClientId(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Tenant ID (Optional)</label>
+                                        <Input
+                                            placeholder="common"
+                                            value={outlookTenantId}
+                                            onChange={(e) => setOutlookTenantId(e.target.value)}
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Default is "common". Use your specific Tenant ID for organization accounts.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setShowOutlookModal(false)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={handleSaveOutlookAndConnect}
+                                    disabled={savingOutlookCredentials || !outlookClientId}
+                                >
+                                    {savingOutlookCredentials ? (
+                                        <LoadingSpinner size="sm" className="mr-2" />
+                                    ) : (
+                                        <Check className="w-4 h-4 mr-2" />
+                                    )}
+                                    Save & Connect
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    ) : (
+                        <>
+                            {outlookDeviceCode && (
+                                <div className="space-y-4 py-4">
+                                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                        <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                                            Action Required
+                                        </h4>
+                                        <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
+                                            {outlookDeviceCode.message}
+                                        </p>
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex items-center gap-2 bg-white dark:bg-black/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+                                                <code className="text-lg font-mono font-bold flex-1 text-center select-all">
+                                                    {outlookDeviceCode.userCode}
+                                                </code>
+                                            </div>
+                                            <Button
+                                                variant="default"
+                                                className="w-full bg-blue-600 hover:bg-blue-700"
+                                                onClick={() => window.open(outlookDeviceCode.verificationUri, '_blank')}
+                                            >
+                                                Open Microsoft Login
+                                                <ExternalLink className="w-4 h-4 ml-2" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-center">
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <LoadingSpinner size="sm" />
+                                            Waiting for authorization...
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setShowOutlookModal(false)}>
+                                    Cancel
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Create Rule Modal */}
+            <Dialog open={showRuleModal} onOpenChange={setShowRuleModal}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create Auto-Pilot Rule</DialogTitle>
+                        <DialogDescription>
+                            Define a condition based on AI analysis to trigger an action.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Rule Name</label>
+                            <Input
+                                placeholder="e.g. Archive Newsletters"
+                                value={newRuleName}
+                                onChange={(e) => setNewRuleName(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Authorization Code</label>
-                                <Input
-                                    placeholder="4/0AQlEd8x..."
-                                    value={gmailAuthCode}
-                                    onChange={(e) => setGmailAuthCode(e.target.value)}
-                                    className="font-mono"
-                                />
+                                <label className="text-sm font-medium">If Condition Field</label>
+                                <select
+                                    className="w-full p-2 border rounded-md bg-background"
+                                    value={newRuleKey}
+                                    onChange={(e) => setNewRuleKey(e.target.value)}
+                                >
+                                    <option value="category">Category</option>
+                                    <option value="sentiment">Sentiment</option>
+                                    <option value="priority">Priority</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Equals Value</label>
+                                {newRuleKey === 'category' ? (
+                                    <select
+                                        className="w-full p-2 border rounded-md bg-background"
+                                        value={newRuleValue}
+                                        onChange={(e) => setNewRuleValue(e.target.value)}
+                                    >
+                                        <option value="newsletter">Newsletter</option>
+                                        <option value="spam">Spam</option>
+                                        <option value="support">Support</option>
+                                        <option value="client">Client</option>
+                                        <option value="internal">Internal</option>
+                                        <option value="personal">Personal</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                ) : newRuleKey === 'sentiment' ? (
+                                    <select
+                                        className="w-full p-2 border rounded-md bg-background"
+                                        value={newRuleValue}
+                                        onChange={(e) => setNewRuleValue(e.target.value)}
+                                    >
+                                        <option value="Positive">Positive</option>
+                                        <option value="Neutral">Neutral</option>
+                                        <option value="Negative">Negative</option>
+                                    </select>
+                                ) : (
+                                    <select
+                                        className="w-full p-2 border rounded-md bg-background"
+                                        value={newRuleValue}
+                                        onChange={(e) => setNewRuleValue(e.target.value)}
+                                    >
+                                        <option value="High">High</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="Low">Low</option>
+                                    </select>
+                                )}
                             </div>
                         </div>
 
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setGmailModalStep('credentials')}>
-                                Back
-                            </Button>
-                            <Button
-                                onClick={handleSubmitAuthCode}
-                                disabled={connectingGmail || !gmailAuthCode.trim()}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Then Perform Action</label>
+                            <select
+                                className="w-full p-2 border rounded-md bg-background"
+                                value={newRuleAction}
+                                onChange={(e) => setNewRuleAction(e.target.value)}
                             >
-                                {connectingGmail ? (
-                                    <LoadingSpinner size="sm" className="mr-2" />
-                                ) : (
-                                    <Check className="w-4 h-4 mr-2" />
-                                )}
-                                Connect
-                            </Button>
-                        </DialogFooter>
-                    </>
-                    )}
+                                <option value="archive">Archive Email</option>
+                                <option value="delete">Delete Email</option>
+                                <option value="draft">Draft Reply</option>
+                                <option value="read">Mark as Read</option>
+                                <option value="star">Star / Flag</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowRuleModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleCreateRule} disabled={savingRule}>
+                            {savingRule ? <LoadingSpinner size="sm" className="mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                            Create Rule
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
@@ -632,45 +883,56 @@ export function Configuration() {
                         </div>
 
                         {/* Custom Rules */}
-                        {state.rules.length > 0 && (
-                            <div className="pt-2">
-                                <h4 className="text-sm font-medium mb-2">Custom Rules</h4>
-                                {state.rules.map((rule: Rule) => (
-                                    <div
-                                        key={rule.id}
-                                        className="flex justify-between items-center py-2 px-3 bg-secondary/30 rounded-lg mb-2"
-                                    >
-                                        <div>
-                                            <span className="text-sm">{rule.name}</span>
-                                            <span className="text-xs text-muted-foreground ml-2">
-                                                → {rule.action}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleToggleRule(rule.id)}
-                                            >
-                                                {rule.is_enabled ? (
-                                                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                                ) : (
-                                                    <span className="w-2 h-2 rounded-full bg-gray-400" />
-                                                )}
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="text-destructive"
-                                                onClick={() => actions.deleteRule(rule.id)}
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
+                        <div className="pt-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-medium">Custom Rules</h4>
+                                <Button variant="ghost" size="sm" onClick={() => setShowRuleModal(true)}>
+                                    <Plus className="w-4 h-4 mr-1" /> Add Rule
+                                </Button>
                             </div>
-                        )}
+
+                            {state.rules.length === 0 && (
+                                <p className="text-xs text-muted-foreground text-center py-2 border border-dashed rounded-lg">
+                                    No custom rules yet
+                                </p>
+                            )}
+
+                            {state.rules.length > 0 && state.rules.map((rule: Rule) => (
+                                <div
+                                    key={rule.id}
+                                    className="flex justify-between items-center py-2 px-3 bg-secondary/30 rounded-lg mb-2"
+                                >
+                                    <div>
+                                        <span className="text-sm">{rule.name}</span>
+                                        <span className="text-xs text-muted-foreground ml-2">
+                                            → {rule.action}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleToggleRule(rule.id)}
+                                        >
+                                            {rule.is_enabled ? (
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                            ) : (
+                                                <span className="w-2 h-2 rounded-full bg-gray-400" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-destructive"
+                                            onClick={() => actions.deleteRule(rule.id)}
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
                     </CardContent>
                 </Card>
             </div>

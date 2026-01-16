@@ -121,8 +121,8 @@ export class GmailService {
             .from('email_accounts')
             .update({
                 access_token: encryptToken(credentials.access_token!),
-                token_expires_at: credentials.expiry_date 
-                    ? new Date(credentials.expiry_date).toISOString() 
+                token_expires_at: credentials.expiry_date
+                    ? new Date(credentials.expiry_date).toISOString()
                     : null,
                 updated_at: new Date().toISOString(),
             })
@@ -149,7 +149,7 @@ export class GmailService {
         });
 
         const messages: GmailMessage[] = [];
-        
+
         for (const msg of response.data.messages || []) {
             if (!msg.id) continue;
 
@@ -183,7 +183,7 @@ export class GmailService {
 
         let body = '';
         const payload = message.payload;
-        
+
         if (payload?.parts) {
             // Multipart message
             const textPart = payload.parts.find(p => p.mimeType === 'text/plain');
@@ -282,6 +282,25 @@ export class GmailService {
             id: messageId,
             requestBody: { addLabelIds: labelIds },
         });
+    }
+
+    async removeLabel(account: EmailAccount, messageId: string, labelIds: string[]): Promise<void> {
+        const gmail = await this.getAuthenticatedClient(account);
+        await gmail.users.messages.modify({
+            userId: 'me',
+            id: messageId,
+            requestBody: { removeLabelIds: labelIds },
+        });
+    }
+
+    async markAsRead(account: EmailAccount, messageId: string): Promise<void> {
+        await this.removeLabel(account, messageId, ['UNREAD']);
+        logger.debug('Message marked as read', { messageId });
+    }
+
+    async starMessage(account: EmailAccount, messageId: string): Promise<void> {
+        await this.addLabel(account, messageId, ['STARRED']);
+        logger.debug('Message starred', { messageId });
     }
 
     async getProfile(account: EmailAccount): Promise<{ emailAddress: string; messagesTotal: number }> {

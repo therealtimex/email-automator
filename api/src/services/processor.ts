@@ -94,7 +94,7 @@ export class EmailProcessorService {
             logger.info('Sync completed', { accountId, ...result });
         } catch (error) {
             logger.error('Sync failed', error, { accountId });
-            
+
             if (log) {
                 await this.supabase
                     .from('processing_logs')
@@ -105,7 +105,7 @@ export class EmailProcessorService {
                     })
                     .eq('id', log.id);
             }
-            
+
             throw error;
         }
 
@@ -246,10 +246,10 @@ export class EmailProcessorService {
         for (const rule of rules) {
             if (this.matchesCondition(analysis, rule.condition)) {
                 await this.executeAction(account, email, rule.action);
-                
+
                 if (rule.action === 'delete') result.deleted++;
                 else if (rule.action === 'draft') result.drafted++;
-                
+
                 break; // Only execute first matching rule
             }
         }
@@ -267,7 +267,7 @@ export class EmailProcessorService {
     private async executeAction(
         account: EmailAccount,
         email: Email,
-        action: 'delete' | 'archive' | 'draft',
+        action: 'delete' | 'archive' | 'draft' | 'read' | 'star',
         draftContent?: string
     ): Promise<void> {
         try {
@@ -278,6 +278,10 @@ export class EmailProcessorService {
                     await this.gmailService.archiveMessage(account, email.external_id);
                 } else if (action === 'draft' && draftContent) {
                     await this.gmailService.createDraft(account, email.external_id, draftContent);
+                } else if (action === 'read') {
+                    await this.gmailService.markAsRead(account, email.external_id);
+                } else if (action === 'star') {
+                    await this.gmailService.starMessage(account, email.external_id);
                 }
             } else if (account.provider === 'outlook') {
                 if (action === 'delete') {
@@ -286,6 +290,10 @@ export class EmailProcessorService {
                     await this.microsoftService.archiveMessage(account, email.external_id);
                 } else if (action === 'draft' && draftContent) {
                     await this.microsoftService.createDraft(account, email.external_id, draftContent);
+                } else if (action === 'read') {
+                    await this.microsoftService.markAsRead(account, email.external_id);
+                } else if (action === 'star') {
+                    await this.microsoftService.flagMessage(account, email.external_id);
                 }
             }
 
