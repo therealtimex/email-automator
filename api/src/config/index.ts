@@ -24,39 +24,39 @@ export const config = {
     port: parsePort(process.argv.slice(2), process.env.PORT, 3004),
     nodeEnv: process.env.NODE_ENV || 'development',
     isProduction: process.env.NODE_ENV === 'production',
-    
+
     // Paths
     rootDir: join(__dirname, '..', '..', '..'),
     scriptsDir: join(__dirname, '..', '..', '..', 'scripts'),
-    
+
     // Supabase
     supabase: {
         url: process.env.SUPABASE_URL || '',
         anonKey: process.env.SUPABASE_ANON_KEY || '',
         serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     },
-    
+
     // LLM
     llm: {
         apiKey: process.env.LLM_API_KEY || '',
         baseUrl: process.env.LLM_BASE_URL,
         model: process.env.LLM_MODEL || 'gpt-4o-mini',
     },
-    
+
     // OAuth - Gmail
     gmail: {
         clientId: process.env.GMAIL_CLIENT_ID || '',
         clientSecret: process.env.GMAIL_CLIENT_SECRET || '',
         redirectUri: process.env.GMAIL_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob',
     },
-    
+
     // OAuth - Microsoft
     microsoft: {
         clientId: process.env.MS_GRAPH_CLIENT_ID || '',
         tenantId: process.env.MS_GRAPH_TENANT_ID || 'common',
         clientSecret: process.env.MS_GRAPH_CLIENT_SECRET || '',
     },
-    
+
     // Security
     security: {
         encryptionKey: process.env.TOKEN_ENCRYPTION_KEY || '',
@@ -66,18 +66,18 @@ export const config = {
         rateLimitMax: 100,
         disableAuth: process.env.DISABLE_AUTH === 'true',
     },
-    
+
     // Processing
     processing: {
         batchSize: parseInt(process.env.EMAIL_BATCH_SIZE || '20', 10),
-        syncIntervalMs: parseInt(process.env.SYNC_INTERVAL_MS || '300000', 10), // 5 minutes
+        syncIntervalMs: parseInt(process.env.SYNC_INTERVAL_MS || '60000', 10), // 1 minute
         maxRetries: 3,
     },
 };
 
 export function validateConfig(): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
-    
+
     if (!config.supabase.url) {
         errors.push('SUPABASE_URL is required');
     }
@@ -90,6 +90,6 @@ export function validateConfig(): { valid: boolean; errors: string[] } {
     if (config.isProduction && !config.security.encryptionKey) {
         errors.push('TOKEN_ENCRYPTION_KEY must be set in production');
     }
-    
+
     return { valid: errors.length === 0, errors };
 }

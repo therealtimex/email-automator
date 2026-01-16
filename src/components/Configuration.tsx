@@ -28,6 +28,7 @@ export function Configuration() {
         deviceCode: string;
     } | null>(null);
     const [savingSettings, setSavingSettings] = useState(false);
+    const [testingLlm, setTestingLlm] = useState(false);
     const [localSettings, setLocalSettings] = useState<Partial<UserSettings>>({});
 
     // Gmail credentials modal state
@@ -356,6 +357,27 @@ export function Configuration() {
 
         if (success) {
             toast.success('Settings saved');
+        }
+    };
+
+    const handleTestConnection = async () => {
+        setTestingLlm(true);
+        try {
+            const result = await api.testLlm({
+                llm_model: localSettings.llm_model || null,
+                llm_base_url: localSettings.llm_base_url || null,
+                llm_api_key: localSettings.llm_api_key || null,
+            });
+
+            if (result.data?.success) {
+                toast.success(result.data.message);
+            } else {
+                toast.error(result.data?.message || 'Connection test failed');
+            }
+        } catch (error) {
+            toast.error('Failed to test connection');
+        } finally {
+            setTestingLlm(false);
         }
     };
 
@@ -947,7 +969,7 @@ export function Configuration() {
                     <CardDescription>Configure Local LLM or API settings</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Model Name</label>
                             <Input
@@ -967,8 +989,29 @@ export function Configuration() {
                                 Use http://localhost:11434/v1 for Ollama
                             </p>
                         </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">API Key</label>
+                            <Input
+                                type="password"
+                                placeholder="sk-..."
+                                value={localSettings.llm_api_key || ''}
+                                onChange={(e) => setLocalSettings(s => ({ ...s, llm_api_key: e.target.value }))}
+                            />
+                        </div>
                     </div>
-                    <div className="flex justify-end mt-4">
+                    <div className="flex justify-end mt-4 gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={handleTestConnection}
+                            disabled={testingLlm}
+                        >
+                            {testingLlm ? (
+                                <LoadingSpinner size="sm" className="mr-2" />
+                            ) : (
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                            )}
+                            Check Connection
+                        </Button>
                         <Button onClick={handleSaveSettings} disabled={savingSettings}>
                             {savingSettings ? (
                                 <LoadingSpinner size="sm" className="mr-2" />

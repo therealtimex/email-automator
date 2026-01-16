@@ -64,6 +64,25 @@ router.patch('/',
     })
 );
 
+// Test LLM Connection
+router.post('/test-llm',
+    apiRateLimit,
+    authMiddleware,
+    asyncHandler(async (req, res) => {
+        const { llm_model, llm_base_url, llm_api_key } = req.body;
+
+        const { getIntelligenceService } = await import('../services/intelligence.js');
+        const intelligence = getIntelligenceService({
+            model: llm_model,
+            baseUrl: llm_base_url,
+            apiKey: llm_api_key,
+        });
+
+        const result = await intelligence.testConnection();
+        res.json(result);
+    })
+);
+
 // Get analytics/stats
 router.get('/stats',
     authMiddleware,
@@ -105,14 +124,14 @@ router.get('/stats',
         for (const email of emailStats || []) {
             const cat = email.category || 'uncategorized';
             stats.categoryCounts[cat] = (stats.categoryCounts[cat] || 0) + 1;
-            
+
             const action = email.action_taken || 'none';
             stats.actionCounts[action] = (stats.actionCounts[action] || 0) + 1;
         }
 
         // Count by provider
         for (const account of accounts || []) {
-            stats.accountsByProvider[account.provider] = 
+            stats.accountsByProvider[account.provider] =
                 (stats.accountsByProvider[account.provider] || 0) + 1;
         }
 

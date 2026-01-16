@@ -23,6 +23,7 @@ class HybridApiClient {
     private expressApiUrl: string;
     private anonKey: string;
     private token: string | null = null;
+    private supabaseClient: any = null;
 
     constructor() {
         const config = getApiConfig();
@@ -31,7 +32,16 @@ class HybridApiClient {
         this.anonKey = config.anonKey;
     }
 
+    setSupabaseClient(client: any) {
+        this.supabaseClient = client;
+    }
+
     setToken(token: string | null) {
+        if (token) {
+            console.debug('[HybridApiClient] Token updated');
+        } else {
+            console.debug('[HybridApiClient] Token cleared');
+        }
         this.token = token;
     }
 
@@ -47,11 +57,31 @@ class HybridApiClient {
             ...(options.headers || {}),
         };
 
+        // Fallback: try to get token from supabaseClient if missing
+        if (auth && !this.token && this.supabaseClient) {
+            const { data: { session } } = await this.supabaseClient.auth.getSession();
+            if (session?.access_token) {
+                this.token = session.access_token;
+                console.debug('[HybridApiClient] Recovered token from session');
+            }
+        }
+
+        if (auth && !this.token) {
+            console.warn(`[HybridApiClient] Attempted protected request to ${endpoint} without token`);
+            return {
+                error: {
+                    code: 'AUTH_REQUIRED',
+                    message: 'You must be logged in to perform this action',
+                },
+            };
+        }
+
         if (auth && this.token) {
             (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
         }
 
         try {
+            console.debug(`[HybridApiClient] ${options.method || 'GET'} ${baseUrl}${endpoint}`);
             const response = await fetch(`${baseUrl}${endpoint}`, {
                 ...fetchOptions,
                 headers,
@@ -249,6 +279,13 @@ class HybridApiClient {
         return this.edgeRequest<{ stats: any }>('/api-v1-settings/stats');
     }
 
+    async testLlm(config: { llm_model: string | null; llm_base_url: string | null; llm_api_key: string | null }) {
+        return this.expressRequest<{ success: boolean; message: string }>('/api/settings/test-llm', {
+            method: 'POST',
+            body: JSON.stringify(config),
+        });
+    }
+
     // ============================================================================
     // SYNC ENDPOINTS (Express API - Local App)
     // ============================================================================
@@ -310,6 +347,7 @@ export const api = new HybridApiClient();
 
 // Helper to initialize API with auth token from Supabase session
 export async function initializeApi(supabase: any) {
+    api.setSupabaseClient(supabase);
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) {
         api.setToken(session.access_token);

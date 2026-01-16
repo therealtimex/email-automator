@@ -104,6 +104,7 @@ export interface UserSettings {
     user_id: string;
     llm_model: string | null;
     llm_base_url: string | null;
+    llm_api_key: string | null;
     auto_trash_spam: boolean;
     smart_drafts: boolean;
     sync_interval_minutes: number;

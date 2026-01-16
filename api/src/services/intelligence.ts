@@ -64,7 +64,7 @@ export class IntelligenceService {
                 client: oai,
                 mode: 'JSON',
             });
-            
+
             this.isConfigured = true;
             logger.info('Intelligence service initialized', { model: this.model, baseUrl: baseUrl || 'default' });
         } catch (error) {
@@ -111,8 +111,8 @@ ${context.userPreferences?.smartDrafts ? '- User wants draft responses for impor
                 max_retries: config.processing.maxRetries,
             });
 
-            logger.debug('Email analyzed', { 
-                category: response.category, 
+            logger.debug('Email analyzed', {
+                category: response.category,
                 action: response.suggested_action,
             });
 
@@ -159,6 +159,27 @@ Please write a reply.`,
             return null;
         }
     }
+
+    async testConnection(): Promise<{ success: boolean; message: string }> {
+        if (!this.isReady()) {
+            return { success: false, message: 'Intelligence service not initialized. Check your API Key.' };
+        }
+
+        try {
+            await this.client.chat.completions.create({
+                model: this.model,
+                messages: [{ role: 'user', content: 'Say "Connection Successful"' }],
+                max_tokens: 5,
+            });
+            return { success: true, message: 'Connection successful!' };
+        } catch (error) {
+            logger.error('Connection test failed', error);
+            return {
+                success: false,
+                message: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
 }
 
 // Singleton instance with default config
@@ -168,7 +189,7 @@ export function getIntelligenceService(overrides?: { model?: string; baseUrl?: s
     if (overrides) {
         return new IntelligenceService(overrides);
     }
-    
+
     if (!defaultInstance) {
         defaultInstance = new IntelligenceService();
     }

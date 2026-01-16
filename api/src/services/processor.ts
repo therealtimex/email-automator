@@ -257,10 +257,11 @@ export class EmailProcessorService {
 
         // Analyze with AI
         const intelligenceService = getIntelligenceService(
-            settings?.llm_model || settings?.llm_base_url
+            settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
                 ? {
                     model: settings.llm_model,
                     baseUrl: settings.llm_base_url,
+                    apiKey: settings.llm_api_key,
                 }
                 : undefined
         );
