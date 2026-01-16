@@ -12,7 +12,7 @@ import { SetupWizard } from './components/SetupWizard';
 import { Dashboard } from './components/Dashboard';
 import { Configuration } from "./components/Configuration";
 import { Login } from './components/Login';
-import { getSupabaseConfig } from './lib/supabase-config';
+import { getSupabaseConfig, validateSupabaseConnection } from './lib/supabase-config';
 import { supabase } from './lib/supabase';
 import {
     checkMigrationStatus,
@@ -38,24 +38,40 @@ function AppContent() {
 
     // Initial Config Check
     useEffect(() => {
-        const config = getSupabaseConfig();
-        if (!config) {
-            setNeedsSetup(true);
-        } else if (state.isInitialized && state.isAuthenticated) {
-            // Load initial data only after initialization and auth
-            actions.fetchAccounts();
-            actions.fetchRules();
-            actions.fetchSettings();
+        const checkConfig = async () => {
+            const config = getSupabaseConfig();
 
-            // Check migration status
-            checkMigrationStatus(supabase).then((status) => {
-                setMigrationStatus(status);
-                if (status.needsMigration && !isMigrationReminderDismissed()) {
-                    setShowMigrationBanner(true);
-                }
-            });
-        }
-        setCheckingConfig(false);
+            if (!config) {
+                setNeedsSetup(true);
+                setCheckingConfig(false);
+                return;
+            }
+
+            // Validate the configuration (especially if it came from environment variables)
+            const validation = await validateSupabaseConnection(config.url, config.anonKey);
+
+            if (!validation.valid) {
+                // Force setup wizard on invalid config
+                setNeedsSetup(true);
+                setCheckingConfig(false);
+                return;
+            } else if (state.isInitialized && state.isAuthenticated) {
+                // Load initial data only after initialization and auth
+                actions.fetchAccounts();
+                actions.fetchRules();
+                actions.fetchSettings();
+
+                // Check migration status
+                checkMigrationStatus(supabase).then((status) => {
+                    setMigrationStatus(status);
+                    if (status.needsMigration && !isMigrationReminderDismissed()) {
+                        setShowMigrationBanner(true);
+                    }
+                });
+            }
+            setCheckingConfig(false);
+        };
+        checkConfig();
     }, [state.isInitialized, state.isAuthenticated]);
 
     const handleOpenMigrationModal = () => {
@@ -91,7 +107,7 @@ function AppContent() {
 
     // Show login if not authenticated
     if (!state.isAuthenticated) {
-        return <Login />;
+        return <Login onConfigure={() => setNeedsSetup(true)} />;
     }
 
     const handleLogout = async () => {
@@ -287,7 +303,7 @@ function AnalyticsPage() {
                             <div key={log.id} className="flex items-center justify-between py-2 border-b last:border-0">
                                 <div className="flex items-center gap-3">
                                     <span className={`w-2 h-2 rounded-full ${log.status === 'success' ? 'bg-emerald-500' :
-                                            log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500'
+                                        log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500'
                                         }`} />
                                     <span className="text-sm">
                                         {new Date(log.started_at).toLocaleString()}

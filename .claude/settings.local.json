@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pgrep:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(chmod:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

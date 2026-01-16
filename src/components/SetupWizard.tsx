@@ -156,9 +156,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             saveSupabaseConfig({ url: normalizedUrl, anonKey: trimmedKey });
             setStep('success');
 
-            // Completes the flow
+            // Completes the flow by reloading to pick up new config
             setTimeout(() => {
-                onComplete();
+                window.location.reload();
             }, 1000);
         } else {
             setError(result.error || 'Connection failed. Please check your credentials.');

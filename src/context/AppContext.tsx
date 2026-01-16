@@ -16,20 +16,20 @@ interface AppState {
     // Auth
     user: any | null;
     isAuthenticated: boolean;
-    
+
     // Data
     emails: Email[];
     accounts: EmailAccount[];
     rules: Rule[];
     settings: UserSettings | null;
     stats: Stats | null;
-    
+
     // UI
     isLoading: boolean;
     isInitialized: boolean;
     error: string | null;
     selectedEmailId: string | null;
-    
+
     // Pagination
     emailsTotal: number;
     emailsOffset: number;
@@ -74,9 +74,9 @@ type Action =
 function reducer(state: AppState, action: Action): AppState {
     switch (action.type) {
         case 'SET_USER':
-            return { 
-                ...state, 
-                user: action.payload, 
+            return {
+                ...state,
+                user: action.payload,
                 isAuthenticated: !!action.payload,
                 isLoading: false,
             };
@@ -87,8 +87,8 @@ function reducer(state: AppState, action: Action): AppState {
         case 'SET_ERROR':
             return { ...state, error: action.payload, isLoading: false };
         case 'SET_EMAILS':
-            return { 
-                ...state, 
+            return {
+                ...state,
                 emails: action.payload.emails,
                 emailsTotal: action.payload.total,
                 emailsOffset: action.payload.offset,
@@ -96,7 +96,7 @@ function reducer(state: AppState, action: Action): AppState {
         case 'UPDATE_EMAIL':
             return {
                 ...state,
-                emails: state.emails.map(e => 
+                emails: state.emails.map(e =>
                     e.id === action.payload.id ? action.payload : e
                 ),
             };
@@ -105,8 +105,8 @@ function reducer(state: AppState, action: Action): AppState {
         case 'ADD_ACCOUNT':
             return { ...state, accounts: [action.payload, ...state.accounts] };
         case 'REMOVE_ACCOUNT':
-            return { 
-                ...state, 
+            return {
+                ...state,
                 accounts: state.accounts.filter(a => a.id !== action.payload),
             };
         case 'SET_RULES':
@@ -116,13 +116,13 @@ function reducer(state: AppState, action: Action): AppState {
         case 'UPDATE_RULE':
             return {
                 ...state,
-                rules: state.rules.map(r => 
+                rules: state.rules.map(r =>
                     r.id === action.payload.id ? action.payload : r
                 ),
             };
         case 'REMOVE_RULE':
-            return { 
-                ...state, 
+            return {
+                ...state,
                 rules: state.rules.filter(r => r.id !== action.payload),
             };
         case 'SET_SETTINGS':
@@ -132,7 +132,7 @@ function reducer(state: AppState, action: Action): AppState {
         case 'SET_SELECTED_EMAIL':
             return { ...state, selectedEmailId: action.payload };
         case 'CLEAR_DATA':
-            return { ...initialState, isLoading: false };
+            return { ...initialState, isLoading: false, isInitialized: true };
         default:
             return state;
     }
@@ -176,6 +176,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
 
             try {
+                // Validate connection before proceeding
+                // This catches cases where env vars are present but invalid
+                const { error: pingError } = await supabase.from('init_state').select('count', { count: 'exact', head: true });
+
+                // If we get an auth error (401/403) or connection error, the config is likely bad.
+                // However, RLS might deny access, which counts as a success connectivity-wise but a 403.
+                // WE MUST distinguishing between "Bad Key" (401) and "RLS Denied" (401/403?? usually 401 is bad key).
+                // Actually, init_state view is public or has specific RLS. 
+                // A bad key comes as a PostgrestError with code 'PGRST301' or similar, or just a 401 response.
+
+                if (pingError && pingError.message === 'Invalid API key') {
+                    console.error('[AppContext] Invalid API Key detected during init');
+                    // Clear invalid config if it was from storage? 
+                    // If it's env vars, we can't clear them, but we can ignore them?
+                    // App.tsx needs to know to show SetupWizard.
+                    // We can signal this by setting error or specific state.
+                    dispatch({ type: 'SET_INITIALIZED', payload: true }); // Let App render, but it might fail.
+                    return;
+                }
+
                 await initializeApi(supabase);
 
                 const { data: { session } } = await supabase.auth.getSession();
@@ -195,6 +215,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 return () => subscription.unsubscribe();
             } catch (error) {
                 console.error('[AppContext] Init error:', error);
+
+                // If valid config exists but basic connection fails, we should probably let the user know 
+                // or fall back to setup.
+                // For now, just mark initialized so UI shows error state if needed.
                 dispatch({ type: 'SET_ERROR', payload: 'Failed to initialize' });
                 dispatch({ type: 'SET_INITIALIZED', payload: true });
             }
@@ -212,8 +236,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 search: params.search,
             });
             if (response.data) {
-                dispatch({ 
-                    type: 'SET_EMAILS', 
+                dispatch({
+                    type: 'SET_EMAILS',
                     payload: {
                         emails: response.data.emails,
                         total: response.data.total,
@@ -257,8 +281,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 // Update local state
                 const email = state.emails.find(e => e.id === emailId);
                 if (email) {
-                    dispatch({ 
-                        type: 'UPDATE_EMAIL', 
+                    dispatch({
+                        type: 'UPDATE_EMAIL',
                         payload: { ...email, action_taken: action as any }
                     });
                 }
