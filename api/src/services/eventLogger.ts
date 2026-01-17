@@ -34,8 +34,8 @@ export class EventLogger {
         }
     }
 
-    async info(state: string, message: string, details?: any) {
-        await this.log('info', state, { message, ...details });
+    async info(state: string, message: string, details?: any, emailId?: string) {
+        await this.log('info', state, { message, ...details }, emailId);
     }
 
     async analysis(state: string, emailId: string, analysis: any) {

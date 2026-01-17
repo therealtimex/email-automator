@@ -91,14 +91,14 @@ export class IntelligenceService {
         return ready;
     }
 
-    async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger): Promise<EmailAnalysis | null> {
+    async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger, emailId?: string): Promise<EmailAnalysis | null> {
         console.log('[Intelligence] analyzeEmail called for:', context.subject);
         
         if (!this.isReady()) {
             console.log('[Intelligence] Not ready, skipping');
             logger.warn('Intelligence service not ready, skipping analysis');
             if (eventLogger) {
-                await eventLogger.info('Skipped', 'AI Analysis skipped: Model not configured. Please check settings.');
+                await eventLogger.info('Skipped', 'AI Analysis skipped: Model not configured. Please check settings.', undefined, emailId);
             }
             return null;
         }
@@ -154,7 +154,7 @@ REQUIRED JSON STRUCTURE:
                     model: this.model,
                     system_prompt: systemPrompt,
                     content_preview: cleanedContent
-                });
+                }, emailId);
             } catch (err) {
                 console.error('[Intelligence] Failed to log thinking event:', err);
             }
@@ -194,8 +194,8 @@ REQUIRED JSON STRUCTURE:
                 actions: validated.suggested_actions,
             });
 
-            if (eventLogger) {
-                await eventLogger.analysis('Decided', 'Analysis complete', {
+            if (eventLogger && emailId) {
+                await eventLogger.analysis('Decided', emailId, {
                     ...validated,
                     _raw_response: rawResponse 
                 });
@@ -208,7 +208,7 @@ REQUIRED JSON STRUCTURE:
                 await eventLogger.error('Error', {
                     error: error instanceof Error ? error.message : String(error),
                     raw_response: rawResponse || 'No response received from LLM'
-                });
+                }, emailId);
             }
             return null;
         }

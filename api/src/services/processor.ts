@@ -275,7 +275,30 @@ export class EmailProcessorService {
         
         if (eventLogger) await eventLogger.info('Processing', `Processing email: ${message.subject}`);
 
-        // Analyze with AI
+        // 1. Create a "Skeleton" record to get an ID for tracing
+        const emailData: Partial<Email> = {
+            account_id: account.id,
+            external_id: message.id,
+            subject: message.subject,
+            sender: message.sender,
+            recipient: message.recipient,
+            date: message.date ? new Date(message.date).toISOString() : null,
+            body_snippet: message.snippet || message.body.substring(0, 500),
+        };
+
+        const { data: savedEmail, error: saveError } = await this.supabase
+            .from('emails')
+            .insert(emailData)
+            .select()
+            .single();
+
+        if (saveError || !savedEmail) {
+            logger.error('Failed to create initial email record', saveError);
+            if (eventLogger) await eventLogger.error('Database Error', saveError);
+            return;
+        }
+
+        // 2. Analyze with AI (passing the ID so events are linked)
         const intelligenceService = getIntelligenceService(
             settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
                 ? {
@@ -295,38 +318,36 @@ export class EmailProcessorService {
                 autoTrashSpam: settings?.auto_trash_spam,
                 smartDrafts: settings?.smart_drafts,
             },
-        }, eventLogger || undefined);
+        }, eventLogger || undefined, savedEmail.id);
 
-        // Save to database
-        const emailData: Partial<Email> = {
-            account_id: account.id,
-            external_id: message.id,
-            subject: message.subject,
-            sender: message.sender,
-            recipient: message.recipient,
-            date: message.date ? new Date(message.date).toISOString() : null,
-            body_snippet: message.snippet || message.body.substring(0, 500),
-            category: analysis?.category || null,
-            is_useless: analysis?.is_useless || false,
-            ai_analysis: analysis as any,
-            suggested_actions: analysis?.suggested_actions || [],
-            suggested_action: analysis?.suggested_actions?.[0] || 'none', // Fallback
-        };
+        if (!analysis) {
+            result.errors++;
+            return;
+        }
 
-        const { data: savedEmail } = await this.supabase
+        // 3. Update the email record with results
+        await this.supabase
             .from('emails')
-            .insert(emailData)
-            .select()
-            .single();
-            
-        // Log email created event? Maybe redundant if we have analysis event.
+            .update({
+                category: analysis.category,
+                is_useless: analysis.is_useless,
+                ai_analysis: analysis as any,
+                suggested_actions: analysis.suggested_actions || [],
+                suggested_action: analysis.suggested_actions?.[0] || 'none',
+            })
+            .eq('id', savedEmail.id);
+
+        const processedEmail = { 
+            ...savedEmail, 
+            category: analysis.category,
+            is_useless: analysis.is_useless,
+            suggested_actions: analysis.suggested_actions 
+        };
 
         result.processed++;
 
-        // Execute automation rules
-        if (analysis && savedEmail) {
-            await this.executeRules(account, savedEmail, analysis, rules, settings, result, eventLogger);
-        }
+        // 4. Execute automation rules
+        await this.executeRules(account, processedEmail as Email, analysis, rules, settings, result, eventLogger);
     }
 
     private async executeRules(
@@ -359,7 +380,7 @@ export class EmailProcessorService {
                 
                 // If the rule is to draft, and it has specific instructions, generate it now
                 if (rule.action === 'draft' && rule.instructions) {
-                    if (eventLogger) await eventLogger.info('Thinking', `Generating customized draft based on rule: ${rule.name}`);
+                    if (eventLogger) await eventLogger.info('Thinking', `Generating customized draft based on rule: ${rule.name}`, undefined, email.id);
                     
                     const intelligenceService = getIntelligenceService(
                         settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
@@ -445,7 +466,7 @@ export class EmailProcessorService {
     ): Promise<void> {
         try {
             if (eventLogger) {
-                await eventLogger.info('Acting', `Executing action: ${action}`, { emailId: email.id, reason, hasAttachments: !!attachments?.length });
+                await eventLogger.info('Acting', `Executing action: ${action}`, { reason, hasAttachments: !!attachments?.length }, email.id);
             }
 
             if (account.provider === 'gmail') {

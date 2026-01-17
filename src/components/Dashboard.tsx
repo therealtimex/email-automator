@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -725,6 +725,19 @@ function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loading
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
     const isLoading = !!loadingAction;
 
+    const getExternalMailUrl = () => {
+        if (!email.email_accounts) return '#';
+        const { provider, email_address } = email.email_accounts;
+        
+        if (provider === 'gmail') {
+            // Gmail deep link using the message ID
+            return `https://mail.google.com/mail/u/${email_address}/#all/${email.external_id}`;
+        } else {
+            // Outlook/M365 deep link
+            return `https://outlook.office.com/mail/deeplink/read/${encodeURIComponent(email.external_id)}`;
+        }
+    };
+
     return (
         <Card
             className={cn(
@@ -820,6 +833,15 @@ function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loading
                         ) : (
                             // Normal action buttons
                             <>
+                                <a 
+                                    href={getExternalMailUrl()} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
+                                    title={`Open in ${email.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook'}`}
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
                                 <Button
                                     variant="ghost"
                                     size="icon"
