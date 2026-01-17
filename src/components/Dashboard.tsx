@@ -1,14 +1,187 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { useApp } from '../context/AppContext';
 import { toast } from './Toast';
 import { LoadingSpinner, CardLoader } from './LoadingSpinner';
-import { EmailAccount, Email, UserSettings } from '../lib/types';
+import { EmailAccount, Email, UserSettings, ProcessingEvent } from '../lib/types';
 import { cn } from '../lib/utils';
 import { useRealtimeEmails } from '../hooks/useRealtimeEmails';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from './ui/dialog';
+
+export function AITraceModal({ 
+    email, 
+    isOpen, 
+    onOpenChange 
+}: { 
+    email: Email | null, 
+    isOpen: boolean, 
+    onOpenChange: (open: boolean) => void 
+}) {
+    const [events, setEvents] = useState<ProcessingEvent[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && email) {
+            fetchEvents();
+        }
+    }, [isOpen, email]);
+
+    const fetchEvents = async () => {
+        if (!email) return;
+        setIsLoading(true);
+        try {
+            const response = await api.getEmailEvents(email.id);
+            if (response.data) {
+                setEvents(response.data.events);
+            }
+        } catch (error) {
+            console.error('Failed to fetch trace:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const getIcon = (type: string) => {
+        switch (type) {
+            case 'analysis': return <Brain className="w-4 h-4 text-purple-500" />;
+            case 'action': return <Zap className="w-4 h-4 text-emerald-500" />;
+            case 'error': return <AlertCircle className="w-4 h-4 text-red-500" />;
+            default: return <Info className="w-4 h-4 text-blue-500" />;
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-6 border-b">
+                    <div className="flex items-center gap-2">
+                        <Cpu className="w-5 h-5 text-primary" />
+                        <DialogTitle>AI Processing Trace</DialogTitle>
+                    </div>
+                    <DialogDescription>
+                        Step-by-step log of how the AI analyzed and acted on this email.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-secondary/5">
+                    {isLoading ? (
+                        <div className="py-20 flex justify-center"><LoadingSpinner /></div>
+                    ) : events.length === 0 ? (
+                        <div className="py-20 text-center text-muted-foreground italic font-mono text-sm">
+                            No granular trace events found for this email.
+                        </div>
+                    ) : (
+                        events.map((event, i) => (
+                            <div key={event.id} className="relative pl-8">
+                                {/* Timeline Line */}
+                                {i !== events.length - 1 && (
+                                    <div className="absolute left-[15px] top-8 bottom-[-24px] w-px bg-border" />
+                                )}
+                                
+                                {/* Icon Badge */}
+                                <div className="absolute left-0 top-0 w-8 h-8 rounded-full border bg-background flex items-center justify-center z-10 shadow-sm">
+                                    {getIcon(event.event_type)}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-foreground/70">
+                                            {event.agent_state}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                            <Clock className="w-3 h-3" />
+                                            {new Date(event.created_at).toLocaleTimeString()}
+                                        </span>
+                                    </div>
+
+                                    {/* Event Details */}
+                                    <div className="bg-card border rounded-lg p-4 shadow-sm">
+                                        {event.event_type === 'info' && (
+                                            <p className="text-sm text-foreground/90">{event.details?.message}</p>
+                                        )}
+
+                                        {event.event_type === 'analysis' && (
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="text-[10px] bg-secondary px-2 py-1 rounded">
+                                                        <span className="text-muted-foreground mr-1">Category:</span>
+                                                        <span className="font-bold uppercase">{event.details?.category}</span>
+                                                    </div>
+                                                    <div className="text-[10px] bg-secondary px-2 py-1 rounded">
+                                                        <span className="text-muted-foreground mr-1">Sentiment:</span>
+                                                        <span className="font-bold uppercase">{event.details?.sentiment}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {event.details?.system_prompt && (
+                                                    <div className="space-y-1">
+                                                        <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                                            <Code className="w-3 h-3" /> System Prompt
+                                                        </div>
+                                                        <pre className="text-[10px] bg-secondary/50 p-2 rounded border overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
+                                                            {event.details?.system_prompt}
+                                                        </pre>
+                                                    </div>
+                                                )}
+
+                                                {event.details?._raw_response && (
+                                                    <div className="space-y-1">
+                                                        <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                                            <Code className="w-3 h-3" /> Raw LLM Response
+                                                        </div>
+                                                        <pre className="text-[10px] bg-emerald-500/5 p-2 rounded border border-emerald-500/10 overflow-x-auto font-mono">
+                                                            {JSON.stringify(JSON.parse(event.details._raw_response), null, 2)}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {event.event_type === 'action' && (
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 capitalize">
+                                                        Executed: {event.details?.action}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground italic">
+                                                        "{event.details?.reason}"
+                                                    </p>
+                                                </div>
+                                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                            </div>
+                                        )}
+
+                                        {event.event_type === 'error' && (
+                                            <div className="space-y-2">
+                                                <p className="text-sm text-red-600 dark:text-red-400 font-bold">
+                                                    {event.details?.error}
+                                                </p>
+                                                {event.details?.raw_response && (
+                                                    <pre className="text-[10px] bg-red-500/5 p-2 rounded border border-red-500/10 overflow-x-auto whitespace-pre-wrap font-mono">
+                                                        {event.details.raw_response}
+                                                    </pre>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
     spam: 'bg-destructive/10 text-destructive',
@@ -37,6 +210,8 @@ export function Dashboard() {
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
     const [actionLoading, setActionLoading] = useState<Record<string, string>>({});
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [isTraceOpen, setIsTraceOpen] = useState(false);
+    const [traceEmail, setTraceEmail] = useState<Email | null>(null);
 
     // Realtime subscription for live email updates
     const handleRealtimeInsert = useCallback((email: Email) => {
@@ -142,6 +317,11 @@ export function Dashboard() {
         loadEmails(newOffset);
     };
 
+    const handleViewTrace = (email: Email) => {
+        setTraceEmail(email);
+        setIsTraceOpen(true);
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
             {/* Main Content */}
@@ -233,6 +413,7 @@ export function Dashboard() {
                                 key={email.id}
                                 email={email}
                                 onAction={handleAction}
+                                onViewTrace={handleViewTrace}
                                 onSelect={() => setSelectedEmail(email)}
                                 isSelected={selectedEmail?.id === email.id}
                                 loadingAction={actionLoading[email.id]}
@@ -240,6 +421,12 @@ export function Dashboard() {
                                 onCancelDelete={cancelDelete}
                             />
                         ))}
+
+                        <AITraceModal 
+                            isOpen={isTraceOpen} 
+                            onOpenChange={setIsTraceOpen} 
+                            email={traceEmail} 
+                        />
 
                         {/* Pagination */}
                         {state.emailsTotal > 20 && (
@@ -505,6 +692,7 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings }
 interface EmailCardProps {
     email: Email;
     onAction: (email: Email, action: string) => void;
+    onViewTrace: (email: Email) => void;
     onSelect: () => void;
     isSelected: boolean;
     loadingAction?: string;
@@ -512,7 +700,7 @@ interface EmailCardProps {
     onCancelDelete?: () => void;
 }
 
-function EmailCard({ email, onAction, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
+function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
     const isLoading = !!loadingAction;
 
@@ -611,6 +799,15 @@ function EmailCard({ email, onAction, onSelect, isSelected, loadingAction, isDel
                         ) : (
                             // Normal action buttons
                             <>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                    onClick={() => onViewTrace(email)}
+                                    title="View AI Trace (Prompt/Response)"
+                                >
+                                    <Eye className="w-3.5 h-3.5" />
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"

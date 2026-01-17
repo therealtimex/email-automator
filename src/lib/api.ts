@@ -227,6 +227,10 @@ class HybridApiClient {
         return this.edgeRequest<{ email: any }>(`/api-v1-emails/${emailId}`);
     }
 
+    async getEmailEvents(emailId: string) {
+        return this.edgeRequest<{ events: any[] }>(`/api-v1-emails/${emailId}/events`);
+    }
+
     async deleteEmail(emailId: string) {
         return this.edgeRequest<{ success: boolean }>(`/api-v1-emails/${emailId}`, {
             method: 'DELETE',

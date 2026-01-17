@@ -100,6 +100,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    // GET /api-v1-emails/:id/events - Get processing events for an email
+    if (req.method === 'GET' && pathParts.length === 3 && pathParts[2] === 'events') {
+      const emailId = pathParts[1];
+
+      // Verify ownership and get events
+      const { data, error } = await supabaseAdmin
+        .from('processing_events')
+        .select('*')
+        .eq('email_id', emailId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Database error:', error);
+        return createErrorResponse(500, 'Failed to fetch email events');
+      }
+
+      return createSuccessResponse({ events: data || [] });
+    }
+
     // GET /api-v1-emails/:id - Get single email
     if (req.method === 'GET' && pathParts.length === 2) {
       const emailId = pathParts[1];

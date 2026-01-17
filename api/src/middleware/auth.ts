@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { config } from '../config/index.js';
 import { AuthenticationError, AuthorizationError } from './errorHandler.js';
-import { createLogger } from '../utils/logger.js';
+import { createLogger, Logger } from '../utils/logger.js';
 
 const logger = createLogger('AuthMiddleware');
 
@@ -80,6 +80,8 @@ export async function authMiddleware(
 
             if (supabase) {
                 req.supabase = supabase;
+                // Initialize logger persistence for mock user
+                Logger.setPersistence(supabase, req.user.id);
             } else {
                 throw new AuthenticationError('Supabase not configured. Please set up Supabase in the app or provide SUPABASE_URL/ANON_KEY in .env');
             }
@@ -115,6 +117,9 @@ export async function authMiddleware(
             logger.debug('Auth failed', { error: error?.message });
             throw new AuthenticationError('Invalid or expired token');
         }
+
+        // Initialize logger persistence for this request
+        Logger.setPersistence(supabase, user.id);
 
         // Attach user and supabase client to request
         req.user = user;

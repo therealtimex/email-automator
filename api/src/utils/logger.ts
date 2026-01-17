@@ -21,36 +21,72 @@ const LOG_LEVELS: Record<LogLevel, number> = {
     error: 3,
 };
 
-class Logger {
+export class Logger {
     private minLevel: LogLevel;
     private context?: string;
+    private static supabaseClient: any = null;
+    private static currentUserId: string | null = null;
 
     constructor(context?: string) {
         this.minLevel = config.isProduction ? 'info' : 'debug';
         this.context = context;
     }
 
+    /**
+     * Set the Supabase client and current user ID for DB persistence.
+     * This is called by the auth middleware or server initialization.
+     */
+    static setPersistence(client: any, userId: string | null = null): void {
+        Logger.supabaseClient = client;
+        Logger.currentUserId = userId;
+    }
+
     private shouldLog(level: LogLevel): boolean {
         return LOG_LEVELS[level] >= LOG_LEVELS[this.minLevel];
+    }
+
+    private async saveToSupabase(level: LogLevel, message: string, meta?: LogMeta): Promise<void> {
+        // Only persist warn and error levels to DB to prevent bloat
+        // unless explicitly forced via meta
+        const persistLevels: LogLevel[] = ['warn', 'error'];
+        const shouldPersist = persistLevels.includes(level) || meta?._persist === true;
+
+        if (shouldPersist && Logger.supabaseClient) {
+            try {
+                // Remove internal flags from meta before saving
+                const { _persist, ...cleanMeta } = meta || {};
+                
+                await Logger.supabaseClient.from('system_logs').insert({
+                    user_id: Logger.currentUserId,
+                    level,
+                    source: this.context || 'System',
+                    message,
+                    metadata: cleanMeta,
+                    created_at: new Date().toISOString()
+                });
+            } catch (err) {
+                // Fail silently to avoid infinite loops if logging fails
+                console.error('[Logger] Failed to persist log to Supabase:', err);
+            }
+        }
     }
 
     private formatMessage(level: LogLevel, message: string, meta?: LogMeta): string {
         const timestamp = new Date().toISOString();
         const contextStr = this.context ? `[${this.context}]` : '';
-        const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
+        const { _persist, ...cleanMeta } = meta || {};
+        const metaStr = Object.keys(cleanMeta).length > 0 ? ` ${JSON.stringify(cleanMeta)}` : '';
         
         if (config.isProduction) {
-            // JSON format for production (easier to parse)
             return JSON.stringify({
                 timestamp,
                 level,
                 context: this.context,
                 message,
-                ...meta,
+                ...cleanMeta,
             });
         }
         
-        // Pretty format for development
         const color = LOG_COLORS[level];
         const reset = LOG_COLORS.reset;
         return `${timestamp} ${color}${level.toUpperCase().padEnd(5)}${reset} ${contextStr} ${message}${metaStr}`;
@@ -59,18 +95,21 @@ class Logger {
     debug(message: string, meta?: LogMeta): void {
         if (this.shouldLog('debug')) {
             console.debug(this.formatMessage('debug', message, meta));
+            this.saveToSupabase('debug', message, meta);
         }
     }
 
     info(message: string, meta?: LogMeta): void {
         if (this.shouldLog('info')) {
             console.info(this.formatMessage('info', message, meta));
+            this.saveToSupabase('info', message, meta);
         }
     }
 
     warn(message: string, meta?: LogMeta): void {
         if (this.shouldLog('warn')) {
             console.warn(this.formatMessage('warn', message, meta));
+            this.saveToSupabase('warn', message, meta);
         }
     }
 
@@ -80,13 +119,12 @@ class Logger {
             if (error instanceof Error) {
                 errorMeta.errorName = error.name;
                 errorMeta.errorMessage = error.message;
-                if (!config.isProduction) {
-                    errorMeta.stack = error.stack;
-                }
+                errorMeta.stack = error.stack;
             } else if (error) {
                 errorMeta.error = error;
             }
             console.error(this.formatMessage('error', message, errorMeta));
+            this.saveToSupabase('error', message, errorMeta);
         }
     }
 
