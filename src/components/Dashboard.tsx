@@ -547,12 +547,28 @@ function EmailCard({ email, onAction, onSelect, isSelected, loadingAction, isDel
                 <div className="bg-secondary/30 p-3 rounded-lg border border-border/50 flex justify-between items-center">
                     <div className="flex items-center gap-2 text-xs font-medium">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        Suggested: <span className="text-foreground">{email.suggested_action || 'none'}</span>
-                        {email.action_taken && (
+                        Suggested: 
+                        {(email.suggested_actions && email.suggested_actions.length > 0) ? (
+                            <div className="flex gap-1 flex-wrap">
+                                {email.suggested_actions.map(action => (
+                                    <span key={action} className="text-foreground border border-border/50 px-1.5 py-0.5 rounded capitalize bg-background/50">
+                                        {action}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : (
+                            <span className="text-foreground">{email.suggested_action || 'none'}</span>
+                        )}
+                        
+                        {(email.actions_taken && email.actions_taken.length > 0) ? (
+                             <span className="text-muted-foreground ml-2 truncate max-w-[100px]" title={email.actions_taken.join(', ')}>
+                                (Done: {email.actions_taken.join(', ')})
+                            </span>
+                        ) : email.action_taken ? (
                             <span className="text-muted-foreground ml-2">
                                 (Done: {email.action_taken})
                             </span>
-                        )}
+                        ) : null}
                     </div>
                     <div className="flex gap-1 items-center" onClick={(e) => e.stopPropagation()}>
                         {isDeletePending ? (

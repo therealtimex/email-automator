@@ -27,8 +27,10 @@ export interface Email {
     category: EmailCategory | null;
     is_useless: boolean;
     ai_analysis: EmailAnalysis | null;
-    suggested_action: EmailAction | null;
-    action_taken: EmailAction | null;
+    suggested_action?: EmailAction | null; // Deprecated
+    suggested_actions?: EmailAction[];
+    action_taken?: EmailAction | null; // Deprecated
+    actions_taken?: EmailAction[];
     created_at: string;
     email_accounts?: EmailAccount;
 }
@@ -48,6 +50,7 @@ export interface RuleCondition {
     is_useless?: boolean;
     sender_contains?: string;
     subject_contains?: string;
+    priority?: Priority;
 }
 
 export interface UserSettings {

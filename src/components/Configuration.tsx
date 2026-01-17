@@ -941,15 +941,13 @@ export function Configuration() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Button
-                                            variant="ghost"
+                                            variant={rule.is_enabled ? 'default' : 'outline'}
                                             size="sm"
                                             onClick={() => handleToggleRule(rule.id)}
+                                            className="h-7 px-2"
                                         >
-                                            {rule.is_enabled ? (
-                                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                            ) : (
-                                                <span className="w-2 h-2 rounded-full bg-gray-400" />
-                                            )}
+                                            <Power className="w-3.5 h-3.5 mr-1" />
+                                            {rule.is_enabled ? 'On' : 'Off'}
                                         </Button>
                                         <Button
                                             variant="ghost"

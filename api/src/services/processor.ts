@@ -308,7 +308,8 @@ export class EmailProcessorService {
             category: analysis?.category || null,
             is_useless: analysis?.is_useless || false,
             ai_analysis: analysis as any,
-            suggested_action: analysis?.suggested_action || null,
+            suggested_actions: analysis?.suggested_actions || [],
+            suggested_action: analysis?.suggested_actions?.[0] || 'none', // Fallback
         };
 
         const { data: savedEmail } = await this.supabase

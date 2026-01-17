@@ -11,14 +11,14 @@ const logger = createLogger('Intelligence');
 // Define the schema for email analysis
 export const EmailAnalysisSchema = z.object({
     summary: z.string().describe('A brief summary of the email content'),
-    category: z.enum(['spam', 'newsletter', 'support', 'client', 'internal', 'personal', 'other'])
+    category: z.enum(['spam', 'newsletter', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'other'])
         .describe('The category of the email'),
     sentiment: z.enum(['Positive', 'Neutral', 'Negative'])
         .describe('The emotional tone of the email'),
     is_useless: z.boolean()
         .describe('Whether the email is considered useless (spam, newsletter, etc.)'),
-    suggested_action: z.enum(['none', 'delete', 'archive', 'reply', 'flag'])
-        .describe('The recommended next action'),
+    suggested_actions: z.array(z.enum(['none', 'delete', 'archive', 'reply', 'flag']))
+        .describe('The recommended next actions (e.g. ["reply", "archive"])'),
     draft_response: z.string().optional()
         .describe('A suggested draft response if the action is reply'),
     priority: z.enum(['High', 'Medium', 'Low'])
