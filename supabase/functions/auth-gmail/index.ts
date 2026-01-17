@@ -141,6 +141,8 @@ async function handleCallback(req: Request): Promise<Response> {
           token_expires_at: tokenExpiresAt,
           scopes: tokens.scope?.split(' ') || SCOPES,
           is_active: true,
+          sync_start_date: new Date().toISOString(), // Default to starting from "now"
+          sync_max_emails_per_run: 50, // Safe default batch size
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id, email_address' }

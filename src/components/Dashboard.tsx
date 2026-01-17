@@ -650,7 +650,28 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings }
                                 <Input
                                     type="datetime-local"
                                     className="h-7 text-[10px] px-2 py-0"
-                                    value={account.sync_start_date ? account.sync_start_date.substring(0, 16) : ''}
+                                    value={(() => {
+                                        // 1. Priority: User-defined start date
+                                        if (account.sync_start_date) return account.sync_start_date.substring(0, 16);
+                                        
+                                        // 2. Fallback: Last known checkpoint (data time)
+                                        if (account.last_sync_checkpoint) {
+                                            if (account.provider === 'gmail') {
+                                                try {
+                                                    const ms = parseInt(account.last_sync_checkpoint);
+                                                    if (!isNaN(ms)) return new Date(ms).toISOString().substring(0, 16);
+                                                } catch (e) { /* ignore */ }
+                                            } else {
+                                                // Outlook checkpoint is already ISO
+                                                return account.last_sync_checkpoint.substring(0, 16);
+                                            }
+                                        }
+
+                                        // 3. Last fallback: Last sync execution time
+                                        if (account.last_sync_at) return account.last_sync_at.substring(0, 16);
+                                        
+                                        return '';
+                                    })()}
                                     onChange={(e) => handleUpdate(account.id, {
                                         sync_start_date: e.target.value ? new Date(e.target.value).toISOString() : null
                                     })}
