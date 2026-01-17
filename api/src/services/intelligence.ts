@@ -103,23 +103,18 @@ export class IntelligenceService {
             return null;
         }
 
-        if (eventLogger) {
-            console.log('[Intelligence] Logging "Thinking" event');
-            await eventLogger.info('Thinking', `Analyzing email: ${context.subject}`, { model: this.model });
-        }
-
-        // Clean and truncate content to avoid token overflow and noise
+        // 1. Prepare Content and Signals
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
+        
+        const metadataSignals = [];
+        if (context.metadata?.listUnsubscribe) metadataSignals.push('- Contains Unsubscribe header (High signal for Newsletter/Promo)');
+        if (context.metadata?.autoSubmitted && context.metadata.autoSubmitted !== 'no') metadataSignals.push(`- Auto-Submitted: ${context.metadata.autoSubmitted}`);
+        if (context.metadata?.importance) metadataSignals.push(`- Sender Priority/Importance: ${context.metadata.importance}`);
+        if (context.metadata?.mailer) metadataSignals.push(`- Sent via: ${context.metadata.mailer}`);
 
-        try {
-            const metadataSignals = [];
-            if (context.metadata?.listUnsubscribe) metadataSignals.push('- Contains Unsubscribe header (High signal for Newsletter/Promo)');
-            if (context.metadata?.autoSubmitted && context.metadata.autoSubmitted !== 'no') metadataSignals.push(`- Auto-Submitted: ${context.metadata.autoSubmitted}`);
-            if (context.metadata?.importance) metadataSignals.push(`- Sender Priority/Importance: ${context.metadata.importance}`);
-            if (context.metadata?.mailer) metadataSignals.push(`- Sent via: ${context.metadata.mailer}`);
-
-            const systemPrompt = `You are an AI Email Assistant. Your task is to analyze the provided email and extract structured information as JSON.
+        const systemPrompt = `You are an AI Email Assistant. Your task is to analyze the provided email and extract structured information as JSON.
 Do NOT include any greetings, chatter, or special tokens like <|channel|> in your output.
+Return ONLY a valid JSON object.
 
 Definitions for Categories:
 - "important": Work-related, urgent, from known contacts
@@ -136,36 +131,84 @@ Context:
 - Date: ${context.date}
 ${metadataSignals.length > 0 ? `\nMetadata Signals:\n${metadataSignals.join('\n')}` : ''}
 ${context.userPreferences?.autoTrashSpam ? '- User has auto-trash spam enabled' : ''}
-${context.userPreferences?.smartDrafts ? '- User wants draft responses for important emails' : ''}`;
+${context.userPreferences?.smartDrafts ? '- User wants draft responses for important emails' : ''}
 
-            const response = await this.client.chat.completions.create({
+REQUIRED JSON STRUCTURE:
+{
+  "summary": "string",
+  "category": "spam|newsletter|promotional|transactional|social|support|client|internal|personal|other",
+  "sentiment": "Positive|Neutral|Negative",
+  "is_useless": boolean,
+  "suggested_actions": ["none"|"delete"|"archive"|"reply"|"flag"],
+  "draft_response": "string (optional)",
+  "priority": "High|Medium|Low",
+  "key_points": ["string"],
+  "action_items": ["string"]
+}`;
+
+        // 2. Log Thinking Phase
+        if (eventLogger) {
+            console.log('[Intelligence] Logging "Thinking" event');
+            try {
+                await eventLogger.info('Thinking', `Analyzing email: ${context.subject}`, { 
+                    model: this.model,
+                    system_prompt: systemPrompt,
+                    content_preview: cleanedContent
+                });
+            } catch (err) {
+                console.error('[Intelligence] Failed to log thinking event:', err);
+            }
+        }
+
+        let rawResponse = '';
+        try {
+            // Using raw completion call to handle garbage characters and strip tokens manually
+            const response = await this.client.client.chat.completions.create({
                 model: this.model,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: cleanedContent || '[Empty email body]' },
                 ],
-                response_model: {
-                    schema: EmailAnalysisSchema,
-                    name: 'EmailAnalysis',
-                },
                 temperature: 0.1,
-                max_retries: config.processing.maxRetries,
             });
 
-            logger.debug('Email analyzed', {
-                category: response.category,
-                action: response.suggested_action,
-            });
-
-            if (eventLogger) {
-                await eventLogger.analysis('Decided', 'Analysis complete', response);
+            rawResponse = response.choices[0]?.message?.content || '';
+            console.log('[Intelligence] Raw LLM Response received (length:', rawResponse.length, ')');
+            
+            // Clean the response: Find first '{' and last '}'
+            let jsonStr = rawResponse.trim();
+            const startIdx = jsonStr.indexOf('{');
+            const endIdx = jsonStr.lastIndexOf('}');
+            
+            if (startIdx === -1 || endIdx === -1) {
+                throw new Error('Response did not contain a valid JSON object (missing curly braces)');
             }
 
-            return response;
-        } catch (error) {
-            logger.error('AI Analysis failed', error);
+            jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+
+            const parsed = JSON.parse(jsonStr);
+            const validated = EmailAnalysisSchema.parse(parsed);
+
+            logger.debug('Email analyzed', {
+                category: validated.category,
+                actions: validated.suggested_actions,
+            });
+
             if (eventLogger) {
-                await eventLogger.error('Error', error);
+                await eventLogger.analysis('Decided', 'Analysis complete', {
+                    ...validated,
+                    _raw_response: rawResponse 
+                });
+            }
+
+            return validated;
+        } catch (error) {
+            console.error('[Intelligence] AI Analysis failed:', error);
+            if (eventLogger) {
+                await eventLogger.error('Error', {
+                    error: error instanceof Error ? error.message : String(error),
+                    raw_response: rawResponse || 'No response received from LLM'
+                });
             }
             return null;
         }

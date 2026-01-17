@@ -16,7 +16,7 @@ export class EventLogger {
         emailId?: string
     ) {
         try {
-            await this.supabase.from('processing_events').insert({
+            const { error } = await this.supabase.from('processing_events').insert({
                 run_id: this.runId,
                 email_id: emailId || null,
                 event_type: eventType,
@@ -24,6 +24,10 @@ export class EventLogger {
                 details: details || {},
                 created_at: new Date().toISOString()
             });
+            
+            if (error) {
+                console.error('[EventLogger] Supabase Insert Error:', error);
+            }
         } catch (error) {
             // Non-blocking error logging - don't fail the job because logging failed
             logger.error('Failed to write processing event', error);

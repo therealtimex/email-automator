@@ -8,16 +8,20 @@ import {
     Info, 
     AlertTriangle, 
     Activity,
-    Minimize2
+    Minimize2,
+    ChevronDown,
+    ChevronUp,
+    Code
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
+import { cn } from '../lib/utils';
 
 export function LiveTerminal() {
     const [events, setEvents] = useState<ProcessingEvent[]>([]);
     const [isExpanded, setIsExpanded] = useState(false);
-    const bottomRef = useRef<HTMLDivElement>(null);
-
+    const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
+    
     // Initial fetch of recent events
     useEffect(() => {
         fetchRecentEvents();
@@ -34,10 +38,16 @@ export function LiveTerminal() {
                 },
                 (payload) => {
                     const newEvent = payload.new as ProcessingEvent;
+                    
+                    // Auto-expand errors
+                    if (newEvent.event_type === 'error') {
+                        setExpandedEvents(prev => ({ ...prev, [newEvent.id]: true }));
+                    }
+
                     setEvents((prev) => {
-                        // Keep only last 100 events to prevent memory issues
-                        const updated = [...prev, newEvent];
-                        if (updated.length > 100) return updated.slice(updated.length - 100);
+                        // Insert at the beginning (descending order)
+                        const updated = [newEvent, ...prev];
+                        if (updated.length > 100) return updated.slice(0, 100);
                         return updated;
                     });
                 }
@@ -49,13 +59,6 @@ export function LiveTerminal() {
         };
     }, []);
 
-    // Auto-scroll to bottom
-    useEffect(() => {
-        if (bottomRef.current && isExpanded) {
-            bottomRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
-    }, [events, isExpanded]);
-
     const fetchRecentEvents = async () => {
         const { data } = await supabase
             .from('processing_events')
@@ -64,17 +67,20 @@ export function LiveTerminal() {
             .limit(50);
         
         if (data) {
-            // Reverse so oldest is top (terminal style)
-            setEvents(data.reverse());
+            setEvents(data);
         }
+    };
+
+    const toggleExpand = (id: string) => {
+        setExpandedEvents(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
     const getIcon = (type: string) => {
         switch (type) {
-            case 'analysis': return <Brain className="w-3 h-3 text-purple-400" />;
-            case 'action': return <Zap className="w-3 h-3 text-emerald-400" />;
-            case 'error': return <AlertTriangle className="w-3 h-3 text-red-400" />;
-            default: return <Info className="w-3 h-3 text-blue-400" />;
+            case 'analysis': return <Brain className="w-3 h-3 text-purple-500" />;
+            case 'action': return <Zap className="w-3 h-3 text-emerald-500" />;
+            case 'error': return <AlertTriangle className="w-3 h-3 text-red-500" />;
+            default: return <Info className="w-3 h-3 text-blue-500" />;
         }
     };
 
@@ -87,7 +93,7 @@ export function LiveTerminal() {
             <div className="fixed bottom-4 right-4 z-50">
                 <Button 
                     onClick={() => setIsExpanded(true)}
-                    className="shadow-lg bg-black text-white hover:bg-gray-900 border border-gray-800"
+                    className="shadow-lg bg-primary text-primary-foreground hover:opacity-90 border border-border"
                 >
                     <Terminal className="w-4 h-4 mr-2" />
                     Live Activity
@@ -103,80 +109,118 @@ export function LiveTerminal() {
     }
 
     return (
-        <Card className="fixed bottom-4 right-4 z-50 w-[500px] h-[600px] flex flex-col shadow-2xl border-gray-800 bg-black/95 text-gray-300 backdrop-blur-md animate-in slide-in-from-bottom-10">
-            <CardHeader className="py-3 px-4 border-b border-gray-800 flex flex-row items-center justify-between sticky top-0 bg-black/95 z-10">
+        <Card className="fixed bottom-4 right-4 z-50 w-[550px] h-[650px] flex flex-col shadow-2xl border-border bg-background/95 text-foreground backdrop-blur-md animate-in slide-in-from-bottom-10">
+            <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between sticky top-0 bg-background/95 z-20">
                 <div className="flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-green-500" />
-                    <CardTitle className="text-sm font-mono text-white">Agent Terminal</CardTitle>
-                    <div className="flex items-center gap-1 text-[10px] text-green-500 bg-green-950/30 px-2 py-0.5 rounded-full border border-green-900">
+                    <Terminal className="w-4 h-4 text-primary" />
+                    <CardTitle className="text-sm font-mono font-bold">Agent Terminal</CardTitle>
+                    <div className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 font-bold">
                         <Activity className="w-3 h-3" />
                         LIVE
                     </div>
                 </div>
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 w-6 p-0 hover:bg-gray-800"
-                    onClick={() => setIsExpanded(false)}
-                >
-                    <Minimize2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-[10px] font-mono hover:bg-secondary"
+                        onClick={() => setEvents([])}
+                    >
+                        Clear
+                    </Button>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 w-7 p-0 hover:bg-secondary"
+                        onClick={() => setIsExpanded(false)}
+                    >
+                        <Minimize2 className="w-4 h-4" />
+                    </Button>
+                </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-4 custom-scrollbar">
+            <CardContent className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-6 custom-scrollbar">
                 {events.length === 0 && (
-                    <div className="text-center text-gray-600 py-10">
+                    <div className="text-center text-muted-foreground py-20 italic">
                         Waiting for agent activity...
                     </div>
                 )}
                 
                 {events.map((event, i) => (
-                    <div key={event.id} className="relative pl-6 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <div key={event.id} className="relative pl-8 animate-in fade-in slide-in-from-top-2 duration-300">
                         {/* Connecting Line */}
                         {i !== events.length - 1 && (
-                            <div className="absolute left-[11px] top-6 bottom-[-16px] w-[1px] bg-gray-800" />
+                            <div className="absolute left-[13px] top-7 bottom-[-24px] w-[1px] bg-border" />
                         )}
                         
                         {/* Icon Badge */}
-                        <div className={`absolute left-0 top-0 w-6 h-6 rounded-full border border-gray-800 bg-gray-900 flex items-center justify-center z-10`}>
+                        <div className={cn(
+                            "absolute left-0 top-0 w-7 h-7 rounded-full border border-border bg-card flex items-center justify-center z-10 shadow-sm",
+                            event.event_type === 'error' && "border-red-500/50 bg-red-500/5",
+                            event.event_type === 'analysis' && "border-purple-500/50 bg-purple-500/5",
+                            event.event_type === 'action' && "border-emerald-500/50 bg-emerald-500/5"
+                        )}>
                             {getIcon(event.event_type)}
                         </div>
 
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between text-gray-500">
-                                <span className="font-bold text-gray-400">{event.agent_state}</span>
-                                <span className="text-[10px] opacity-50">{formatTime(event.created_at)}</span>
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between group">
+                                <div className="flex items-center gap-2">
+                                    <span className={cn(
+                                        "font-bold uppercase tracking-tight text-[10px]",
+                                        event.event_type === 'info' && "text-muted-foreground",
+                                        event.event_type === 'analysis' && "text-purple-600 dark:text-purple-400",
+                                        event.event_type === 'action' && "text-emerald-600 dark:text-emerald-400",
+                                        event.event_type === 'error' && "text-red-600 dark:text-red-400",
+                                    )}>
+                                        {event.agent_state}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground/60">{formatTime(event.created_at)}</span>
+                                </div>
+                                {(event.details?.system_prompt || event.details?._raw_response || event.details?.raw_response) && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => toggleExpand(event.id)}
+                                    >
+                                        {expandedEvents[event.id] ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
+                                        Details
+                                    </Button>
+                                )}
                             </div>
 
                             {/* Detailed Content */}
                             {event.event_type === 'analysis' && event.details ? (
-                                <div className="mt-1 bg-indigo-950/20 border border-indigo-500/20 rounded p-3">
-                                    <div className="flex gap-2 mb-2">
-                                        <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                                            event.details.is_useless ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'
-                                        }`}>
+                                <div className="bg-purple-500/5 border border-purple-500/10 rounded-lg p-3 space-y-2">
+                                    <div className="flex gap-2">
+                                        <span className={cn(
+                                            "px-1.5 py-0.5 rounded text-[9px] font-bold border",
+                                            event.details.is_useless ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20" : "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                                        )}>
                                             {event.details.is_useless ? 'USELESS' : 'RELEVANT'}
                                         </span>
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] border bg-blue-500/10 text-blue-400 border-blue-500/20 capitalize">
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 uppercase">
                                             {event.details.category}
                                         </span>
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] border bg-purple-500/10 text-purple-400 border-purple-500/20 capitalize">
-                                            {event.details.sentiment}
-                                        </span>
                                     </div>
-                                    <p className="text-gray-300 leading-relaxed opacity-90">
+                                    <p className="text-foreground/90 italic leading-relaxed">
                                         "{event.details.summary}"
                                     </p>
-                                    {event.details.suggested_action && event.details.suggested_action !== 'none' && (
-                                        <div className="mt-2 text-xs flex items-center gap-1 text-emerald-400">
-                                            <Zap className="w-3 h-3" />
-                                            Suggestion: <span className="uppercase">{event.details.suggested_action}</span>
+                                    {event.details.suggested_actions && event.details.suggested_actions.length > 0 && (
+                                        <div className="pt-1 flex items-center gap-2 flex-wrap">
+                                            {event.details.suggested_actions.map((a: string) => (
+                                                <div key={a} className="flex items-center gap-1 text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase">
+                                                    <Zap className="w-2.5 h-2.5" />
+                                                    {a}
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
                                 </div>
                             ) : event.event_type === 'action' && event.details ? (
-                                <div className="mt-1 bg-emerald-950/20 border border-emerald-500/20 rounded p-3">
-                                    <p className="text-emerald-400 font-bold mb-1 uppercase text-[10px] tracking-wider">Action Executed</p>
-                                    <p className="text-white">
+                                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">
+                                    <p className="text-emerald-600 dark:text-emerald-400 font-bold mb-1 uppercase text-[9px] tracking-widest">Execution Complete</p>
+                                    <p className="text-foreground font-medium">
                                         {event.details.action === 'delete' && 'Moved to Trash'}
                                         {event.details.action === 'archive' && 'Archived Email'}
                                         {event.details.action === 'draft' && 'Drafted Reply'}
@@ -185,24 +229,78 @@ export function LiveTerminal() {
                                         {!['delete', 'archive', 'draft', 'read', 'star'].includes(event.details.action) && event.details.action}
                                     </p>
                                     {event.details.reason && (
-                                        <p className="text-[10px] text-gray-500 mt-1">
-                                            Why: {event.details.reason}
+                                        <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                                            <Info className="w-3 h-3" />
+                                            {event.details.reason}
                                         </p>
                                     )}
                                 </div>
                             ) : event.event_type === 'error' && event.details ? (
-                                <div className="mt-1 bg-red-950/20 border border-red-500/20 rounded p-2 text-red-300">
+                                <div className="bg-red-500/5 border border-red-500/10 rounded-lg p-2.5 text-red-600 dark:text-red-400 font-medium">
                                     {event.details.error}
                                 </div>
                             ) : (
-                                <p className="text-gray-400 break-words">
+                                <p className="text-muted-foreground leading-relaxed">
                                     {event.details?.message || JSON.stringify(event.details)}
                                 </p>
+                            )}
+
+                            {/* Collapsible Technical Details */}
+                            {expandedEvents[event.id] && (
+                                <div className="mt-2 space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                                    {event.details?.system_prompt && (
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+                                                <Code className="w-3 h-3" /> System Prompt
+                                            </div>
+                                            <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
+                                                <pre className="whitespace-pre-wrap break-words text-[10px] leading-normal text-muted-foreground select-all">
+                                                    {event.details.system_prompt}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {event.details?.content_preview && (
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+                                                <Code className="w-3 h-3" /> Input Content (Cleaned)
+                                            </div>
+                                            <div className="bg-secondary/50 rounded-md p-3 border border-border">
+                                                <p className="whitespace-pre-wrap break-words text-[10px] text-muted-foreground">
+                                                    {event.details.content_preview}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {event.details?._raw_response && (
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+                                                <Code className="w-3 h-3" /> Raw LLM JSON Output
+                                            </div>
+                                            <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
+                                                <pre className="text-[10px] text-muted-foreground select-all">
+                                                    {JSON.stringify(JSON.parse(event.details._raw_response), null, 2)}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {event.details?.raw_response && (
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+                                                <Code className="w-3 h-3" /> Raw Response (from Error)
+                                            </div>
+                                            <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
+                                                <pre className="text-[10px] text-muted-foreground select-all whitespace-pre-wrap">
+                                                    {event.details.raw_response}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
                 ))}
-                <div ref={bottomRef} />
             </CardContent>
         </Card>
     );

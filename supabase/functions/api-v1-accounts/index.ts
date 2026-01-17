@@ -46,11 +46,33 @@ Deno.serve(async (req) => {
       const accountId = pathParts[1];
       const updates = await req.json();
 
+      // Fetch current state to check if we are moving the start date backwards
+      const { data: currentAccount } = await supabaseAdmin
+        .from('email_accounts')
+        .select('sync_start_date, last_sync_checkpoint')
+        .eq('id', accountId)
+        .eq('user_id', user.id)
+        .single();
+
       // Only allow updating specific fields
       const allowedUpdates: Record<string, any> = {};
-      if (updates.sync_start_date !== undefined) allowedUpdates.sync_start_date = updates.sync_start_date;
+      if (updates.sync_start_date !== undefined) {
+        allowedUpdates.sync_start_date = updates.sync_start_date;
+        
+        // If moving start date backwards, reset checkpoint to force backfill
+        if (currentAccount && updates.sync_start_date) {
+          const newDate = new Date(updates.sync_start_date).getTime();
+          const oldDate = currentAccount.sync_start_date ? new Date(currentAccount.sync_start_date).getTime() : Infinity;
+          
+          if (newDate < oldDate) {
+            console.log('Sync start date moved backwards, resetting checkpoint for account:', accountId);
+            allowedUpdates.last_sync_checkpoint = null;
+          }
+        }
+      }
       if (updates.sync_max_emails_per_run !== undefined) allowedUpdates.sync_max_emails_per_run = updates.sync_max_emails_per_run;
       if (updates.is_active !== undefined) allowedUpdates.is_active = updates.is_active;
+      if (updates.last_sync_checkpoint !== undefined) allowedUpdates.last_sync_checkpoint = updates.last_sync_checkpoint;
 
       const { data, error } = await supabaseAdmin
         .from('email_accounts')

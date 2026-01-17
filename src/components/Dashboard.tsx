@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -441,6 +441,16 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings }
                                     disabled={account.last_sync_status === 'syncing'}
                                 >
                                     <RefreshCw className={cn("w-3 h-3", account.last_sync_status === 'syncing' && "animate-spin")} />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-orange-500"
+                                    title="Reset Checkpoint (Force Full Re-sync from Start Date)"
+                                    onClick={() => onUpdate(account.id, { last_sync_checkpoint: null })}
+                                    disabled={account.last_sync_status === 'syncing'}
+                                >
+                                    <RotateCcw className="w-3 h-3" />
                                 </Button>
                             </div>
                         </div>
