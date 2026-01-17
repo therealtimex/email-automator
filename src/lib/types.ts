@@ -59,12 +59,17 @@ export interface UserSettings {
     auto_trash_spam: boolean;
     smart_drafts: boolean;
     sync_interval_minutes: number;
-    // BYOK Credentials
-    google_client_id?: string;
-    google_client_secret?: string;
-    microsoft_client_id?: string;
-    microsoft_client_secret?: string;
-    microsoft_tenant_id?: string;
+    preferences?: Record<string, any>;
+}
+
+export interface Integration {
+    id: string;
+    user_id: string;
+    provider: 'google' | 'microsoft' | 'openai';
+    credentials: Record<string, any>;
+    is_enabled: boolean;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface ProcessingLog {
@@ -77,6 +82,16 @@ export interface ProcessingLog {
     emails_deleted: number;
     emails_drafted: number;
     error_message: string | null;
+}
+
+export interface ProcessingEvent {
+    id: string;
+    run_id: string;
+    email_id?: string | null;
+    event_type: 'info' | 'analysis' | 'action' | 'error';
+    agent_state: string;
+    details?: any;
+    created_at: string;
 }
 
 // Enums

@@ -106,5 +106,11 @@ export const schemas = {
         auto_trash_spam: z.boolean().optional(),
         smart_drafts: z.boolean().optional(),
         sync_interval_minutes: z.number().min(1).max(60).optional(),
+        // BYOK Credentials (transient, moved to integrations)
+        google_client_id: z.string().optional(),
+        google_client_secret: z.string().optional(),
+        microsoft_client_id: z.string().optional(),
+        microsoft_client_secret: z.string().optional(),
+        microsoft_tenant_id: z.string().optional(),
     }),
 };

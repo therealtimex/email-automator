@@ -3,6 +3,8 @@ import Instructor from '@instructor-ai/instructor';
 import { z } from 'zod';
 import { config } from '../config/index.js';
 import { createLogger } from '../utils/logger.js';
+import { EventLogger } from './eventLogger.js';
+import { ContentCleaner } from '../utils/contentCleaner.js';
 
 const logger = createLogger('Intelligence');
 
@@ -49,46 +51,71 @@ export class IntelligenceService {
         const baseUrl = overrides?.baseUrl || config.llm.baseUrl;
         this.model = overrides?.model || config.llm.model;
 
-        if (!apiKey) {
-            logger.warn('LLM_API_KEY is missing. AI analysis will not work.');
+        // Allow local LLM servers (LM Studio, Ollama) or custom endpoints that don't need API keys
+        // We assume any custom baseUrl might be a local/private instance.
+        const isCustomEndpoint = baseUrl && !baseUrl.includes('api.openai.com');
+
+        if (!apiKey && !isCustomEndpoint) {
+            logger.warn('LLM_API_KEY is missing and no custom LLM endpoint configured. AI analysis will not work.');
             return;
         }
 
         try {
             const oai = new OpenAI({
-                apiKey,
+                apiKey: apiKey || 'not-needed-for-local',  // Placeholder for local LLMs
                 baseURL: baseUrl,
             });
 
             this.client = Instructor({
                 client: oai,
-                mode: 'JSON',
+                mode: 'MD_JSON',
             });
 
             this.isConfigured = true;
             logger.info('Intelligence service initialized', { model: this.model, baseUrl: baseUrl || 'default' });
         } catch (error) {
+            console.error('[Intelligence] Init failed:', error);
             logger.error('Failed to initialize Intelligence service', error);
         }
     }
 
     isReady(): boolean {
-        return this.isConfigured && !!this.client;
+        const ready = this.isConfigured && !!this.client;
+        if (!ready) console.log('[Intelligence] isReady check failed:', { isConfigured: this.isConfigured, hasClient: !!this.client });
+        return ready;
     }
 
-    async analyzeEmail(content: string, context: EmailContext): Promise<EmailAnalysis | null> {
+    async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger): Promise<EmailAnalysis | null> {
+        console.log('[Intelligence] analyzeEmail called for:', context.subject);
+        
         if (!this.isReady()) {
+            console.log('[Intelligence] Not ready, skipping');
             logger.warn('Intelligence service not ready, skipping analysis');
+            if (eventLogger) {
+                await eventLogger.info('Skipped', 'AI Analysis skipped: Model not configured. Please check settings.');
+            }
             return null;
         }
 
+        if (eventLogger) {
+            console.log('[Intelligence] Logging "Thinking" event');
+            await eventLogger.info('Thinking', `Analyzing email: ${context.subject}`, { model: this.model });
+        }
+
+        // Clean and truncate content to avoid token overflow and noise
+        const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
+
         try {
-            const systemPrompt = `You are an AI Email Assistant. Analyze the provided email and extract structured information.
-Your goal is to help the user manage their inbox efficiently by:
-1. Categorizing emails accurately
-2. Identifying spam and useless emails
-3. Suggesting appropriate actions
-4. Drafting responses when needed
+            const systemPrompt = `You are an AI Email Assistant. Your task is to analyze the provided email and extract structured information as JSON.
+Do NOT include any greetings, chatter, or special tokens like <|channel|> in your output.
+
+Definitions for Categories:
+- "important": Work-related, urgent, from known contacts
+- "promotional": Marketing, sales, discounts
+- "transactional": Receipts, shipping, confirmations
+- "social": LinkedIn, friends, social updates
+- "newsletter": Subscribed content
+- "spam": Junk, suspicious
 
 Context:
 - Current Date: ${new Date().toISOString()}
@@ -102,12 +129,13 @@ ${context.userPreferences?.smartDrafts ? '- User wants draft responses for impor
                 model: this.model,
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: content || '[Empty email body]' },
+                    { role: 'user', content: cleanedContent || '[Empty email body]' },
                 ],
                 response_model: {
                     schema: EmailAnalysisSchema,
                     name: 'EmailAnalysis',
                 },
+                temperature: 0.1,
                 max_retries: config.processing.maxRetries,
             });
 
@@ -116,9 +144,16 @@ ${context.userPreferences?.smartDrafts ? '- User wants draft responses for impor
                 action: response.suggested_action,
             });
 
+            if (eventLogger) {
+                await eventLogger.analysis('Decided', 'Analysis complete', response);
+            }
+
             return response;
         } catch (error) {
             logger.error('AI Analysis failed', error);
+            if (eventLogger) {
+                await eventLogger.error('Error', error);
+            }
             return null;
         }
     }

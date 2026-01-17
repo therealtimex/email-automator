@@ -12,25 +12,44 @@ const logger = createLogger('SettingsRoutes');
 router.get('/',
     authMiddleware,
     asyncHandler(async (req, res) => {
-        const { data, error } = await req.supabase!
-            .from('user_settings')
-            .select('*')
-            .eq('user_id', req.user!.id)
-            .single();
+        // Fetch settings and integrations in parallel
+        const [settingsResult, integrationsResult] = await Promise.all([
+            req.supabase!
+                .from('user_settings')
+                .select('*')
+                .eq('user_id', req.user!.id)
+                .single(),
+            req.supabase!
+                .from('integrations')
+                .select('*')
+                .eq('user_id', req.user!.id)
+        ]);
 
-        if (error && error.code !== 'PGRST116') {
-            // PGRST116 = no rows returned
-            throw error;
-        }
+        const settingsData = settingsResult.data;
+        const integrationsData = integrationsResult.data || [];
 
         // Return defaults if no settings exist
-        const settings = data || {
+        const settings = settingsData || {
             llm_model: null,
             llm_base_url: null,
             auto_trash_spam: false,
             smart_drafts: false,
             sync_interval_minutes: 5,
         };
+
+        // Merge integration credentials back into settings for frontend compatibility
+        const googleIntegration = integrationsData.find((i: any) => i.provider === 'google');
+        if (googleIntegration?.credentials) {
+            settings.google_client_id = googleIntegration.credentials.client_id;
+            settings.google_client_secret = googleIntegration.credentials.client_secret;
+        }
+
+        const microsoftIntegration = integrationsData.find((i: any) => i.provider === 'microsoft');
+        if (microsoftIntegration?.credentials) {
+            settings.microsoft_client_id = microsoftIntegration.credentials.client_id;
+            settings.microsoft_client_secret = microsoftIntegration.credentials.client_secret;
+            settings.microsoft_tenant_id = microsoftIntegration.credentials.tenant_id;
+        }
 
         res.json({ settings });
     })
@@ -42,25 +61,95 @@ router.patch('/',
     authMiddleware,
     validateBody(schemas.updateSettings),
     asyncHandler(async (req, res) => {
-        const updates = req.body;
+        const {
+            google_client_id,
+            google_client_secret,
+            microsoft_client_id,
+            microsoft_client_secret,
+            microsoft_tenant_id,
+            ...userSettingsUpdates
+        } = req.body;
+        
         const userId = req.user!.id;
 
-        // Upsert settings
-        const { data, error } = await req.supabase!
+        // 1. Update user_settings
+        const { data: updatedSettings, error: settingsError } = await req.supabase!
             .from('user_settings')
             .upsert({
                 user_id: userId,
-                ...updates,
+                ...userSettingsUpdates,
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'user_id' })
             .select()
             .single();
 
-        if (error) throw error;
+        if (settingsError) throw settingsError;
+
+        // 2. Handle Google Integration
+        if (google_client_id || google_client_secret) {
+            const { data: existing } = await req.supabase!
+                .from('integrations')
+                .select('credentials')
+                .eq('user_id', userId)
+                .eq('provider', 'google')
+                .single();
+                
+            const credentials: any = {};
+            if (google_client_id) credentials.client_id = google_client_id;
+            if (google_client_secret) credentials.client_secret = google_client_secret;
+
+            const newCredentials = { ...(existing?.credentials || {}), ...credentials };
+
+            await req.supabase!
+                .from('integrations')
+                .upsert({
+                    user_id: userId,
+                    provider: 'google',
+                    credentials: newCredentials,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id, provider' });
+        }
+
+        // 3. Handle Microsoft Integration
+        if (microsoft_client_id || microsoft_client_secret || microsoft_tenant_id) {
+             const { data: existing } = await req.supabase!
+                .from('integrations')
+                .select('credentials')
+                .eq('user_id', userId)
+                .eq('provider', 'microsoft')
+                .single();
+
+             const credentials: any = {};
+             if (microsoft_client_id) credentials.client_id = microsoft_client_id;
+             if (microsoft_client_secret) credentials.client_secret = microsoft_client_secret;
+             if (microsoft_tenant_id) credentials.tenant_id = microsoft_tenant_id;
+
+             const newCredentials = { ...(existing?.credentials || {}), ...credentials };
+
+            await req.supabase!
+                .from('integrations')
+                .upsert({
+                    user_id: userId,
+                    provider: 'microsoft',
+                    credentials: newCredentials,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id, provider' });
+        }
+
+        // Construct response with merged values
+        const finalSettings = {
+            ...updatedSettings,
+            // Re-inject the values from request if they were present
+            ...(google_client_id ? { google_client_id } : {}),
+            ...(google_client_secret ? { google_client_secret } : {}),
+            ...(microsoft_client_id ? { microsoft_client_id } : {}),
+            ...(microsoft_client_secret ? { microsoft_client_secret } : {}),
+            ...(microsoft_tenant_id ? { microsoft_tenant_id } : {}),
+        };
 
         logger.info('Settings updated', { userId });
 
-        res.json({ settings: data });
+        res.json({ settings: finalSettings });
     })
 );
 

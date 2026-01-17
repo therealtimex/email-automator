@@ -22,6 +22,7 @@ import {
 } from './lib/migration-check';
 import { MigrationBanner } from './components/migration/MigrationBanner';
 import { MigrationModal } from './components/migration/MigrationModal';
+import { LiveTerminal } from './components/LiveTerminal';
 
 type TabType = 'dashboard' | 'config' | 'analytics';
 
@@ -252,6 +253,8 @@ function AppContent() {
                         status={migrationStatus}
                     />
                 )}
+
+                <LiveTerminal />
             </div>
         </MigrationProvider>
     );

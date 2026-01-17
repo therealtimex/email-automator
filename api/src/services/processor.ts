@@ -5,6 +5,7 @@ import { getGmailService, GmailMessage } from './gmail.js';
 import { getMicrosoftService, OutlookMessage } from './microsoft.js';
 import { getIntelligenceService, EmailAnalysis } from './intelligence.js';
 import { EmailAccount, Email, Rule, ProcessingLog } from './supabase.js';
+import { EventLogger } from './eventLogger.js';
 
 const logger = createLogger('Processor');
 
@@ -79,11 +80,14 @@ export class EmailProcessorService {
                 .eq('user_id', userId)
                 .single();
 
+            const eventLogger = log ? new EventLogger(this.supabase, log.id) : null;
+            if (eventLogger) await eventLogger.info('Running', 'Starting sync process');
+
             // Process based on provider
             if (refreshedAccount.provider === 'gmail') {
-                await this.processGmailAccount(refreshedAccount, rules || [], settings, result);
+                await this.processGmailAccount(refreshedAccount, rules || [], settings, result, eventLogger);
             } else if (refreshedAccount.provider === 'outlook') {
-                await this.processOutlookAccount(refreshedAccount, rules || [], settings, result);
+                await this.processOutlookAccount(refreshedAccount, rules || [], settings, result, eventLogger);
             }
 
             // Update log and account on success
@@ -141,7 +145,8 @@ export class EmailProcessorService {
         account: EmailAccount,
         rules: Rule[],
         settings: any,
-        result: ProcessingResult
+        result: ProcessingResult,
+        eventLogger: EventLogger | null
     ): Promise<void> {
         const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
 
@@ -154,11 +159,15 @@ export class EmailProcessorService {
             const startSeconds = Math.floor(new Date(account.sync_start_date).getTime() / 1000);
             query = `after:${startSeconds}`;
         }
+        
+        if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Gmail', { query, batchSize });
 
         const { messages } = await this.gmailService.fetchMessages(account, {
             maxResults: batchSize,
             query: query || undefined,
         });
+        
+        if (eventLogger) await eventLogger.info('Fetching', `Fetched ${messages.length} emails`);
 
         let maxInternalDate = account.last_sync_checkpoint ? parseInt(account.last_sync_checkpoint) : 0;
 
@@ -169,7 +178,7 @@ export class EmailProcessorService {
                 // For now, we'll use the date from headers which is what parseMessage returns
                 // But internalDate is more reliable for checkpoints.
                 // Re-viewing parseMessage shows it doesn't return internalDate.
-                await this.processMessage(account, message, rules, settings, result);
+                await this.processMessage(account, message, rules, settings, result, eventLogger);
 
                 // Track progress for checkpoint (simplified: using Date.now() for next time, 
                 // or better: the date of the message)
@@ -177,6 +186,7 @@ export class EmailProcessorService {
                 if (msgDate > maxInternalDate) maxInternalDate = msgDate;
             } catch (error) {
                 logger.error('Failed to process Gmail message', error, { messageId: message.id });
+                if (eventLogger) await eventLogger.error('Error', error);
                 result.errors++;
             }
         }
@@ -194,7 +204,8 @@ export class EmailProcessorService {
         account: EmailAccount,
         rules: Rule[],
         settings: any,
-        result: ProcessingResult
+        result: ProcessingResult,
+        eventLogger: EventLogger | null
     ): Promise<void> {
         const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
 
@@ -206,22 +217,27 @@ export class EmailProcessorService {
             filter = `receivedDateTime ge ${new Date(account.sync_start_date).toISOString()}`;
         }
 
+        if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Outlook', { filter, batchSize });
+
         const { messages } = await this.microsoftService.fetchMessages(account, {
             top: batchSize,
             filter: filter || undefined,
         });
+        
+        if (eventLogger) await eventLogger.info('Fetching', `Fetched ${messages.length} emails`);
 
         let latestCheckpoint = account.last_sync_checkpoint || '';
 
         for (const message of messages) {
             try {
-                await this.processMessage(account, message, rules, settings, result);
+                await this.processMessage(account, message, rules, settings, result, eventLogger);
 
                 if (!latestCheckpoint || message.date > latestCheckpoint) {
                     latestCheckpoint = message.date;
                 }
             } catch (error) {
                 logger.error('Failed to process Outlook message', error, { messageId: message.id });
+                if (eventLogger) await eventLogger.error('Error', error);
                 result.errors++;
             }
         }
@@ -240,7 +256,8 @@ export class EmailProcessorService {
         message: GmailMessage | OutlookMessage,
         rules: Rule[],
         settings: any,
-        result: ProcessingResult
+        result: ProcessingResult,
+        eventLogger: EventLogger | null
     ): Promise<void> {
         // Check if already processed
         const { data: existing } = await this.supabase
@@ -252,8 +269,11 @@ export class EmailProcessorService {
 
         if (existing) {
             logger.debug('Message already processed', { messageId: message.id });
+            if (eventLogger) await eventLogger.info('Skipped', `Already processed: ${message.subject}`);
             return;
         }
+        
+        if (eventLogger) await eventLogger.info('Processing', `Processing email: ${message.subject}`);
 
         // Analyze with AI
         const intelligenceService = getIntelligenceService(
@@ -274,7 +294,7 @@ export class EmailProcessorService {
                 autoTrashSpam: settings?.auto_trash_spam,
                 smartDrafts: settings?.smart_drafts,
             },
-        });
+        }, eventLogger || undefined);
 
         // Save to database
         const emailData: Partial<Email> = {
@@ -296,12 +316,14 @@ export class EmailProcessorService {
             .insert(emailData)
             .select()
             .single();
+            
+        // Log email created event? Maybe redundant if we have analysis event.
 
         result.processed++;
 
         // Execute automation rules
         if (analysis && savedEmail) {
-            await this.executeRules(account, savedEmail, analysis, rules, settings, result);
+            await this.executeRules(account, savedEmail, analysis, rules, settings, result, eventLogger);
         }
     }
 
@@ -311,25 +333,26 @@ export class EmailProcessorService {
         analysis: EmailAnalysis,
         rules: Rule[],
         settings: any,
-        result: ProcessingResult
+        result: ProcessingResult,
+        eventLogger: EventLogger | null
     ): Promise<void> {
         // Auto-trash spam
         if (settings?.auto_trash_spam && analysis.is_useless && analysis.category === 'spam') {
-            await this.executeAction(account, email, 'delete');
+            await this.executeAction(account, email, 'delete', undefined, eventLogger, 'Auto-trash spam setting');
             result.deleted++;
             return;
         }
 
         // Smart drafts
         if (settings?.smart_drafts && analysis.suggested_action === 'reply' && analysis.draft_response) {
-            await this.executeAction(account, email, 'draft', analysis.draft_response);
+            await this.executeAction(account, email, 'draft', analysis.draft_response, eventLogger, 'Smart drafts setting');
             result.drafted++;
         }
 
         // User-defined rules
         for (const rule of rules) {
             if (this.matchesCondition(analysis, rule.condition)) {
-                await this.executeAction(account, email, rule.action);
+                await this.executeAction(account, email, rule.action, undefined, eventLogger, `Rule: ${rule.name}`);
 
                 if (rule.action === 'delete') result.deleted++;
                 else if (rule.action === 'draft') result.drafted++;
@@ -352,9 +375,15 @@ export class EmailProcessorService {
         account: EmailAccount,
         email: Email,
         action: 'delete' | 'archive' | 'draft' | 'read' | 'star',
-        draftContent?: string
+        draftContent?: string,
+        eventLogger?: EventLogger | null,
+        reason?: string
     ): Promise<void> {
         try {
+            if (eventLogger) {
+                await eventLogger.info('Acting', `Executing action: ${action}`, { emailId: email.id, reason });
+            }
+
             if (account.provider === 'gmail') {
                 if (action === 'delete') {
                     await this.gmailService.trashMessage(account, email.external_id);
@@ -388,8 +417,15 @@ export class EmailProcessorService {
                 .eq('id', email.id);
 
             logger.debug('Action executed', { emailId: email.id, action });
+            
+            if (eventLogger) {
+                await eventLogger.action('Acted', email.id, action, reason);
+            }
         } catch (error) {
             logger.error('Failed to execute action', error, { emailId: email.id, action });
+            if (eventLogger) {
+                await eventLogger.error('Action Failed', error, email.id);
+            }
             throw error;
         }
     }

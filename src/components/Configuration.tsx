@@ -17,6 +17,14 @@ import {
     DialogTitle,
 } from './ui/dialog';
 
+interface ExtendedUserSettings extends UserSettings {
+    google_client_id?: string;
+    google_client_secret?: string;
+    microsoft_client_id?: string;
+    microsoft_client_secret?: string;
+    microsoft_tenant_id?: string;
+}
+
 export function Configuration() {
     const { state, actions } = useApp();
     const [isConnecting, setIsConnecting] = useState(false);
@@ -29,7 +37,7 @@ export function Configuration() {
     } | null>(null);
     const [savingSettings, setSavingSettings] = useState(false);
     const [testingLlm, setTestingLlm] = useState(false);
-    const [localSettings, setLocalSettings] = useState<Partial<UserSettings>>({});
+    const [localSettings, setLocalSettings] = useState<Partial<ExtendedUserSettings>>({});
 
     // Gmail credentials modal state
     const [showGmailModal, setShowGmailModal] = useState(false);
@@ -149,7 +157,7 @@ export function Configuration() {
                 ...localSettings,
                 google_client_id: gmailClientId,
                 google_client_secret: gmailClientSecret,
-            });
+            } as any);
 
             if (success) {
                 // Update local state
@@ -230,7 +238,7 @@ export function Configuration() {
                 ...localSettings,
                 microsoft_client_id: outlookClientId,
                 microsoft_tenant_id: outlookTenantId || 'common',
-            });
+            } as any);
 
             if (success) {
                 // Update local state
@@ -353,7 +361,7 @@ export function Configuration() {
 
     const handleSaveSettings = async () => {
         setSavingSettings(true);
-        const success = await actions.updateSettings(localSettings);
+        const success = await actions.updateSettings(localSettings as any);
         setSavingSettings(false);
 
         if (success) {

@@ -11,35 +11,37 @@ export interface OAuthCredentials {
 /**
  * Fetch credentials for a specific provider.
  * Priority: 
- * 1. user_settings table (for the given user)
+ * 1. integrations table (for the given user)
  * 2. Deno.env (server-side secrets)
  */
 export async function getProviderCredentials(
     userId: string,
     provider: 'google' | 'microsoft'
 ): Promise<OAuthCredentials> {
-    // 1. Try to fetch from user_settings
-    const { data: settings } = await supabaseAdmin
-        .from('user_settings')
-        .select('*')
+    // 1. Try to fetch from integrations
+    const { data: integration } = await supabaseAdmin
+        .from('integrations')
+        .select('credentials')
         .eq('user_id', userId)
-        .single();
+        .eq('provider', provider)
+        .maybeSingle();
 
-    if (settings) {
-        if (provider === 'google' && settings.google_client_id && settings.google_client_secret) {
+    if (integration?.credentials) {
+        const creds = integration.credentials as any;
+        
+        if (provider === 'google' && creds.client_id && creds.client_secret) {
             return {
-                clientId: settings.google_client_id,
-                clientSecret: settings.google_client_secret,
-                redirectUri: Deno.env.get('GMAIL_REDIRECT_URI') // Redirect URI is usually app-specific, still from env for now or could be generic
+                clientId: creds.client_id,
+                clientSecret: creds.client_secret,
+                redirectUri: Deno.env.get('GMAIL_REDIRECT_URI') 
             };
         }
 
-        if (provider === 'microsoft' && settings.microsoft_client_id) {
-            // MS ID is required, Secret is optional for Public Client but we support confidential if provided
+        if (provider === 'microsoft' && creds.client_id) {
             return {
-                clientId: settings.microsoft_client_id,
-                clientSecret: settings.microsoft_client_secret || Deno.env.get('MS_GRAPH_CLIENT_SECRET') || '',
-                tenantId: settings.microsoft_tenant_id || Deno.env.get('MS_GRAPH_TENANT_ID') || 'common'
+                clientId: creds.client_id,
+                clientSecret: creds.client_secret || Deno.env.get('MS_GRAPH_CLIENT_SECRET') || '',
+                tenantId: creds.tenant_id || Deno.env.get('MS_GRAPH_TENANT_ID') || 'common'
             };
         }
     }

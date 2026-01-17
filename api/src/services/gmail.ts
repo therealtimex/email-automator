@@ -34,16 +34,19 @@ export class GmailService {
     }
 
     async getProviderCredentials(supabase: SupabaseClient, userId: string): Promise<OAuthCredentials> {
-        const { data: settings } = await supabase
-            .from('user_settings')
-            .select('google_client_id, google_client_secret')
+        const { data: integration } = await supabase
+            .from('integrations')
+            .select('credentials')
             .eq('user_id', userId)
+            .eq('provider', 'google')
             .single();
 
-        if (settings?.google_client_id && settings?.google_client_secret) {
+        const creds = integration?.credentials as any;
+
+        if (creds?.client_id && creds?.client_secret) {
             return {
-                clientId: settings.google_client_id,
-                clientSecret: settings.google_client_secret,
+                clientId: creds.client_id,
+                clientSecret: creds.client_secret,
                 redirectUri: config.gmail.redirectUri
             };
         }
