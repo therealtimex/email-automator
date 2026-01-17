@@ -7,6 +7,13 @@ import { EmailAccount } from './supabase.js';
 
 const logger = createLogger('GmailService');
 
+export interface RuleAttachment {
+    name: string;
+    path: string;
+    type: string;
+    size: number;
+}
+
 export interface GmailMessage {
     id: string;
     threadId: string;
@@ -16,6 +23,12 @@ export interface GmailMessage {
     date: string;
     body: string;
     snippet: string;
+    headers: {
+        importance?: string;
+        listUnsubscribe?: string;
+        autoSubmitted?: string;
+        mailer?: string;
+    };
 }
 
 export interface OAuthCredentials {
@@ -239,6 +252,12 @@ export class GmailService {
             date: getHeader('Date'),
             body,
             snippet: message.snippet || '',
+            headers: {
+                importance: getHeader('Importance') || getHeader('X-Priority'),
+                listUnsubscribe: getHeader('List-Unsubscribe'),
+                autoSubmitted: getHeader('Auto-Submitted'),
+                mailer: getHeader('X-Mailer'),
+            }
         };
     }
 
@@ -270,7 +289,9 @@ export class GmailService {
     async createDraft(
         account: EmailAccount,
         originalMessageId: string,
-        replyContent: string
+        replyContent: string,
+        supabase?: SupabaseClient,
+        attachments?: RuleAttachment[]
     ): Promise<string> {
         const gmail = await this.getAuthenticatedClient(account);
 
@@ -282,14 +303,57 @@ export class GmailService {
         const subject = getHeader('Subject');
         const threadId = original.data.threadId;
 
-        const rawMessage = [
-            `To: ${toAddress}`,
-            `Subject: Re: ${subject}`,
-            `In-Reply-To: ${originalMessageId}`,
-            `References: ${originalMessageId}`,
-            '',
-            replyContent,
-        ].join('\r\n');
+        let rawMessage = '';
+        const boundary = `----=_Part_${Math.random().toString(36).substring(2)}`;
+
+        if (attachments && attachments.length > 0 && supabase) {
+            // Multipart message
+            rawMessage = [
+                `To: ${toAddress}`,
+                `Subject: Re: ${subject}`,
+                `In-Reply-To: ${originalMessageId}`,
+                `References: ${originalMessageId}`,
+                `Content-Type: multipart/mixed; boundary="${boundary}"`,
+                '',
+                `--${boundary}`,
+                'Content-Type: text/plain; charset="UTF-8"',
+                'Content-Transfer-Encoding: 7bit',
+                '',
+                replyContent,
+                '',
+            ].join('\r\n');
+
+            for (const attachment of attachments) {
+                try {
+                    const content = await this.fetchAttachment(supabase, attachment.path);
+                    const base64Content = Buffer.from(content).toString('base64');
+                    
+                    rawMessage += [
+                        `--${boundary}`,
+                        `Content-Type: ${attachment.type}; name="${attachment.name}"`,
+                        `Content-Disposition: attachment; filename="${attachment.name}"`,
+                        'Content-Transfer-Encoding: base64',
+                        '',
+                        base64Content,
+                        '',
+                    ].join('\r\n');
+                } catch (err) {
+                    logger.error('Failed to attach file', err, { path: attachment.path });
+                }
+            }
+            
+            rawMessage += `--${boundary}--`;
+        } else {
+            // Simple plain text message
+            rawMessage = [
+                `To: ${toAddress}`,
+                `Subject: Re: ${subject}`,
+                `In-Reply-To: ${originalMessageId}`,
+                `References: ${originalMessageId}`,
+                '',
+                replyContent,
+            ].join('\r\n');
+        }
 
         const encodedMessage = Buffer.from(rawMessage)
             .toString('base64')
@@ -307,7 +371,7 @@ export class GmailService {
             },
         });
 
-        logger.debug('Draft created', { draftId: draft.data.id });
+        logger.debug('Draft created', { draftId: draft.data.id, attachments: attachments?.length || 0 });
         return draft.data.id!;
     }
 
@@ -337,6 +401,15 @@ export class GmailService {
     async starMessage(account: EmailAccount, messageId: string): Promise<void> {
         await this.addLabel(account, messageId, ['STARRED']);
         logger.debug('Message starred', { messageId });
+    }
+
+    private async fetchAttachment(supabase: SupabaseClient, path: string): Promise<Uint8Array> {
+        const { data, error } = await supabase.storage
+            .from('rule-attachments')
+            .download(path);
+
+        if (error) throw error;
+        return new Uint8Array(await data.arrayBuffer());
     }
 
     async getProfile(account: EmailAccount): Promise<{ emailAddress: string; messagesTotal: number }> {

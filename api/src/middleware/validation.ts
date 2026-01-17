@@ -87,14 +87,16 @@ export const schemas = {
     createRule: z.object({
         name: z.string().min(1).max(100),
         condition: z.record(z.unknown()),
-        action: z.enum(['delete', 'archive', 'draft']),
+        action: z.enum(['delete', 'archive', 'draft', 'star', 'read']),
+        instructions: z.string().optional(),
         is_enabled: z.boolean().default(true),
     }),
 
     updateRule: z.object({
         name: z.string().min(1).max(100).optional(),
         condition: z.record(z.unknown()).optional(),
-        action: z.enum(['delete', 'archive', 'draft']).optional(),
+        action: z.enum(['delete', 'archive', 'draft', 'star', 'read']).optional(),
+        instructions: z.string().optional(),
         is_enabled: z.boolean().optional(),
     }),
 

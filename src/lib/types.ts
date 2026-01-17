@@ -41,6 +41,8 @@ export interface Rule {
     name: string;
     condition: RuleCondition;
     action: 'delete' | 'archive' | 'draft' | 'read' | 'star';
+    instructions?: string;
+    attachments?: RuleAttachment[];
     is_enabled: boolean;
     created_at: string;
 }
@@ -49,8 +51,19 @@ export interface RuleCondition {
     category?: EmailCategory;
     is_useless?: boolean;
     sender_contains?: string;
+    sender_domain?: string;
+    sender_email?: string;
     subject_contains?: string;
+    body_contains?: string;
     priority?: Priority;
+    sentiment?: Sentiment;
+}
+
+export interface RuleAttachment {
+    name: string;
+    path: string;
+    type: string;
+    size: number;
 }
 
 export interface UserSettings {

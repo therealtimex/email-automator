@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
-import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload } from 'lucide-react';
+import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload, Paperclip, X } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useApp } from '../context/AppContext';
 import { api } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
 import { EmailAccount, Rule, UserSettings } from '../lib/types';
@@ -62,6 +63,9 @@ export function Configuration() {
     const [newRuleKey, setNewRuleKey] = useState('category');
     const [newRuleValue, setNewRuleValue] = useState('newsletter');
     const [newRuleAction, setNewRuleAction] = useState('archive');
+    const [newRuleInstructions, setNewRuleInstructions] = useState('');
+    const [newRuleAttachments, setNewRuleAttachments] = useState<RuleAttachment[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
     const [savingRule, setSavingRule] = useState(false);
 
     useEffect(() => {
@@ -332,6 +336,8 @@ export function Configuration() {
                 name: newRuleName,
                 condition,
                 action: newRuleAction as any,
+                instructions: newRuleAction === 'draft' ? newRuleInstructions : undefined,
+                attachments: newRuleAction === 'draft' ? newRuleAttachments : [],
                 is_enabled: true
             });
 
@@ -339,6 +345,8 @@ export function Configuration() {
                 toast.success('Rule created');
                 setShowRuleModal(false);
                 setNewRuleName('');
+                setNewRuleInstructions('');
+                setNewRuleAttachments([]);
                 actions.fetchRules();
             } else {
                 toast.error('Failed to create rule');
@@ -392,6 +400,46 @@ export function Configuration() {
 
     const handleToggleRule = async (ruleId: string) => {
         await actions.toggleRule(ruleId);
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        setIsUploading(true);
+        const file = files[0];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${state.user.id}/${fileName}`;
+
+        try {
+            const { error: uploadError } = await supabase.storage
+                .from('rule-attachments')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const newAttachment: RuleAttachment = {
+                name: file.name,
+                path: filePath,
+                type: file.type,
+                size: file.size
+            };
+
+            setNewRuleAttachments(prev => [...prev, newAttachment]);
+            toast.success('File uploaded');
+        } catch (error) {
+            console.error('Upload error:', error);
+            toast.error('Failed to upload file');
+        } finally {
+            setIsUploading(false);
+            // Reset input
+            e.target.value = '';
+        }
+    };
+
+    const removeAttachment = (path: string) => {
+        setNewRuleAttachments(prev => prev.filter(a => a.path !== path));
     };
 
     const getProviderIcon = (provider: string) => {
@@ -677,25 +725,44 @@ export function Configuration() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">If Condition Field</label>
                                 <select
-                                    className="w-full p-2 border rounded-md bg-background"
+                                    className="w-full p-2 border rounded-md bg-background text-sm"
                                     value={newRuleKey}
-                                    onChange={(e) => setNewRuleKey(e.target.value)}
+                                    onChange={(e) => {
+                                        setNewRuleKey(e.target.value);
+                                        // Set default values for certain keys
+                                        if (e.target.value === 'category') setNewRuleValue('newsletter');
+                                        else if (e.target.value === 'sentiment') setNewRuleValue('Positive');
+                                        else if (e.target.value === 'priority') setNewRuleValue('High');
+                                        else setNewRuleValue('');
+                                    }}
                                 >
-                                    <option value="category">Category</option>
-                                    <option value="sentiment">Sentiment</option>
-                                    <option value="priority">Priority</option>
+                                    <optgroup label="AI Analysis">
+                                        <option value="category">Category</option>
+                                        <option value="sentiment">Sentiment</option>
+                                        <option value="priority">Priority</option>
+                                    </optgroup>
+                                    <optgroup label="Metadata">
+                                        <option value="sender_email">Specific Email (Exact)</option>
+                                        <option value="sender_domain">Email Domain (@...)</option>
+                                        <option value="sender_contains">Sender contains...</option>
+                                        <option value="subject_contains">Subject contains...</option>
+                                        <option value="body_contains">Body contains...</option>
+                                    </optgroup>
                                 </select>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Equals Value</label>
                                 {newRuleKey === 'category' ? (
                                     <select
-                                        className="w-full p-2 border rounded-md bg-background"
+                                        className="w-full p-2 border rounded-md bg-background text-sm"
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
                                     >
                                         <option value="newsletter">Newsletter</option>
                                         <option value="spam">Spam</option>
+                                        <option value="promotional">Promotional</option>
+                                        <option value="transactional">Transactional</option>
+                                        <option value="social">Social</option>
                                         <option value="support">Support</option>
                                         <option value="client">Client</option>
                                         <option value="internal">Internal</option>
@@ -704,7 +771,7 @@ export function Configuration() {
                                     </select>
                                 ) : newRuleKey === 'sentiment' ? (
                                     <select
-                                        className="w-full p-2 border rounded-md bg-background"
+                                        className="w-full p-2 border rounded-md bg-background text-sm"
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
                                     >
@@ -712,9 +779,9 @@ export function Configuration() {
                                         <option value="Neutral">Neutral</option>
                                         <option value="Negative">Negative</option>
                                     </select>
-                                ) : (
+                                ) : newRuleKey === 'priority' ? (
                                     <select
-                                        className="w-full p-2 border rounded-md bg-background"
+                                        className="w-full p-2 border rounded-md bg-background text-sm"
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
                                     >
@@ -722,6 +789,16 @@ export function Configuration() {
                                         <option value="Medium">Medium</option>
                                         <option value="Low">Low</option>
                                     </select>
+                                ) : (
+                                    <Input
+                                        placeholder={
+                                            newRuleKey === 'sender_domain' ? 'rta.vn' :
+                                            newRuleKey === 'sender_email' ? 'john@example.com' :
+                                            'Keywords...'
+                                        }
+                                        value={newRuleValue}
+                                        onChange={(e) => setNewRuleValue(e.target.value)}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -740,6 +817,71 @@ export function Configuration() {
                                 <option value="star">Star / Flag</option>
                             </select>
                         </div>
+
+                        {newRuleAction === 'draft' && (
+                            <>
+                                <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                                    <label className="text-sm font-medium">Draft Instructions (Context)</label>
+                                    <textarea
+                                        className="w-full p-2 border rounded-md bg-background min-h-[80px] text-sm"
+                                        placeholder="e.g. Tell them I'm busy until Friday, but interested in the proposal."
+                                        value={newRuleInstructions}
+                                        onChange={(e) => setNewRuleInstructions(e.target.value)}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Specific context for the AI ghostwriter.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <Paperclip className="w-4 h-4" />
+                                        Attachments (Optional)
+                                    </label>
+                                    
+                                    <div className="flex flex-col gap-2">
+                                        {newRuleAttachments.map(file => (
+                                            <div key={file.path} className="flex items-center justify-between p-2 bg-secondary/50 rounded border text-xs">
+                                                <span className="truncate max-w-[200px]">{file.name}</span>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    className="h-6 w-6 p-0 text-destructive"
+                                                    onClick={() => removeAttachment(file.path)}
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                        
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                                onChange={handleFileUpload}
+                                                disabled={isUploading}
+                                            />
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className="w-full border-dashed"
+                                                disabled={isUploading}
+                                            >
+                                                {isUploading ? (
+                                                    <LoadingSpinner size="sm" className="mr-2" />
+                                                ) : (
+                                                    <Plus className="w-3 h-3 mr-2" />
+                                                )}
+                                                {isUploading ? 'Uploading...' : 'Add Attachment'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Files will be attached to every draft generated by this rule.
+                                    </p>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <DialogFooter>
@@ -931,33 +1073,50 @@ export function Configuration() {
                             {state.rules.length > 0 && state.rules.map((rule: Rule) => (
                                 <div
                                     key={rule.id}
-                                    className="flex justify-between items-center py-2 px-3 bg-secondary/30 rounded-lg mb-2"
+                                    className="p-3 bg-secondary/30 rounded-lg mb-2"
                                 >
-                                    <div>
-                                        <span className="text-sm">{rule.name}</span>
-                                        <span className="text-xs text-muted-foreground ml-2">
-                                            → {rule.action}
-                                        </span>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <div>
+                                            <span className="text-sm font-medium">{rule.name}</span>
+                                            <span className="text-xs text-muted-foreground ml-2">
+                                                → {rule.action}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant={rule.is_enabled ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => handleToggleRule(rule.id)}
+                                                className="h-7 px-2"
+                                            >
+                                                <Power className="w-3.5 h-3.5 mr-1" />
+                                                {rule.is_enabled ? 'On' : 'Off'}
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-destructive"
+                                                onClick={() => actions.deleteRule(rule.id)}
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant={rule.is_enabled ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => handleToggleRule(rule.id)}
-                                            className="h-7 px-2"
-                                        >
-                                            <Power className="w-3.5 h-3.5 mr-1" />
-                                            {rule.is_enabled ? 'On' : 'Off'}
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="text-destructive"
-                                            onClick={() => actions.deleteRule(rule.id)}
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                    </div>
+                                    {rule.instructions && (
+                                        <p className="text-[10px] text-muted-foreground italic border-t border-border/50 pt-1 mt-1 truncate">
+                                            "{rule.instructions}"
+                                        </p>
+                                    )}
+                                    {rule.attachments && rule.attachments.length > 0 && (
+                                        <div className="flex gap-1 mt-1">
+                                            {rule.attachments.map(a => (
+                                                <div key={a.path} className="flex items-center gap-1 text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">
+                                                    <Paperclip className="w-2.5 h-2.5" />
+                                                    {a.name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

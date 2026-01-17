@@ -22,6 +22,11 @@ export interface OutlookMessage {
     date: string;
     body: string;
     snippet: string;
+    headers: {
+        importance?: string;
+        listUnsubscribe?: string;
+        autoSubmitted?: string;
+    };
 }
 
 export interface DeviceCodeResponse {
@@ -155,7 +160,7 @@ export class MicrosoftService {
         const accessToken = account.access_token || '';
         const { top = 20, skip = 0, filter } = options;
 
-        let url = `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime desc`;
+        let url = `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime desc&$select=id,conversationId,subject,from,toRecipients,receivedDateTime,body,bodyPreview,importance`;
         if (filter) {
             url += `&$filter=${encodeURIComponent(filter)}`;
         }
@@ -186,6 +191,9 @@ export class MicrosoftService {
             date: msg.receivedDateTime,
             body: msg.body?.content || '',
             snippet: msg.bodyPreview || '',
+            headers: {
+                importance: msg.importance,
+            }
         }));
 
         return {

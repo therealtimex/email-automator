@@ -290,6 +290,7 @@ export class EmailProcessorService {
             subject: message.subject,
             sender: message.sender,
             date: message.date,
+            metadata: message.headers,
             userPreferences: {
                 autoTrashSpam: settings?.auto_trash_spam,
                 smartDrafts: settings?.smart_drafts,
@@ -345,15 +346,43 @@ export class EmailProcessorService {
         }
 
         // Smart drafts
-        if (settings?.smart_drafts && analysis.suggested_action === 'reply' && analysis.draft_response) {
+        const shouldDraft = analysis.suggested_actions?.includes('reply');
+        if (settings?.smart_drafts && shouldDraft && analysis.draft_response) {
             await this.executeAction(account, email, 'draft', analysis.draft_response, eventLogger, 'Smart drafts setting');
             result.drafted++;
         }
 
         // User-defined rules
         for (const rule of rules) {
-            if (this.matchesCondition(analysis, rule.condition)) {
-                await this.executeAction(account, email, rule.action, undefined, eventLogger, `Rule: ${rule.name}`);
+            if (this.matchesCondition(email, analysis, rule.condition as any)) {
+                let draftContent = undefined;
+                
+                // If the rule is to draft, and it has specific instructions, generate it now
+                if (rule.action === 'draft' && rule.instructions) {
+                    if (eventLogger) await eventLogger.info('Thinking', `Generating customized draft based on rule: ${rule.name}`);
+                    
+                    const intelligenceService = getIntelligenceService(
+                        settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
+                            ? {
+                                model: settings.llm_model,
+                                baseUrl: settings.llm_base_url,
+                                apiKey: settings.llm_api_key,
+                            }
+                            : undefined
+                    );
+                    
+                    const customizedDraft = await intelligenceService.generateDraftReply({
+                        subject: email.subject || '',
+                        sender: email.sender || '',
+                        body: email.body_snippet || '' // Note: body_snippet is used here, might want full body if available
+                    }, rule.instructions);
+                    
+                    if (customizedDraft) {
+                        draftContent = customizedDraft;
+                    }
+                }
+
+                await this.executeAction(account, email, rule.action, draftContent, eventLogger, `Rule: ${rule.name}`, rule.attachments);
 
                 if (rule.action === 'delete') result.deleted++;
                 else if (rule.action === 'draft') result.drafted++;
@@ -363,10 +392,43 @@ export class EmailProcessorService {
         }
     }
 
-    private matchesCondition(analysis: EmailAnalysis, condition: Record<string, unknown>): boolean {
+    private matchesCondition(email: Partial<Email>, analysis: EmailAnalysis, condition: Record<string, unknown>): boolean {
         for (const [key, value] of Object.entries(condition)) {
-            if ((analysis as any)[key] !== value) {
-                return false;
+            const val = value as string;
+            
+            switch (key) {
+                case 'sender_email':
+                    if (email.sender?.toLowerCase() !== val.toLowerCase()) return false;
+                    break;
+                case 'sender_domain':
+                    // Check if sender ends with domain (e.g. @gmail.com)
+                    const domain = val.startsWith('@') ? val : `@${val}`;
+                    if (!email.sender?.toLowerCase().endsWith(domain.toLowerCase())) return false;
+                    break;
+                case 'sender_contains':
+                    if (!email.sender?.toLowerCase().includes(val.toLowerCase())) return false;
+                    break;
+                case 'subject_contains':
+                    if (!email.subject?.toLowerCase().includes(val.toLowerCase())) return false;
+                    break;
+                case 'body_contains':
+                    if (!email.body_snippet?.toLowerCase().includes(val.toLowerCase())) return false;
+                    break;
+                case 'category':
+                    if (analysis.category !== value) return false;
+                    break;
+                case 'priority':
+                    if (analysis.priority !== value) return false;
+                    break;
+                case 'sentiment':
+                    if (analysis.sentiment !== value) return false;
+                    break;
+                case 'is_useless':
+                    if (analysis.is_useless !== value) return false;
+                    break;
+                default:
+                    // Fallback for any other keys that might be in analysis
+                    if ((analysis as any)[key] !== value) return false;
             }
         }
         return true;
@@ -378,11 +440,12 @@ export class EmailProcessorService {
         action: 'delete' | 'archive' | 'draft' | 'read' | 'star',
         draftContent?: string,
         eventLogger?: EventLogger | null,
-        reason?: string
+        reason?: string,
+        attachments?: any[]
     ): Promise<void> {
         try {
             if (eventLogger) {
-                await eventLogger.info('Acting', `Executing action: ${action}`, { emailId: email.id, reason });
+                await eventLogger.info('Acting', `Executing action: ${action}`, { emailId: email.id, reason, hasAttachments: !!attachments?.length });
             }
 
             if (account.provider === 'gmail') {
@@ -391,7 +454,7 @@ export class EmailProcessorService {
                 } else if (action === 'archive') {
                     await this.gmailService.archiveMessage(account, email.external_id);
                 } else if (action === 'draft' && draftContent) {
-                    await this.gmailService.createDraft(account, email.external_id, draftContent);
+                    await this.gmailService.createDraft(account, email.external_id, draftContent, this.supabase, attachments);
                 } else if (action === 'read') {
                     await this.gmailService.markAsRead(account, email.external_id);
                 } else if (action === 'star') {

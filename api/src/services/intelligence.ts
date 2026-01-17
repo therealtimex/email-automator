@@ -35,6 +35,12 @@ export interface EmailContext {
     subject: string;
     sender: string;
     date: string;
+    metadata?: {
+        importance?: string;
+        listUnsubscribe?: string;
+        autoSubmitted?: string;
+        mailer?: string;
+    };
     userPreferences?: {
         autoTrashSpam?: boolean;
         smartDrafts?: boolean;
@@ -106,6 +112,12 @@ export class IntelligenceService {
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
 
         try {
+            const metadataSignals = [];
+            if (context.metadata?.listUnsubscribe) metadataSignals.push('- Contains Unsubscribe header (High signal for Newsletter/Promo)');
+            if (context.metadata?.autoSubmitted && context.metadata.autoSubmitted !== 'no') metadataSignals.push(`- Auto-Submitted: ${context.metadata.autoSubmitted}`);
+            if (context.metadata?.importance) metadataSignals.push(`- Sender Priority/Importance: ${context.metadata.importance}`);
+            if (context.metadata?.mailer) metadataSignals.push(`- Sent via: ${context.metadata.mailer}`);
+
             const systemPrompt = `You are an AI Email Assistant. Your task is to analyze the provided email and extract structured information as JSON.
 Do NOT include any greetings, chatter, or special tokens like <|channel|> in your output.
 
@@ -122,6 +134,7 @@ Context:
 - Subject: ${context.subject}
 - From: ${context.sender}
 - Date: ${context.date}
+${metadataSignals.length > 0 ? `\nMetadata Signals:\n${metadataSignals.join('\n')}` : ''}
 ${context.userPreferences?.autoTrashSpam ? '- User has auto-trash spam enabled' : ''}
 ${context.userPreferences?.smartDrafts ? '- User wants draft responses for important emails' : ''}`;
 
