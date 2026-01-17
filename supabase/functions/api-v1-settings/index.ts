@@ -67,8 +67,11 @@ Deno.serve(async (req) => {
       // Get recent syncs
       const { data: recentSyncs } = await supabaseAdmin
         .from('processing_logs')
-        .select('*, email_accounts!inner(user_id)')
-        .eq('email_accounts.user_id', user.id)
+        .select(`
+          *,
+          email_accounts(email_address)
+        `)
+        .eq('user_id', user.id)
         .order('started_at', { ascending: false })
         .limit(10);
 

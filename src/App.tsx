@@ -347,23 +347,46 @@ function AnalyticsPage() {
                 {stats.recentSyncs.length === 0 ? (
                     <p className="text-muted-foreground text-sm">No sync activity yet</p>
                 ) : (
-                    <div className="space-y-2">
-                        {stats.recentSyncs.map((log) => (
-                            <div key={log.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                                <div className="flex items-center gap-3">
-                                    <span className={`w-2 h-2 rounded-full ${log.status === 'success' ? 'bg-emerald-500' :
-                                        log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500'
-                                        }`} />
-                                    <span className="text-sm">
-                                        {new Date(log.started_at).toLocaleString()}
-                                    </span>
+                    <div className="space-y-3">
+                        {stats.recentSyncs.map((log: any) => {
+                            const duration = log.completed_at 
+                                ? Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)
+                                : null;
+                                
+                            return (
+                                <div key={log.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg hover:bg-secondary/30 transition-colors gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-2.5 h-2.5 rounded-full",
+                                            log.status === 'success' ? 'bg-emerald-500' :
+                                            log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] animate-pulse'
+                                        )} />
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium">
+                                                {log.email_accounts?.email_address || 'System Sync'}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
+                                                {new Date(log.started_at).toLocaleString()}
+                                                {duration !== null && (
+                                                    <span className="ml-2 px-1.5 py-0.5 bg-secondary rounded-full">
+                                                        {duration}s
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4 text-xs">
+                                        <div className="flex flex-col items-end">
+                                            <span className="font-bold text-primary">{log.emails_processed} emails</span>
+                                            <span className="text-[10px] text-muted-foreground">
+                                                {log.emails_deleted} deleted, {log.emails_drafted} drafted
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="text-sm text-muted-foreground">
-                                    {log.emails_processed} processed
-                                    {log.emails_deleted > 0 && `, ${log.emails_deleted} deleted`}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

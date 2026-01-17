@@ -150,14 +150,14 @@ export class EmailProcessorService {
     ): Promise<void> {
         const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
 
-        // Construct query
+        // Construct query: Prioritize user-defined sync_start_date if provided
         let query = '';
-        if (account.last_sync_checkpoint) {
-            const lastSyncSeconds = Math.floor(parseInt(account.last_sync_checkpoint) / 1000);
-            query = `after:${lastSyncSeconds}`;
-        } else if (account.sync_start_date) {
+        if (account.sync_start_date) {
             const startSeconds = Math.floor(new Date(account.sync_start_date).getTime() / 1000);
             query = `after:${startSeconds}`;
+        } else if (account.last_sync_checkpoint) {
+            const lastSyncSeconds = Math.floor(parseInt(account.last_sync_checkpoint) / 1000);
+            query = `after:${lastSyncSeconds}`;
         }
         
         if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Gmail', { query, batchSize });
@@ -169,34 +169,35 @@ export class EmailProcessorService {
         
         if (eventLogger) await eventLogger.info('Fetching', `Fetched ${messages.length} emails`);
 
+        // We process in ASCENDING order (oldest to newest) to move checkpoint forward correctly
+        // Gmail API always returns newest first, so we reverse for processing
+        const sortedMessages = [...messages].reverse();
+
         let maxInternalDate = account.last_sync_checkpoint ? parseInt(account.last_sync_checkpoint) : 0;
 
-        for (const message of messages) {
+        for (const message of sortedMessages) {
             try {
-                // Get internalDate from Gmail message if possible
-                // We need to fetch details again or modify GmailService to return it
-                // For now, we'll use the date from headers which is what parseMessage returns
-                // But internalDate is more reliable for checkpoints.
-                // Re-viewing parseMessage shows it doesn't return internalDate.
                 await this.processMessage(account, message, rules, settings, result, eventLogger);
 
-                // Track progress for checkpoint (simplified: using Date.now() for next time, 
-                // or better: the date of the message)
+                // Checkpoint tracking
+                // Note: We should use internalDate from Gmail metadata for accuracy
+                // For now we use the header date parsed by service
                 const msgDate = new Date(message.date).getTime();
-                if (msgDate > maxInternalDate) maxInternalDate = msgDate;
+                if (msgDate > maxInternalDate) {
+                    maxInternalDate = msgDate;
+                    
+                    // Update checkpoint in DB immediately after each successful message 
+                    // to prevent loss on crash
+                    await this.supabase
+                        .from('email_accounts')
+                        .update({ last_sync_checkpoint: maxInternalDate.toString() })
+                        .eq('id', account.id);
+                }
             } catch (error) {
                 logger.error('Failed to process Gmail message', error, { messageId: message.id });
                 if (eventLogger) await eventLogger.error('Error', error);
                 result.errors++;
             }
-        }
-
-        // Update checkpoint
-        if (maxInternalDate > (account.last_sync_checkpoint ? parseInt(account.last_sync_checkpoint) : 0)) {
-            await this.supabase
-                .from('email_accounts')
-                .update({ last_sync_checkpoint: maxInternalDate.toString() })
-                .eq('id', account.id);
         }
     }
 
@@ -209,12 +210,12 @@ export class EmailProcessorService {
     ): Promise<void> {
         const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
 
-        // Construct filter
+        // Construct filter: Prioritize user-defined sync_start_date
         let filter = '';
-        if (account.last_sync_checkpoint) {
-            filter = `receivedDateTime gt ${account.last_sync_checkpoint}`;
-        } else if (account.sync_start_date) {
+        if (account.sync_start_date) {
             filter = `receivedDateTime ge ${new Date(account.sync_start_date).toISOString()}`;
+        } else if (account.last_sync_checkpoint) {
+            filter = `receivedDateTime gt ${account.last_sync_checkpoint}`;
         }
 
         if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Outlook', { filter, batchSize });
@@ -226,28 +227,29 @@ export class EmailProcessorService {
         
         if (eventLogger) await eventLogger.info('Fetching', `Fetched ${messages.length} emails`);
 
+        // Microsoft API supports sorting in request, we assume service handles basic ordering
+        // but we reverse to ensure oldest-first processing for checkpointing if needed.
+        const sortedMessages = [...messages].reverse();
+
         let latestCheckpoint = account.last_sync_checkpoint || '';
 
-        for (const message of messages) {
+        for (const message of sortedMessages) {
             try {
                 await this.processMessage(account, message, rules, settings, result, eventLogger);
 
                 if (!latestCheckpoint || message.date > latestCheckpoint) {
                     latestCheckpoint = message.date;
+                    
+                    await this.supabase
+                        .from('email_accounts')
+                        .update({ last_sync_checkpoint: latestCheckpoint })
+                        .eq('id', account.id);
                 }
             } catch (error) {
                 logger.error('Failed to process Outlook message', error, { messageId: message.id });
                 if (eventLogger) await eventLogger.error('Error', error);
                 result.errors++;
             }
-        }
-
-        // Update checkpoint
-        if (latestCheckpoint && latestCheckpoint !== account.last_sync_checkpoint) {
-            await this.supabase
-                .from('email_accounts')
-                .update({ last_sync_checkpoint: latestCheckpoint })
-                .eq('id', account.id);
         }
     }
 
