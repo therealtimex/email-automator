@@ -6,11 +6,11 @@ import { existsSync } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Robustly find package root (directory containing package.json)
+// Robustly find package root (directory containing package.json and bin folder)
 function findPackageRoot(startDir: string): string {
     let current = startDir;
     while (current !== path.parse(current).root) {
-        if (existsSync(join(current, 'package.json'))) {
+        if (existsSync(join(current, 'package.json')) && existsSync(join(current, 'bin'))) {
             return current;
         }
         current = dirname(current);
@@ -18,9 +18,12 @@ function findPackageRoot(startDir: string): string {
     return process.cwd();
 }
 
+const packageRoot = findPackageRoot(__dirname);
+console.log(`🏠 Package Root: ${packageRoot}`);
+
 function loadEnvironment() {
     const cwdEnv = join(process.cwd(), '.env');
-    const rootEnv = join(findPackageRoot(__dirname), '.env');
+    const rootEnv = join(packageRoot, '.env');
 
     if (existsSync(cwdEnv)) {
         console.log(`📝 Loading environment from CWD: ${cwdEnv}`);
@@ -55,6 +58,7 @@ const cliArgs = parseArgs(process.argv.slice(2));
 
 export const config = {
     // Server
+    packageRoot,
     // Default port 3004 (RealTimeX Desktop uses 3001/3002)
     port: cliArgs.port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3004),
     noUi: cliArgs.noUi,
@@ -62,8 +66,8 @@ export const config = {
     isProduction: process.env.NODE_ENV === 'production',
 
     // Paths - Robust resolution for both TS source and compiled JS in dist/
-    rootDir: process.cwd(),
-    scriptsDir: join(process.cwd(), 'scripts'),
+    rootDir: packageRoot,
+    scriptsDir: join(packageRoot, 'scripts'),
 
     // Supabase
     supabase: {

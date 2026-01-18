@@ -74,18 +74,23 @@ function getDistPath() {
         return process.env.ELECTRON_STATIC_PATH;
     }
 
-    // 2. Try to find dist relative to this file
-    // In dev: dist is at ../dist
-    // In npx/dist: dist is at ../../dist
+    // 2. Try to find dist relative to packageRoot (from config)
+    // This is the most reliable way in compiled app
+    const fromRoot = join(config.rootDir || process.cwd(), 'dist');
+    if (existsSync(join(fromRoot, 'index.html'))) {
+        return fromRoot;
+    }
+
+    // 3. Try to find dist relative to this file
     let current = __dirname;
     for (let i = 0; i < 4; i++) {
         const potential = join(current, 'dist');
-        if (existsSync(potential)) return potential;
+        if (existsSync(join(potential, 'index.html'))) return potential;
         current = path.dirname(current);
     }
 
-    // 3. Fallback to current working directory
-    return join(process.cwd(), 'dist');
+    // 4. Fallback to current working directory
+    return join(config.packageRoot || process.cwd(), 'dist');
 }
 
 const distPath = getDistPath();
