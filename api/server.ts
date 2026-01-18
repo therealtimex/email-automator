@@ -1,8 +1,9 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
+import path, { join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
+import { existsSync } from 'fs';
 import { config, validateConfig } from './src/config/index.js';
 import { errorHandler } from './src/middleware/errorHandler.js';
 import { apiRateLimit } from './src/middleware/rateLimit.js';
@@ -66,8 +67,28 @@ app.use('/api', apiRateLimit);
 // API routes
 app.use('/api', routes);
 
-// Serve static files - robust resolution for compiled app and NPX
-const distPath = process.env.ELECTRON_STATIC_PATH || path.join(process.cwd(), 'dist');
+// Robust resolution for static assets (dist folder)
+function getDistPath() {
+    // 1. Check environment variable override
+    if (process.env.ELECTRON_STATIC_PATH && existsSync(process.env.ELECTRON_STATIC_PATH)) {
+        return process.env.ELECTRON_STATIC_PATH;
+    }
+
+    // 2. Try to find dist relative to this file
+    // In dev: dist is at ../dist
+    // In npx/dist: dist is at ../../dist
+    let current = __dirname;
+    for (let i = 0; i < 4; i++) {
+        const potential = join(current, 'dist');
+        if (existsSync(potential)) return potential;
+        current = path.dirname(current);
+    }
+
+    // 3. Fallback to current working directory
+    return join(process.cwd(), 'dist');
+}
+
+const distPath = getDistPath();
 logger.info('Serving static assets', { path: distPath });
 app.use(express.static(distPath));
 

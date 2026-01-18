@@ -1,16 +1,30 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path, { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Robustly find package root (directory containing package.json)
+function findPackageRoot(startDir: string): string {
+    let current = startDir;
+    while (current !== path.parse(current).root) {
+        if (existsSync(join(current, 'package.json'))) {
+            return current;
+        }
+        current = dirname(current);
+    }
+    return process.cwd(); // Fallback
+}
+
+const packageRoot = findPackageRoot(__dirname);
+
 // 1. Try to load from current working directory (where npx is run)
 dotenv.config({ path: join(process.cwd(), '.env') });
 
-// 2. Fallback to package root (where the binary lives)
-// In dist/api/src/config/index.js, the root is 4 levels up
-dotenv.config({ path: join(__dirname, '..', '..', '..', '..', '.env') });
+// 2. Fallback to package root
+dotenv.config({ path: join(packageRoot, '.env') });
 
 function parseArgs(args: string[]): { port: number | null, noUi: boolean } {
     const portIndex = args.indexOf('--port');
