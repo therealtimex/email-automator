@@ -301,9 +301,16 @@ export class GmailService {
         const getHeader = (name: string) => headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
 
         const toAddress = getHeader('From');
-        const subject = getHeader('Subject');
+        const originalSubject = getHeader('Subject');
         const originalMsgId = getHeader('Message-ID');
         const threadId = original.data.threadId;
+
+        // Ensure subject has Re: prefix
+        const subject = originalSubject.toLowerCase().startsWith('re:') 
+            ? originalSubject 
+            : `Re: ${originalSubject}`;
+
+        logger.info('Creating draft', { threadId, toAddress, subject });
 
         // Threading headers: In-Reply-To should be the Message-ID of the mail we reply to
         const replyHeaders = [];
@@ -319,7 +326,7 @@ export class GmailService {
             // Multipart message
             rawMessage = [
                 `To: ${toAddress}`,
-                `Subject: Re: ${subject}`,
+                `Subject: ${subject}`,
                 ...replyHeaders,
                 'MIME-Version: 1.0',
                 `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -356,7 +363,7 @@ export class GmailService {
             // Simple plain text message
             rawMessage = [
                 `To: ${toAddress}`,
-                `Subject: Re: ${subject}`,
+                `Subject: ${subject}`,
                 ...replyHeaders,
                 'MIME-Version: 1.0',
                 'Content-Type: text/plain; charset="UTF-8"',
@@ -371,19 +378,24 @@ export class GmailService {
             .replace(/\//g, '_')
             .replace(/=+$/, '');
 
-        const draft = await gmail.users.drafts.create({
-            userId: 'me',
-            requestBody: {
-                message: {
-                    threadId,
-                    raw: encodedMessage,
+        try {
+            const draft = await gmail.users.drafts.create({
+                userId: 'me',
+                requestBody: {
+                    message: {
+                        threadId,
+                        raw: encodedMessage,
+                    },
                 },
-            },
-        });
+            });
 
-        const draftId = draft.data.id || 'unknown';
-        logger.debug('Draft created', { draftId, threadId, attachments: attachments?.length || 0 });
-        return draftId;
+            const draftId = draft.data.id || 'unknown';
+            logger.info('Draft created successfully', { draftId, threadId });
+            return draftId;
+        } catch (error) {
+            logger.error('Gmail API Error creating draft', error);
+            throw error;
+        }
     }
 
     async addLabel(account: EmailAccount, messageId: string, labelIds: string[]): Promise<void> {

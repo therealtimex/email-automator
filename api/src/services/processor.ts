@@ -418,8 +418,6 @@ export class EmailProcessorService {
 
                 if (rule.action === 'delete') result.deleted++;
                 else if (rule.action === 'draft') result.drafted++;
-
-                break; // Only execute first matching rule
             }
         }
     }
@@ -463,6 +461,14 @@ export class EmailProcessorService {
                     break;
                 case 'is_useless':
                     if (analysis.is_useless !== value) return false;
+                    break;
+                case 'suggested_actions':
+                    // Handle array membership check (e.g. if condition expects "reply" to be in actions)
+                    const requiredActions = Array.isArray(value) ? value : [value];
+                    const hasAllActions = requiredActions.every(req => 
+                        analysis.suggested_actions?.includes(req as any)
+                    );
+                    if (!hasAllActions) return false;
                     break;
                 default:
                     // Fallback for any other keys that might be in analysis
@@ -558,24 +564,16 @@ export class EmailProcessorService {
                 }
             }
 
-            // Update email record - update both singular (legacy) and plural columns
-            const { data: currentEmail } = await this.supabase
-                .from('emails')
-                .select('actions_taken')
-                .eq('id', email.id)
-                .single();
+            // Update email record using atomic array concatenation to prevent race conditions
+            await this.supabase.rpc('append_email_action', {
+                p_email_id: email.id,
+                p_action: action
+            });
 
-            const actionsTaken = currentEmail?.actions_taken || [];
-            if (!actionsTaken.includes(action)) {
-                actionsTaken.push(action);
-            }
-
+            // Fallback for legacy column
             await this.supabase
                 .from('emails')
-                .update({ 
-                    action_taken: action,
-                    actions_taken: actionsTaken
-                })
+                .update({ action_taken: action })
                 .eq('id', email.id);
 
             logger.debug('Action executed', { emailId: email.id, action });
