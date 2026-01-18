@@ -60,7 +60,17 @@ npx @realtimex/email-automator-setup
 npx @realtimex/email-automator-deploy
 
 # Start Email Automator
-npx @realtimex/email-automator
+npx @realtimex/email-automator --port 3004
+```
+
+### Option 1b: Global Install
+
+```bash
+# Install globally
+npm install -g @realtimex/email-automator
+
+# Then run directly
+email-automator --port 3004
 ```
 
 ### Option 2: Clone and Install

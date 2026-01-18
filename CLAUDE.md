@@ -95,7 +95,7 @@ OAuth credentials:
 - `expressRequest()`: Sync, actions → Local Express API
 
 ### AI Integration
-Uses `@instructor-ai/instructor` with Zod schemas for structured LLM output:
+Uses OpenAI SDK with Zod schemas for structured LLM output:
 - `src/core/intelligence.ts`: Email analysis schema and IntelligenceLayer class
 - Returns typed `EmailAnalysis` with category, sentiment, priority, suggested_action
 

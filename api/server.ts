@@ -69,8 +69,8 @@ app.use('/api', routes);
 
 // Robust resolution for static assets (dist folder)
 function getDistPath() {
-    // 1. Check environment variable override
-    if (process.env.ELECTRON_STATIC_PATH && existsSync(process.env.ELECTRON_STATIC_PATH)) {
+    // 1. Check environment variable override (must contain index.html)
+    if (process.env.ELECTRON_STATIC_PATH && existsSync(join(process.env.ELECTRON_STATIC_PATH, 'index.html'))) {
         return process.env.ELECTRON_STATIC_PATH;
     }
 

@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import Instructor from '@instructor-ai/instructor';
 import { z } from 'zod';
 
 // Define the schema for email analysis
@@ -22,52 +21,65 @@ export const EmailAnalysisSchema = z.object({
 export type EmailAnalysis = z.infer<typeof EmailAnalysisSchema>;
 
 export class IntelligenceLayer {
-    private client;
+    private client: OpenAI | null = null;
+    private model: string;
 
     constructor() {
         if (!process.env.LLM_API_KEY) {
             console.warn('LLM_API_KEY is missing. AI analysis will not work.');
-            this.client = null as any;
             return;
         }
 
-        const oai = new OpenAI({
+        this.client = new OpenAI({
             apiKey: process.env.LLM_API_KEY,
             baseURL: process.env.LLM_BASE_URL,
         });
 
-        this.client = Instructor({
-            client: oai,
-            mode: 'JSON'
-        });
+        this.model = process.env.LLM_MODEL || 'gpt-4o-mini';
     }
 
     async analyzeEmail(content: string, context: { subject: string; sender: string; date: string }): Promise<EmailAnalysis | null> {
+        if (!this.client) {
+            console.error('AI client not initialized');
+            return null;
+        }
+
         try {
+            const systemPrompt = `You are an AI Email Assistant. Analyze the provided email and extract structured information.
+Return ONLY a valid JSON object with these fields:
+{
+  "summary": "string - brief summary",
+  "category": "spam|newsletter|support|client|internal|personal|other",
+  "sentiment": "Positive|Neutral|Negative",
+  "is_useless": boolean,
+  "suggested_action": "none|delete|archive|reply|flag",
+  "draft_response": "string (optional)",
+  "priority": "High|Medium|Low"
+}
+
+Context:
+- Current Date: ${new Date().toISOString()}
+- Subject: ${context.subject}
+- From: ${context.sender}
+- Date: ${context.date}`;
+
             const response = await this.client.chat.completions.create({
-                model: process.env.LLM_MODEL || 'gpt-4o-mini',
+                model: this.model,
                 messages: [
-                    {
-                        role: 'system',
-                        content: `You are an AI Email Assistant. Analyze the provided email and extract structured information.
-            Context Date: ${new Date().toISOString()}
-            Subject: ${context.subject}
-            From: ${context.sender}
-            Date: ${context.date}`
-                    },
-                    {
-                        role: 'user',
-                        content: content
-                    }
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: content }
                 ],
-                response_model: {
-                    schema: EmailAnalysisSchema,
-                    name: "EmailAnalysis"
-                },
-                max_retries: 3
+                response_format: { type: 'json_object' },
+                temperature: 0.1,
             });
 
-            return response;
+            const rawResponse = response.choices[0]?.message?.content || '';
+
+            // Parse and validate with Zod
+            const parsed = JSON.parse(rawResponse);
+            const validated = EmailAnalysisSchema.parse(parsed);
+
+            return validated;
         } catch (error) {
             console.error('AI Analysis Error:', error);
             return null;

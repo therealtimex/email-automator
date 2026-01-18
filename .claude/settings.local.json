@@ -9,7 +9,12 @@
       "Bash(npx tsc:*)",
       "Bash(git log:*)",
       "Bash(curl:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(node -e:*)",
+      "Bash(pkill:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(find:*)"
     ]
   }
 }

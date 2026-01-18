@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import Instructor from '@instructor-ai/instructor';
 import { z } from 'zod';
 import { config } from '../config/index.js';
 import { createLogger } from '../utils/logger.js';
@@ -48,7 +47,7 @@ export interface EmailContext {
 }
 
 export class IntelligenceService {
-    private client: any;
+    private client: OpenAI | null = null;
     private model: string;
     private isConfigured: boolean = false;
 
@@ -67,14 +66,9 @@ export class IntelligenceService {
         }
 
         try {
-            const oai = new OpenAI({
+            this.client = new OpenAI({
                 apiKey: apiKey || 'not-needed-for-local',  // Placeholder for local LLMs
                 baseURL: baseUrl,
-            });
-
-            this.client = Instructor({
-                client: oai,
-                mode: 'MD_JSON',
             });
 
             this.isConfigured = true;
@@ -163,7 +157,7 @@ REQUIRED JSON STRUCTURE:
         let rawResponse = '';
         try {
             // Using raw completion call to handle garbage characters and strip tokens manually
-            const response = await this.client.client.chat.completions.create({
+            const response = await this.client!.chat.completions.create({
                 model: this.model,
                 messages: [
                     { role: 'system', content: systemPrompt },
@@ -223,7 +217,7 @@ REQUIRED JSON STRUCTURE:
         }
 
         try {
-            const response = await this.client.chat.completions.create({
+            const response = await this.client!.chat.completions.create({
                 model: this.model,
                 messages: [
                     {
@@ -257,7 +251,7 @@ Please write a reply.`,
         }
 
         try {
-            await this.client.chat.completions.create({
+            await this.client!.chat.completions.create({
                 model: this.model,
                 messages: [{ role: 'user', content: 'Say "Connection Successful"' }],
                 max_tokens: 5,
