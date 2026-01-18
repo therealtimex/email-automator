@@ -15,16 +15,26 @@ function findPackageRoot(startDir: string): string {
         }
         current = dirname(current);
     }
-    return process.cwd(); // Fallback
+    return process.cwd();
 }
 
-const packageRoot = findPackageRoot(__dirname);
+function loadEnvironment() {
+    const cwdEnv = join(process.cwd(), '.env');
+    const rootEnv = join(findPackageRoot(__dirname), '.env');
 
-// 1. Try to load from current working directory (where npx is run)
-dotenv.config({ path: join(process.cwd(), '.env') });
+    if (existsSync(cwdEnv)) {
+        console.log(`📝 Loading environment from CWD: ${cwdEnv}`);
+        dotenv.config({ path: cwdEnv, override: true });
+    } else if (existsSync(rootEnv)) {
+        console.log(`📝 Loading environment from Root: ${rootEnv}`);
+        dotenv.config({ path: rootEnv, override: true });
+    } else {
+        // Just run default dotenv config in case it's in a standard location
+        dotenv.config();
+    }
+}
 
-// 2. Fallback to package root
-dotenv.config({ path: join(packageRoot, '.env') });
+loadEnvironment();
 
 function parseArgs(args: string[]): { port: number | null, noUi: boolean } {
     const portIndex = args.indexOf('--port');
