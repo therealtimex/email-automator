@@ -1,14 +1,16 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-// 1. Try to load from current working directory (e.g. where npx is run)
-dotenv.config({ path: join(process.cwd(), '.env') });
-// 2. Fallback to package root
-dotenv.config();
+import path, { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// 1. Try to load from current working directory (where npx is run)
+dotenv.config({ path: join(process.cwd(), '.env') });
+
+// 2. Fallback to package root (where the binary lives)
+// In dist/api/src/config/index.js, the root is 4 levels up
+dotenv.config({ path: join(__dirname, '..', '..', '..', '.env') });
 
 function parseArgs(args: string[]): { port: number | null, noUi: boolean } {
     const portIndex = args.indexOf('--port');
