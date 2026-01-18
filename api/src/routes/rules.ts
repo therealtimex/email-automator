@@ -31,7 +31,11 @@ router.post('/',
     authMiddleware,
     validateBody(schemas.createRule),
     asyncHandler(async (req, res) => {
-        const { name, condition, action, is_enabled, instructions, attachments } = req.body;
+        const { name, condition, action, actions, is_enabled, instructions, attachments } = req.body;
+
+        // Use actions array if provided, otherwise use single action for backward compatibility
+        const ruleActions = actions && actions.length > 0 ? actions : (action ? [action] : []);
+        const primaryAction = ruleActions[0] || 'archive'; // For legacy column
 
         const { data, error } = await req.supabase!
             .from('rules')
@@ -39,7 +43,8 @@ router.post('/',
                 user_id: req.user!.id,
                 name,
                 condition,
-                action,
+                action: primaryAction, // Legacy column
+                actions: ruleActions,  // New multi-action column
                 is_enabled,
                 instructions,
                 attachments,
@@ -49,7 +54,7 @@ router.post('/',
 
         if (error) throw error;
 
-        logger.info('Rule created', { ruleId: data.id, userId: req.user!.id });
+        logger.info('Rule created', { ruleId: data.id, actions: ruleActions, userId: req.user!.id });
 
         res.status(201).json({ rule: data });
     })

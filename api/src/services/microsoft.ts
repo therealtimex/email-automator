@@ -160,7 +160,9 @@ export class MicrosoftService {
         const accessToken = account.access_token || '';
         const { top = 20, skip = 0, filter } = options;
 
-        let url = `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime desc&$select=id,conversationId,subject,from,toRecipients,receivedDateTime,body,bodyPreview,importance`;
+        // IMPORTANT: Use ascending order to fetch OLDEST emails first
+        // This ensures checkpoint-based pagination works correctly and doesn't skip emails
+        let url = `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime asc&$select=id,conversationId,subject,from,toRecipients,receivedDateTime,body,bodyPreview,importance`;
         if (filter) {
             url += `&$filter=${encodeURIComponent(filter)}`;
         }

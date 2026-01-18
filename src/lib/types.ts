@@ -51,7 +51,8 @@ export interface Rule {
     user_id: string;
     name: string;
     condition: RuleCondition;
-    action: 'delete' | 'archive' | 'draft' | 'read' | 'star';
+    action?: 'delete' | 'archive' | 'draft' | 'read' | 'star'; // Legacy single action
+    actions?: ('delete' | 'archive' | 'draft' | 'read' | 'star')[]; // New multi-action array
     instructions?: string;
     attachments?: RuleAttachment[];
     is_enabled: boolean;

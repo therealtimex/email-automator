@@ -62,7 +62,7 @@ export function Configuration() {
     const [newRuleName, setNewRuleName] = useState('');
     const [newRuleKey, setNewRuleKey] = useState('category');
     const [newRuleValue, setNewRuleValue] = useState('newsletter');
-    const [newRuleAction, setNewRuleAction] = useState('archive');
+    const [newRuleActions, setNewRuleActions] = useState<string[]>(['archive']);
     const [newRuleOlderThan, setNewRuleOlderThan] = useState('');
     const [newRuleInstructions, setNewRuleInstructions] = useState('');
     const [newRuleAttachments, setNewRuleAttachments] = useState<RuleAttachment[]>([]);
@@ -353,6 +353,11 @@ export function Configuration() {
             return;
         }
 
+        if (newRuleActions.length === 0) {
+            toast.error('Please select at least one action');
+            return;
+        }
+
         setSavingRule(true);
         try {
             const condition: Record<string, any> = { [newRuleKey]: newRuleValue };
@@ -360,12 +365,14 @@ export function Configuration() {
                 condition.older_than_days = parseInt(newRuleOlderThan, 10);
             }
 
+            const hasDraftAction = newRuleActions.includes('draft');
+
             const success = await actions.createRule({
                 name: newRuleName,
                 condition,
-                action: newRuleAction as any,
-                instructions: newRuleAction === 'draft' ? newRuleInstructions : undefined,
-                attachments: newRuleAction === 'draft' ? newRuleAttachments : [],
+                actions: newRuleActions as any[],
+                instructions: hasDraftAction ? newRuleInstructions : undefined,
+                attachments: hasDraftAction ? newRuleAttachments : [],
                 is_enabled: true
             });
 
@@ -373,6 +380,7 @@ export function Configuration() {
                 toast.success('Rule created');
                 setShowRuleModal(false);
                 setNewRuleName('');
+                setNewRuleActions(['archive']);
                 setNewRuleOlderThan('');
                 setNewRuleInstructions('');
                 setNewRuleAttachments([]);
@@ -854,21 +862,45 @@ export function Configuration() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Then Perform Action</label>
-                            <select
-                                className="w-full p-2 border rounded-md bg-background"
-                                value={newRuleAction}
-                                onChange={(e) => setNewRuleAction(e.target.value)}
-                            >
-                                <option value="archive">Archive Email</option>
-                                <option value="delete">Delete Email</option>
-                                <option value="draft">Draft Reply</option>
-                                <option value="read">Mark as Read</option>
-                                <option value="star">Star / Flag</option>
-                            </select>
+                            <label className="text-sm font-medium">Then Perform Action(s)</label>
+                            <p className="text-xs text-muted-foreground mb-2">
+                                Select one or more actions to execute when the rule matches
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    { value: 'archive', label: 'Archive Email' },
+                                    { value: 'delete', label: 'Delete Email' },
+                                    { value: 'draft', label: 'Draft Reply' },
+                                    { value: 'read', label: 'Mark as Read' },
+                                    { value: 'star', label: 'Star / Flag' },
+                                ].map((option) => (
+                                    <label
+                                        key={option.value}
+                                        className={`flex items-center gap-2 p-2 border rounded-md cursor-pointer transition-colors ${
+                                            newRuleActions.includes(option.value)
+                                                ? 'bg-primary/10 border-primary'
+                                                : 'bg-background hover:bg-secondary/50'
+                                        }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={newRuleActions.includes(option.value)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setNewRuleActions([...newRuleActions, option.value]);
+                                                } else {
+                                                    setNewRuleActions(newRuleActions.filter(a => a !== option.value));
+                                                }
+                                            }}
+                                            className="rounded border-gray-300"
+                                        />
+                                        <span className="text-sm">{option.label}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
 
-                        {newRuleAction === 'draft' && (
+                        {newRuleActions.includes('draft') && (
                             <>
                                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
                                     <label className="text-sm font-medium">Draft Instructions (Context)</label>
@@ -1132,7 +1164,11 @@ export function Configuration() {
 
                             {state.rules.length > 0 && state.rules
                                 .filter(r => r.name !== 'Auto-Trash Spam' && r.name !== 'Smart Drafts')
-                                .map((rule: Rule) => (
+                                .map((rule: Rule) => {
+                                const ruleActions = rule.actions && rule.actions.length > 0
+                                    ? rule.actions
+                                    : (rule.action ? [rule.action] : []);
+                                return (
                                 <div
                                     key={rule.id}
                                     className="p-3 bg-secondary/30 rounded-lg mb-2"
@@ -1141,7 +1177,7 @@ export function Configuration() {
                                         <div>
                                             <span className="text-sm font-medium">{rule.name}</span>
                                             <span className="text-xs text-muted-foreground ml-2">
-                                                → {rule.action}
+                                                → {ruleActions.join(' + ')}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -1180,7 +1216,7 @@ export function Configuration() {
                                         </div>
                                     )}
                                 </div>
-                            ))}
+                            );})}
                         </div>
 
                     </CardContent>

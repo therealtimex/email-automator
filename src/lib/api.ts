@@ -249,7 +249,7 @@ class HybridApiClient {
         return this.expressRequest<{ rules: any[] }>('/api/rules');
     }
 
-    async createRule(rule: { name: string; condition: any; action: string; is_enabled?: boolean, instructions?: string, attachments?: any[] }) {
+    async createRule(rule: { name: string; condition: any; action?: string; actions?: string[]; is_enabled?: boolean, instructions?: string, attachments?: any[] }) {
         return this.expressRequest<{ rule: any }>('/api/rules', {
             method: 'POST',
             body: JSON.stringify(rule),

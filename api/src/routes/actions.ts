@@ -11,14 +11,23 @@ import { createLogger } from '../utils/logger.js';
 const router = Router();
 const logger = createLogger('ActionRoutes');
 
-// Execute action on email
+// Execute action(s) on email - supports both single action and array of actions
 router.post('/execute',
     apiRateLimit,
     authMiddleware,
     validateBody(schemas.executeAction),
     asyncHandler(async (req, res) => {
-        const { emailId, action, draftContent } = req.body;
+        const { emailId, action, actions, draftContent } = req.body;
         const userId = req.user!.id;
+
+        // Support both single action (legacy) and actions array
+        const actionsToExecute: string[] = actions && actions.length > 0
+            ? actions
+            : (action ? [action] : []);
+
+        if (actionsToExecute.length === 0) {
+            return res.status(400).json({ error: 'No actions specified' });
+        }
 
         // Fetch email with account info
         const { data: email, error } = await req.supabase!
@@ -37,59 +46,85 @@ router.post('/execute',
         }
 
         const account = email.email_accounts;
-        let actionResult = { success: true, details: '' };
+        const actionResults: { action: string; success: boolean; details?: string }[] = [];
 
-        if (action === 'none') {
-            // Just mark as reviewed
-            await req.supabase!
-                .from('emails')
-                .update({ action_taken: 'none' })
-                .eq('id', emailId);
-        } else if (account.provider === 'gmail') {
-            const gmailService = getGmailService();
-            
-            if (action === 'delete') {
-                await gmailService.trashMessage(account, email.external_id);
-            } else if (action === 'archive') {
-                await gmailService.archiveMessage(account, email.external_id);
-            } else if (action === 'draft') {
-                const content = draftContent || email.ai_analysis?.draft_response || '';
-                if (content) {
-                    const draftId = await gmailService.createDraft(account, email.external_id, content);
-                    actionResult.details = `Draft created: ${draftId}`;
+        for (const currentAction of actionsToExecute) {
+            try {
+                let details = '';
+
+                if (currentAction === 'none') {
+                    // Just mark as reviewed, no provider action needed
+                } else if (account.provider === 'gmail') {
+                    const gmailService = getGmailService();
+
+                    if (currentAction === 'delete') {
+                        await gmailService.trashMessage(account, email.external_id);
+                    } else if (currentAction === 'archive') {
+                        await gmailService.archiveMessage(account, email.external_id);
+                    } else if (currentAction === 'draft') {
+                        const content = draftContent || email.ai_analysis?.draft_response || '';
+                        if (content) {
+                            const draftId = await gmailService.createDraft(account, email.external_id, content);
+                            details = `Draft created: ${draftId}`;
+                        }
+                    } else if (currentAction === 'flag') {
+                        await gmailService.addLabel(account, email.external_id, ['STARRED']);
+                    } else if (currentAction === 'read') {
+                        await gmailService.markAsRead(account, email.external_id);
+                    } else if (currentAction === 'star') {
+                        await gmailService.starMessage(account, email.external_id);
+                    }
+                } else if (account.provider === 'outlook') {
+                    const microsoftService = getMicrosoftService();
+
+                    if (currentAction === 'delete') {
+                        await microsoftService.trashMessage(account, email.external_id);
+                    } else if (currentAction === 'archive') {
+                        await microsoftService.archiveMessage(account, email.external_id);
+                    } else if (currentAction === 'draft') {
+                        const content = draftContent || email.ai_analysis?.draft_response || '';
+                        if (content) {
+                            const draftId = await microsoftService.createDraft(account, email.external_id, content);
+                            details = `Draft created: ${draftId}`;
+                        }
+                    } else if (currentAction === 'read') {
+                        await microsoftService.markAsRead(account, email.external_id);
+                    } else if (currentAction === 'star' || currentAction === 'flag') {
+                        await microsoftService.flagMessage(account, email.external_id);
+                    }
                 }
-            } else if (action === 'flag') {
-                await gmailService.addLabel(account, email.external_id, ['STARRED']);
-            }
 
-            await req.supabase!
-                .from('emails')
-                .update({ action_taken: action })
-                .eq('id', emailId);
-        } else if (account.provider === 'outlook') {
-            const microsoftService = getMicrosoftService();
-            
-            if (action === 'delete') {
-                await microsoftService.trashMessage(account, email.external_id);
-            } else if (action === 'archive') {
-                await microsoftService.archiveMessage(account, email.external_id);
-            } else if (action === 'draft') {
-                const content = draftContent || email.ai_analysis?.draft_response || '';
-                if (content) {
-                    const draftId = await microsoftService.createDraft(account, email.external_id, content);
-                    actionResult.details = `Draft created: ${draftId}`;
-                }
-            }
+                // Record this action using atomic append
+                await req.supabase!.rpc('append_email_action', {
+                    p_email_id: emailId,
+                    p_action: currentAction
+                });
 
-            await req.supabase!
-                .from('emails')
-                .update({ action_taken: action })
-                .eq('id', emailId);
+                actionResults.push({ action: currentAction, success: true, details: details || undefined });
+            } catch (err) {
+                logger.error('Action failed', err, { emailId, action: currentAction });
+                actionResults.push({
+                    action: currentAction,
+                    success: false,
+                    details: err instanceof Error ? err.message : 'Unknown error'
+                });
+            }
         }
 
-        logger.info('Action executed', { emailId, action, userId });
+        // Update legacy column with first action for backward compatibility
+        await req.supabase!
+            .from('emails')
+            .update({ action_taken: actionsToExecute[0] })
+            .eq('id', emailId);
 
-        res.json(actionResult);
+        logger.info('Actions executed', { emailId, actions: actionsToExecute, userId });
+
+        res.json({
+            success: actionResults.every(r => r.success),
+            results: actionResults,
+            // Legacy field for backward compatibility
+            details: actionResults.map(r => r.details).filter(Boolean).join('; ')
+        });
     })
 );
 

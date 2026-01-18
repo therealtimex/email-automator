@@ -110,7 +110,8 @@ export interface Rule {
     user_id: string;
     name: string;
     condition: Record<string, unknown>;
-    action: 'delete' | 'archive' | 'draft' | 'star' | 'read';
+    action?: 'delete' | 'archive' | 'draft' | 'star' | 'read'; // Legacy single action
+    actions?: ('delete' | 'archive' | 'draft' | 'star' | 'read')[]; // New multi-action array
     instructions?: string;
     attachments?: any[];
     is_enabled: boolean;

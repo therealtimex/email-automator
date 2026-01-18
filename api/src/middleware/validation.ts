@@ -69,11 +69,14 @@ export const schemas = {
         accountId: z.string().uuid('Invalid account ID'),
     }),
 
-    // Action schemas
+    // Action schemas - supports both single action (legacy) and actions array
     executeAction: z.object({
         emailId: z.string().uuid('Invalid email ID'),
-        action: z.enum(['delete', 'archive', 'draft', 'flag', 'none']),
+        action: z.enum(['delete', 'archive', 'draft', 'flag', 'read', 'star', 'none']).optional(),
+        actions: z.array(z.enum(['delete', 'archive', 'draft', 'flag', 'read', 'star', 'none'])).optional(),
         draftContent: z.string().optional(),
+    }).refine(data => data.action || (data.actions && data.actions.length > 0), {
+        message: 'Either action or actions must be provided',
     }),
 
     // Migration schemas
@@ -83,19 +86,23 @@ export const schemas = {
         accessToken: z.string().optional(),
     }),
 
-    // Rule schemas
+    // Rule schemas - supports both single action (legacy) and actions array
     createRule: z.object({
         name: z.string().min(1).max(100),
         condition: z.record(z.unknown()),
-        action: z.enum(['delete', 'archive', 'draft', 'star', 'read']),
+        action: z.enum(['delete', 'archive', 'draft', 'star', 'read']).optional(),
+        actions: z.array(z.enum(['delete', 'archive', 'draft', 'star', 'read'])).optional(),
         instructions: z.string().optional(),
         is_enabled: z.boolean().default(true),
+    }).refine(data => data.action || (data.actions && data.actions.length > 0), {
+        message: 'Either action or actions must be provided',
     }),
 
     updateRule: z.object({
         name: z.string().min(1).max(100).optional(),
         condition: z.record(z.unknown()).optional(),
         action: z.enum(['delete', 'archive', 'draft', 'star', 'read']).optional(),
+        actions: z.array(z.enum(['delete', 'archive', 'draft', 'star', 'read'])).optional(),
         instructions: z.string().optional(),
         is_enabled: z.boolean().optional(),
     }),

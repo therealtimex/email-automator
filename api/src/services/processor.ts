@@ -167,7 +167,7 @@ export class EmailProcessorService {
         if (account.sync_start_date) {
             effectiveStartMs = new Date(account.sync_start_date).getTime();
         }
-        
+
         if (account.last_sync_checkpoint) {
             const checkpointMs = parseInt(account.last_sync_checkpoint);
             if (checkpointMs > effectiveStartMs) {
@@ -177,33 +177,40 @@ export class EmailProcessorService {
 
         let query = '';
         if (effectiveStartMs > 0) {
-            const startSeconds = Math.floor(effectiveStartMs / 1000);
+            // Subtract 1 second to make query inclusive (Gmail's after: is exclusive)
+            // This ensures we don't miss emails at the exact checkpoint timestamp
+            const startSeconds = Math.floor(effectiveStartMs / 1000) - 1;
             query = `after:${startSeconds}`;
         }
-        
-        if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Gmail', { query, batchSize });
 
-        const { messages } = await this.gmailService.fetchMessages(account, {
-            maxResults: batchSize,
+        if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Gmail (oldest first)', { query, batchSize });
+
+        // Use "Fetch IDs → Sort → Hydrate" strategy to get OLDEST emails first
+        // Gmail API always returns newest first, so we must fetch all IDs, sort, then hydrate
+        // This prevents skipping emails when using max_emails pagination
+        const { messages, hasMore } = await this.gmailService.fetchMessagesOldestFirst(account, {
+            limit: batchSize,
             query: query || undefined,
+            maxIdsToFetch: 1000, // Safety limit for ID fetching
         });
-        
-        if (eventLogger) await eventLogger.info('Fetching', `Fetched ${messages.length} emails`);
 
-        // We process in ASCENDING order (oldest to newest) to move checkpoint forward correctly
-        const sortedMessages = [...messages].reverse();
+        if (eventLogger) {
+            await eventLogger.info('Fetching', `Fetched ${messages.length} emails (oldest first)${hasMore ? ', more available' : ''}`);
+        }
 
+        // Messages are already sorted oldest-first by fetchMessagesOldestFirst
         let maxInternalDate = account.last_sync_checkpoint ? parseInt(account.last_sync_checkpoint) : 0;
 
-        for (const message of sortedMessages) {
+        for (const message of messages) {
             try {
                 await this.processMessage(account, message, rules, settings, result, eventLogger);
 
-                // Checkpoint tracking
-                const msgDate = new Date(message.date).getTime();
-                if (msgDate > maxInternalDate) {
-                    maxInternalDate = msgDate;
-                    
+                // Checkpoint tracking: Use Gmail's internalDate for accurate checkpoint
+                // internalDate is when Gmail received the email, which matches what after: query uses
+                const msgInternalDate = message.internalDate ? parseInt(message.internalDate) : new Date(message.date).getTime();
+                if (msgInternalDate > maxInternalDate) {
+                    maxInternalDate = msgInternalDate;
+
                     await this.supabase
                         .from('email_accounts')
                         .update({ last_sync_checkpoint: maxInternalDate.toString() })
@@ -240,23 +247,28 @@ export class EmailProcessorService {
 
         let filter = '';
         if (effectiveStartIso) {
-            filter = `receivedDateTime gt ${effectiveStartIso}`;
+            // Use 'ge' (>=) instead of 'gt' (>) to ensure we don't miss emails at exact checkpoint
+            // The duplicate check in processMessage() will skip already-processed emails
+            filter = `receivedDateTime ge ${effectiveStartIso}`;
         }
 
-        if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Outlook', { filter, batchSize });
+        if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Outlook (oldest first)', { filter, batchSize });
 
-        const { messages } = await this.microsoftService.fetchMessages(account, {
+        // Outlook API now returns messages sorted by receivedDateTime ascending (oldest first)
+        // This ensures checkpoint-based pagination works correctly
+        const { messages, hasMore } = await this.microsoftService.fetchMessages(account, {
             top: batchSize,
             filter: filter || undefined,
         });
-        
-        if (eventLogger) await eventLogger.info('Fetching', `Fetched ${messages.length} emails`);
 
-        const sortedMessages = [...messages].reverse();
+        if (eventLogger) {
+            await eventLogger.info('Fetching', `Fetched ${messages.length} emails (oldest first)${hasMore ? ', more available' : ''}`);
+        }
 
+        // Messages are already sorted oldest-first by the API
         let latestCheckpoint = account.last_sync_checkpoint || '';
 
-        for (const message of sortedMessages) {
+        for (const message of messages) {
             try {
                 await this.processMessage(account, message, rules, settings, result, eventLogger);
 
@@ -387,37 +399,49 @@ export class EmailProcessorService {
         // User-defined and System rules (Unified)
         for (const rule of rules) {
             if (this.matchesCondition(email, analysis, rule.condition as any)) {
-                let draftContent = undefined;
-                
-                // If the rule is to draft, and it has specific instructions, generate it now
-                if (rule.action === 'draft' && rule.instructions) {
-                    if (eventLogger) await eventLogger.info('Thinking', `Generating customized draft based on rule: ${rule.name}`, undefined, email.id);
-                    
-                    const intelligenceService = getIntelligenceService(
-                        settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
-                            ? {
-                                model: settings.llm_model,
-                                baseUrl: settings.llm_base_url,
-                                apiKey: settings.llm_api_key,
-                            }
-                            : undefined
-                    );
-                    
-                    const customizedDraft = await intelligenceService.generateDraftReply({
-                        subject: email.subject || '',
-                        sender: email.sender || '',
-                        body: email.body_snippet || '' // Note: body_snippet is used here, might want full body if available
-                    }, rule.instructions);
-                    
-                    if (customizedDraft) {
-                        draftContent = customizedDraft;
-                    }
+                // Get actions array (fallback to single action for backward compatibility)
+                const actions = rule.actions && rule.actions.length > 0
+                    ? rule.actions
+                    : (rule.action ? [rule.action] : []);
+
+                if (eventLogger && actions.length > 1) {
+                    await eventLogger.info('Multi-Action', `Executing ${actions.length} actions for rule: ${rule.name}`, { actions }, email.id);
                 }
 
-                await this.executeAction(account, email, rule.action, draftContent, eventLogger, `Rule: ${rule.name}`, rule.attachments);
+                // Execute each action in the rule
+                for (const action of actions) {
+                    let draftContent = undefined;
 
-                if (rule.action === 'delete') result.deleted++;
-                else if (rule.action === 'draft') result.drafted++;
+                    // If the action is to draft, and it has specific instructions, generate it now
+                    if (action === 'draft' && rule.instructions) {
+                        if (eventLogger) await eventLogger.info('Thinking', `Generating customized draft based on rule: ${rule.name}`, undefined, email.id);
+
+                        const intelligenceService = getIntelligenceService(
+                            settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
+                                ? {
+                                    model: settings.llm_model,
+                                    baseUrl: settings.llm_base_url,
+                                    apiKey: settings.llm_api_key,
+                                }
+                                : undefined
+                        );
+
+                        const customizedDraft = await intelligenceService.generateDraftReply({
+                            subject: email.subject || '',
+                            sender: email.sender || '',
+                            body: email.body_snippet || ''
+                        }, rule.instructions);
+
+                        if (customizedDraft) {
+                            draftContent = customizedDraft;
+                        }
+                    }
+
+                    await this.executeAction(account, email, action, draftContent, eventLogger, `Rule: ${rule.name}`, rule.attachments);
+
+                    if (action === 'delete') result.deleted++;
+                    else if (action === 'draft') result.drafted++;
+                }
             }
         }
     }
@@ -511,13 +535,20 @@ export class EmailProcessorService {
             for (const rule of retentionRules) {
                 if (this.matchesCondition(email, email.ai_analysis as any, rule.condition as any)) {
                     if (eventLogger) await eventLogger.info('Retention', `Applying retention rule: ${rule.name} to ${email.subject}`);
-                    
-                    // We don't support custom drafts in retention yet (usually retention is for delete/archive)
-                    await this.executeAction(account, email, rule.action, undefined, eventLogger, `Retention Rule: ${rule.name}`);
-                    
-                    if (rule.action === 'delete') result.deleted++;
-                    else if (rule.action === 'draft') result.drafted++;
-                    
+
+                    // Get actions array (fallback to single action for backward compatibility)
+                    const actions = rule.actions && rule.actions.length > 0
+                        ? rule.actions
+                        : (rule.action ? [rule.action] : []);
+
+                    // Execute each action
+                    for (const action of actions) {
+                        await this.executeAction(account, email, action, undefined, eventLogger, `Retention Rule: ${rule.name}`);
+
+                        if (action === 'delete') result.deleted++;
+                        else if (action === 'draft') result.drafted++;
+                    }
+
                     break; // Only one rule per email
                 }
             }

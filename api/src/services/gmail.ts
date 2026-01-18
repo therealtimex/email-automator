@@ -21,6 +21,7 @@ export interface GmailMessage {
     sender: string;
     recipient: string;
     date: string;
+    internalDate: string; // Gmail's internal timestamp (ms since epoch) - use this for checkpointing
     body: string;
     snippet: string;
     headers: {
@@ -224,6 +225,132 @@ export class GmailService {
         };
     }
 
+    /**
+     * Fetch messages in OLDEST-FIRST order using "Fetch IDs → Sort → Hydrate" strategy.
+     *
+     * Gmail API always returns newest first and doesn't support sorting.
+     * To process oldest emails first (critical for checkpoint-based sync), we:
+     * 1. Fetch ALL message IDs matching the query (lightweight, paginated)
+     * 2. Sort by internalDate ascending (oldest first)
+     * 3. Take first N messages (limit)
+     * 4. Hydrate only those N messages with full details
+     *
+     * This ensures we never skip emails when using max_emails pagination.
+     */
+    async fetchMessagesOldestFirst(
+        account: EmailAccount,
+        options: { limit: number; query?: string; maxIdsToFetch?: number }
+    ): Promise<{ messages: GmailMessage[]; hasMore: boolean }> {
+        const { limit, query, maxIdsToFetch = 1000 } = options;
+
+        // Step 1: Fetch all message IDs (lightweight)
+        const allIds = await this.fetchAllMessageIds(account, query, maxIdsToFetch);
+
+        if (allIds.length === 0) {
+            return { messages: [], hasMore: false };
+        }
+
+        logger.debug('Fetched message IDs', { count: allIds.length, query });
+
+        // Step 2: Sort by internalDate ascending (oldest first)
+        allIds.sort((a, b) => parseInt(a.internalDate) - parseInt(b.internalDate));
+
+        // Step 3: Take first N IDs
+        const idsToHydrate = allIds.slice(0, limit);
+        const hasMore = allIds.length > limit;
+
+        // Step 4: Hydrate those specific messages
+        const messages = await this.hydrateMessages(account, idsToHydrate.map(m => m.id));
+
+        // Re-sort hydrated messages by internalDate (maintain order)
+        messages.sort((a, b) => parseInt(a.internalDate) - parseInt(b.internalDate));
+
+        return { messages, hasMore };
+    }
+
+    /**
+     * Fetch all message IDs matching a query (lightweight, paginated).
+     * Uses minimal fields for speed: only id and internalDate.
+     */
+    private async fetchAllMessageIds(
+        account: EmailAccount,
+        query: string | undefined,
+        maxIds: number
+    ): Promise<{ id: string; internalDate: string }[]> {
+        const gmail = await this.getAuthenticatedClient(account);
+        const results: { id: string; internalDate: string }[] = [];
+        let pageToken: string | undefined;
+
+        do {
+            const response = await gmail.users.messages.list({
+                userId: 'me',
+                q: query,
+                pageToken,
+                maxResults: 500, // Max allowed per page
+                // Note: messages.list only returns id and threadId, not internalDate
+                // We need to fetch internalDate separately with minimal format
+            });
+
+            const messageRefs = response.data.messages || [];
+
+            // Fetch internalDate for each message (using metadata format for speed)
+            for (const ref of messageRefs) {
+                if (!ref.id || results.length >= maxIds) break;
+
+                try {
+                    const msg = await gmail.users.messages.get({
+                        userId: 'me',
+                        id: ref.id,
+                        format: 'minimal', // Only returns id, threadId, labelIds, snippet, internalDate
+                    });
+
+                    if (msg.data.id && msg.data.internalDate) {
+                        results.push({
+                            id: msg.data.id,
+                            internalDate: msg.data.internalDate,
+                        });
+                    }
+                } catch (error) {
+                    logger.warn('Failed to fetch message metadata', { messageId: ref.id });
+                }
+            }
+
+            pageToken = response.data.nextPageToken ?? undefined;
+        } while (pageToken && results.length < maxIds);
+
+        return results;
+    }
+
+    /**
+     * Hydrate specific messages by ID (fetch full details).
+     */
+    private async hydrateMessages(
+        account: EmailAccount,
+        messageIds: string[]
+    ): Promise<GmailMessage[]> {
+        const gmail = await this.getAuthenticatedClient(account);
+        const messages: GmailMessage[] = [];
+
+        for (const id of messageIds) {
+            try {
+                const detail = await gmail.users.messages.get({
+                    userId: 'me',
+                    id,
+                    format: 'full',
+                });
+
+                const parsed = this.parseMessage(detail.data);
+                if (parsed) {
+                    messages.push(parsed);
+                }
+            } catch (error) {
+                logger.warn('Failed to hydrate message', { messageId: id, error });
+            }
+        }
+
+        return messages;
+    }
+
     private parseMessage(message: gmail_v1.Schema$Message): GmailMessage | null {
         if (!message.id || !message.threadId) return null;
 
@@ -250,6 +377,7 @@ export class GmailService {
             sender: getHeader('From'),
             recipient: getHeader('To'),
             date: getHeader('Date'),
+            internalDate: message.internalDate || '', // Gmail's internal timestamp (ms since epoch)
             body,
             snippet: message.snippet || '',
             headers: {
