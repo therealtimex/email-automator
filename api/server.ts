@@ -68,6 +68,7 @@ app.use('/api', routes);
 
 // Serve static files - robust resolution for compiled app and NPX
 const distPath = process.env.ELECTRON_STATIC_PATH || path.join(process.cwd(), 'dist');
+logger.info('Serving static assets', { path: distPath });
 app.use(express.static(distPath));
 
 // Handle client-side routing

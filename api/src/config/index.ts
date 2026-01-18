@@ -10,7 +10,7 @@ dotenv.config({ path: join(process.cwd(), '.env') });
 
 // 2. Fallback to package root (where the binary lives)
 // In dist/api/src/config/index.js, the root is 4 levels up
-dotenv.config({ path: join(__dirname, '..', '..', '..', '.env') });
+dotenv.config({ path: join(__dirname, '..', '..', '..', '..', '.env') });
 
 function parseArgs(args: string[]): { port: number | null, noUi: boolean } {
     const portIndex = args.indexOf('--port');
