@@ -115,11 +115,11 @@ export function AITraceModal({
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div className="text-[10px] bg-secondary px-2 py-1 rounded">
                                                         <span className="text-muted-foreground mr-1">Category:</span>
-                                                        <span className="font-bold uppercase">{event.details?.category}</span>
+                                                        <span className="font-bold uppercase">{event.details?.category || 'Analyzing...'}</span>
                                                     </div>
                                                     <div className="text-[10px] bg-secondary px-2 py-1 rounded">
                                                         <span className="text-muted-foreground mr-1">Sentiment:</span>
-                                                        <span className="font-bold uppercase">{event.details?.sentiment}</span>
+                                                        <span className="font-bold uppercase">{event.details?.sentiment || 'Analyzing...'}</span>
                                                     </div>
                                                 </div>
                                                 
@@ -657,14 +657,14 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings }
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-[1.5fr_1fr] gap-2">
                             <div className="space-y-1">
                                 <label className="text-[10px] text-muted-foreground flex items-center gap-1">
                                     <Calendar className="w-2.5 h-2.5" /> Sync From
                                 </label>
                                 <Input
                                     type="datetime-local"
-                                    className="h-7 text-[10px] px-2 py-0"
+                                    className="h-7 text-[10px] px-2 py-0 w-full"
                                     value={(() => {
                                         // 1. Priority: User-defined start date
                                         if (account.sync_start_date) return account.sync_start_date.substring(0, 16);
@@ -737,6 +737,7 @@ interface EmailCardProps {
 }
 
 function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
+    if (!email) return null;
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
     const isLoading = !!loadingAction;
 

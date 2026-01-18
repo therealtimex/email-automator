@@ -423,6 +423,8 @@ export class EmailProcessorService {
     }
 
     private matchesCondition(email: Partial<Email>, analysis: EmailAnalysis, condition: Record<string, unknown>): boolean {
+        if (!analysis) return false;
+        
         for (const [key, value] of Object.entries(condition)) {
             const val = value as string;
             
@@ -494,12 +496,13 @@ export class EmailProcessorService {
 
         if (eventLogger) await eventLogger.info('Retention', `Checking retention rules for ${retentionRules.length} policies`);
 
-        // Fetch emails for this account that haven't had an action taken yet
+        // Fetch emails for this account that have been analyzed but haven't had an action taken yet
         const { data: processedEmails, error } = await this.supabase
             .from('emails')
             .select('*')
             .eq('account_id', account.id)
             .is('action_taken', null)
+            .not('ai_analysis', 'is', null)
             .order('date', { ascending: true });
 
         if (error || !processedEmails) return;
