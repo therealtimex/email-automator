@@ -1,4 +1,15 @@
 // Database types
+export interface Profile {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    avatar_url: string | null;
+    is_admin: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface EmailAccount {
     id: string;
     user_id: string;

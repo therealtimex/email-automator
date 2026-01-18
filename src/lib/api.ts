@@ -360,6 +360,48 @@ class HybridApiClient {
             auth: false
         });
     }
+
+    // ============================================================================
+    // PROFILE & SECURITY (Edge Functions / Supabase Auth)
+    // ============================================================================
+
+    async getProfile() {
+        if (!this.supabaseClient) return { error: 'Supabase client not initialized' };
+        const { data: { user } } = await this.supabaseClient.auth.getUser();
+        if (!user) return { error: 'Not authenticated' };
+
+        const { data, error } = await this.supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+        return { data, error };
+    }
+
+    async updateProfile(updates: { first_name?: string; last_name?: string; avatar_url?: string }) {
+        if (!this.supabaseClient) return { error: 'Supabase client not initialized' };
+        const { data: { user } } = await this.supabaseClient.auth.getUser();
+        if (!user) return { error: 'Not authenticated' };
+
+        const { data, error } = await this.supabaseClient
+            .from('profiles')
+            .update({
+                ...updates,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id)
+            .select()
+            .single();
+
+        return { data, error };
+    }
+
+    async changePassword(password: string) {
+        if (!this.supabaseClient) return { error: 'Supabase client not initialized' };
+        const { error } = await this.supabaseClient.auth.updateUser({ password });
+        return { success: !error, error };
+    }
 }
 
 export const api = new HybridApiClient();

@@ -1,7 +1,7 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { api, initializeApi } from '../lib/api';
-import { Email, EmailAccount, Rule, UserSettings, Stats } from '../lib/types';
+import { Email, EmailAccount, Rule, UserSettings, Stats, Profile } from '../lib/types';
 import { getSupabaseConfig } from '../lib/supabase-config';
 
 // Helper to extract error message from API response error
@@ -18,6 +18,7 @@ interface AppState {
     isAuthenticated: boolean;
 
     // Data
+    profile: Profile | null;
     emails: Email[];
     accounts: EmailAccount[];
     rules: Rule[];
@@ -38,6 +39,7 @@ interface AppState {
 const initialState: AppState = {
     user: null,
     isAuthenticated: false,
+    profile: null,
     emails: [],
     accounts: [],
     rules: [],
@@ -59,6 +61,8 @@ type Action =
     | { type: 'SET_ERROR'; payload: string | null }
     | { type: 'SET_EMAILS'; payload: { emails: Email[]; total: number; offset: number } }
     | { type: 'UPDATE_EMAIL'; payload: Email }
+    | { type: 'SET_PROFILE'; payload: Profile }
+    | { type: 'UPDATE_PROFILE'; payload: Profile }
     | { type: 'SET_ACCOUNTS'; payload: EmailAccount[] }
     | { type: 'ADD_ACCOUNT'; payload: EmailAccount }
     | { type: 'REMOVE_ACCOUNT'; payload: string }
@@ -100,6 +104,10 @@ function reducer(state: AppState, action: Action): AppState {
                     e.id === action.payload.id ? action.payload : e
                 ),
             };
+        case 'SET_PROFILE':
+            return { ...state, profile: action.payload };
+        case 'UPDATE_PROFILE':
+            return { ...state, profile: action.payload };
         case 'SET_ACCOUNTS':
             return { ...state, accounts: action.payload };
         case 'ADD_ACCOUNT':
@@ -147,11 +155,13 @@ interface AppContextType {
         fetchAccounts: () => Promise<void>;
         fetchRules: () => Promise<void>;
         fetchSettings: () => Promise<void>;
+        fetchProfile: () => Promise<void>;
         fetchStats: () => Promise<void>;
         executeAction: (emailId: string, action: string, draftContent?: string) => Promise<boolean>;
         triggerSync: (accountId?: string) => Promise<boolean>;
         disconnectAccount: (accountId: string) => Promise<boolean>;
         updateSettings: (settings: Partial<UserSettings>) => Promise<boolean>;
+        updateProfile: (updates: { first_name?: string; last_name?: string; avatar_url?: string }) => Promise<boolean>;
         updateAccount: (accountId: string, updates: Partial<EmailAccount>) => Promise<boolean>;
         createRule: (rule: Omit<Rule, 'id' | 'user_id' | 'created_at'>) => Promise<boolean>;
         deleteRule: (ruleId: string) => Promise<boolean>;
@@ -269,6 +279,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
         },
 
+        fetchProfile: async () => {
+            const response = await api.getProfile();
+            if (response.data) {
+                dispatch({ type: 'SET_PROFILE', payload: response.data });
+            }
+        },
+
         fetchStats: async () => {
             const response = await api.getStats();
             if (response.data) {
@@ -325,6 +342,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 return true;
             }
             dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update settings') });
+            return false;
+        },
+
+        updateProfile: async (updates: { first_name?: string; last_name?: string; avatar_url?: string }) => {
+            const response = await api.updateProfile(updates);
+            if (response.data) {
+                dispatch({ type: 'UPDATE_PROFILE', payload: response.data });
+                return true;
+            }
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update profile') });
             return false;
         },
 

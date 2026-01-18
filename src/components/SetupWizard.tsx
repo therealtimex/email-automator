@@ -28,6 +28,8 @@ type WizardStep = 'welcome' | 'credentials' | 'validating' | 'success';
 
 interface SetupWizardProps {
     onComplete: () => void;
+    open?: boolean;
+    canClose?: boolean;
 }
 
 /**
@@ -134,7 +136,7 @@ function validateKeyFormat(input: string): {
     };
 }
 
-export function SetupWizard({ onComplete }: SetupWizardProps) {
+export function SetupWizard({ onComplete, open = true, canClose = false }: SetupWizardProps) {
     const [step, setStep] = useState<WizardStep>('welcome');
     const [url, setUrl] = useState('');
     const [anonKey, setAnonKey] = useState('');
@@ -173,11 +175,13 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     const showUrlExpansion = url && !url.startsWith('http') && urlValidation.valid;
 
     return (
-        <Dialog open={true} modal={false}>
+        <Dialog open={open} onOpenChange={(val) => {
+            if (!val && canClose) onComplete();
+        }}>
             <DialogContent
                 className="sm:max-w-md"
-                onPointerDownOutside={(e) => e.preventDefault()}
-                onEscapeKeyDown={(e) => e.preventDefault()}
+                onPointerDownOutside={(e) => { if (!canClose) e.preventDefault() }}
+                onEscapeKeyDown={(e) => { if (!canClose) e.preventDefault() }}
             >
                 {step === 'welcome' && (
                     <>
@@ -217,9 +221,16 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                                 </ul>
                             </div>
 
-                            <Button onClick={() => setStep('credentials')} className="w-full">
-                                Continue Setup
-                            </Button>
+                            <div className="flex gap-2">
+                                {canClose && (
+                                    <Button variant="outline" onClick={onComplete} className="flex-1">
+                                        Close
+                                    </Button>
+                                )}
+                                <Button onClick={() => setStep('credentials')} className="flex-1">
+                                    Continue Setup
+                                </Button>
+                            </div>
                         </div>
                     </>
                 )}
@@ -318,6 +329,15 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                                 >
                                     Back
                                 </Button>
+                                {canClose && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={onComplete}
+                                        className="flex-1"
+                                    >
+                                        Close
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={handleValidateAndSave}
                                     disabled={!urlValidation.valid || !keyValidation.valid}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock, Cpu, Brain, Zap, AlertCircle, Info, Code, CheckCircle2 } from 'lucide-react';
+import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock, Cpu, Brain, Zap, AlertCircle, Info, Code, CheckCircle2, UserCircle } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/mode-toggle';
 import { Button } from './components/ui/button';
@@ -11,6 +11,7 @@ import { PageLoader } from './components/LoadingSpinner';
 import { SetupWizard } from './components/SetupWizard';
 import { Dashboard } from './components/Dashboard';
 import { Configuration } from "./components/Configuration";
+import { AccountSettingsPage } from './components/AccountSettingsPage';
 import { Login } from './components/Login';
 import { getSupabaseConfig, validateSupabaseConnection } from './lib/supabase-config';
 import { supabase } from './lib/supabase';
@@ -33,7 +34,7 @@ import {
     DialogTitle,
 } from './components/ui/dialog';
 
-type TabType = 'dashboard' | 'config' | 'analytics';
+type TabType = 'dashboard' | 'config' | 'analytics' | 'account';
 
 function AppContent() {
     const { state, actions } = useApp();
@@ -116,6 +117,7 @@ function AppContent() {
                 actions.fetchAccounts();
                 actions.fetchRules();
                 actions.fetchSettings();
+                actions.fetchProfile();
 
                 // Check migration status
                 checkMigrationStatus(supabase).then((status) => {
@@ -178,11 +180,14 @@ function AppContent() {
                 <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                     <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-8">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-xl font-bold flex items-center gap-2">
+                            <button 
+                                onClick={() => setActiveTab('dashboard')}
+                                className="text-xl font-bold flex items-center gap-2 hover:opacity-80 transition-opacity"
+                            >
                                 <Mail className="w-5 h-5 text-primary" />
                                 <span className="hidden sm:inline">RealTimeX Email Automator</span>
                                 <span className="sm:hidden">Email AI</span>
-                            </h1>
+                            </button>
                         </div>
 
                         <div className="flex gap-4 items-center">
@@ -218,6 +223,19 @@ function AppContent() {
                             <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block" />
                             <ModeToggle />
                             <Button
+                                variant={activeTab === 'account' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                onClick={() => setActiveTab('account')}
+                                className="text-muted-foreground hover:text-foreground p-0 w-8 h-8 rounded-full overflow-hidden border"
+                                title="Account Settings"
+                            >
+                                {state.profile?.avatar_url ? (
+                                    <img src={state.profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    <UserCircle className="w-5 h-5" />
+                                )}
+                            </Button>
+                            <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={handleLogout}
@@ -235,6 +253,7 @@ function AppContent() {
                     {activeTab === 'dashboard' && <Dashboard />}
                     {activeTab === 'config' && <Configuration />}
                     {activeTab === 'analytics' && <AnalyticsPage />}
+                    {activeTab === 'account' && <AccountSettingsPage />}
                 </main>
 
                 {/* Error Display */}
