@@ -5,6 +5,13 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.8] - 2026-01-18
+
+### Fixed
+- **Model Initialization**: Fixed uninitialized `model` field that could cause undefined access
+- **JSON Reliability**: Added `response_format: { type: 'json_object' }` for more reliable JSON parsing
+- **Category Prompt**: Fixed category definitions in prompt to match Zod schema exactly
+
 ## [2.3.7] - 2026-01-18
 
 ### Fixed
@@ -67,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Express API backend
 - Supabase database integration
 
+[2.3.8]: https://github.com/therealtimex/email-automator/compare/v2.3.7...v2.3.8
 [2.3.7]: https://github.com/therealtimex/email-automator/compare/v2.0.0...v2.3.7
 [2.0.0]: https://github.com/therealtimex/email-automator/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/therealtimex/email-automator/releases/tag/v1.0.0
