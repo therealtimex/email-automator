@@ -2,6 +2,9 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+// 1. Try to load from current working directory (e.g. where npx is run)
+dotenv.config({ path: join(process.cwd(), '.env') });
+// 2. Fallback to package root
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);

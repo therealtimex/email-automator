@@ -30,9 +30,8 @@ async function setup() {
   console.log('========================');
   console.log('');
 
-  const envPath = join(__dirname, '..', '.env');
-  const envExamplePath = join(__dirname, '..', '.env.example');
-
+  const envPath = join(process.cwd(), '.env');
+  
   // Check if .env already exists
   if (existsSync(envPath)) {
     const overwrite = await question('⚠️  .env file already exists. Overwrite? (y/N): ');

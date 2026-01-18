@@ -5,9 +5,10 @@
  * Main command to run the Email Automator API server
  */
 
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,7 +25,7 @@ if (portIndex !== -1 && args[portIndex + 1]) {
 
 const noUi = args.includes('--no-ui');
 
-console.log('🚀 Starting Email Automator...');
+console.log('🚀 Email Automator starting...');
 console.log(`📡 Port: ${port}`);
 if (noUi) console.log('🖥️  Mode: No-UI');
 console.log('');
@@ -32,12 +33,27 @@ console.log('');
 // Path to server
 const serverPath = join(__dirname, '..', 'api', 'server.ts');
 
-// Resolve tsx binary path
-// In npx/installed mode, it will be in ../node_modules/.bin/tsx
-// In dev mode, it will be in ../node_modules/.bin/tsx
-const tsxPath = join(__dirname, '..', 'node_modules', '.bin', 'tsx');
+// Robust tsx resolution
+function getTsxPath() {
+  // 1. Try local node_modules
+  const localTsx = join(__dirname, '..', 'node_modules', '.bin', 'tsx');
+  if (existsSync(localTsx)) return localTsx;
 
-// Start server with resolved tsx
+  // 2. Try to find in PATH
+  try {
+    const pathTsx = execSync(process.platform === 'win32' ? 'where tsx' : 'which tsx').toString().trim().split('\n')[0];
+    if (pathTsx) return pathTsx;
+  } catch (e) {
+    // which failed
+  }
+
+  // 3. Fallback to just 'tsx' and hope for the best
+  return 'tsx';
+}
+
+const tsxPath = getTsxPath();
+
+// Start server
 const server = spawn(tsxPath, [serverPath, ...args], {
   stdio: 'inherit',
   env: { ...process.env, PORT: port },

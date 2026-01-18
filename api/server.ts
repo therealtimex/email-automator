@@ -109,12 +109,6 @@ const server = app.listen(config.port, () => {
     if (getServerSupabase()) {
         startScheduler();
     }
-
-    // Automatically open browser unless -n flag is provided
-    if (!config.noUi) {
-        const startCommand = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-        spawn(startCommand, [url], { detached: true }).unref();
-    }
 });
 
 // Handle server errors
