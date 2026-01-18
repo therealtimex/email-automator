@@ -32,11 +32,16 @@ console.log('');
 
 // Path to compiled server
 const serverPath = join(__dirname, '..', 'dist', 'api', 'server.js');
+const distPath = join(__dirname, '..', 'dist');
 
 // Start server with standard node
 const server = spawn(process.execPath, [serverPath, ...args], {
   stdio: 'inherit',
-  env: { ...process.env, PORT: port },
+  env: { 
+    ...process.env, 
+    PORT: port,
+    ELECTRON_STATIC_PATH: distPath // Reuse a standard env name for static assets
+  },
 });
 
 server.on('error', (error) => {

@@ -66,10 +66,8 @@ app.use('/api', apiRateLimit);
 // API routes
 app.use('/api', routes);
 
-// Serve static files - robust resolution for compiled app
-// In npx/dist mode, dist is at ../../../dist relative to this file
-// In dev mode, it is at ../dist
-const distPath = path.join(process.cwd(), 'dist');
+// Serve static files - robust resolution for compiled app and NPX
+const distPath = process.env.ELECTRON_STATIC_PATH || path.join(process.cwd(), 'dist');
 app.use(express.static(distPath));
 
 // Handle client-side routing
