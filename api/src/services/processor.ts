@@ -33,6 +33,7 @@ export class EmailProcessorService {
             .from('processing_logs')
             .insert({
                 user_id: userId,
+                account_id: accountId,
                 status: 'running',
             })
             .select()
@@ -150,14 +151,23 @@ export class EmailProcessorService {
     ): Promise<void> {
         const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
 
-        // Construct query: Prioritize user-defined sync_start_date if provided
-        let query = '';
+        // Construct query: Use checkpoint if it's newer than the user-defined start date
+        let effectiveStartMs = 0;
         if (account.sync_start_date) {
-            const startSeconds = Math.floor(new Date(account.sync_start_date).getTime() / 1000);
+            effectiveStartMs = new Date(account.sync_start_date).getTime();
+        }
+        
+        if (account.last_sync_checkpoint) {
+            const checkpointMs = parseInt(account.last_sync_checkpoint);
+            if (checkpointMs > effectiveStartMs) {
+                effectiveStartMs = checkpointMs;
+            }
+        }
+
+        let query = '';
+        if (effectiveStartMs > 0) {
+            const startSeconds = Math.floor(effectiveStartMs / 1000);
             query = `after:${startSeconds}`;
-        } else if (account.last_sync_checkpoint) {
-            const lastSyncSeconds = Math.floor(parseInt(account.last_sync_checkpoint) / 1000);
-            query = `after:${lastSyncSeconds}`;
         }
         
         if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Gmail', { query, batchSize });
@@ -170,7 +180,6 @@ export class EmailProcessorService {
         if (eventLogger) await eventLogger.info('Fetching', `Fetched ${messages.length} emails`);
 
         // We process in ASCENDING order (oldest to newest) to move checkpoint forward correctly
-        // Gmail API always returns newest first, so we reverse for processing
         const sortedMessages = [...messages].reverse();
 
         let maxInternalDate = account.last_sync_checkpoint ? parseInt(account.last_sync_checkpoint) : 0;
@@ -180,14 +189,10 @@ export class EmailProcessorService {
                 await this.processMessage(account, message, rules, settings, result, eventLogger);
 
                 // Checkpoint tracking
-                // Note: We should use internalDate from Gmail metadata for accuracy
-                // For now we use the header date parsed by service
                 const msgDate = new Date(message.date).getTime();
                 if (msgDate > maxInternalDate) {
                     maxInternalDate = msgDate;
                     
-                    // Update checkpoint in DB immediately after each successful message 
-                    // to prevent loss on crash
                     await this.supabase
                         .from('email_accounts')
                         .update({ last_sync_checkpoint: maxInternalDate.toString() })
@@ -210,12 +215,21 @@ export class EmailProcessorService {
     ): Promise<void> {
         const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
 
-        // Construct filter: Prioritize user-defined sync_start_date
-        let filter = '';
+        // Construct filter: Use checkpoint if it's newer than the user-defined start date
+        let effectiveStartIso = '';
         if (account.sync_start_date) {
-            filter = `receivedDateTime ge ${new Date(account.sync_start_date).toISOString()}`;
-        } else if (account.last_sync_checkpoint) {
-            filter = `receivedDateTime gt ${account.last_sync_checkpoint}`;
+            effectiveStartIso = new Date(account.sync_start_date).toISOString();
+        }
+
+        if (account.last_sync_checkpoint) {
+            if (!effectiveStartIso || account.last_sync_checkpoint > effectiveStartIso) {
+                effectiveStartIso = account.last_sync_checkpoint;
+            }
+        }
+
+        let filter = '';
+        if (effectiveStartIso) {
+            filter = `receivedDateTime gt ${effectiveStartIso}`;
         }
 
         if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Outlook', { filter, batchSize });
@@ -227,8 +241,6 @@ export class EmailProcessorService {
         
         if (eventLogger) await eventLogger.info('Fetching', `Fetched ${messages.length} emails`);
 
-        // Microsoft API supports sorting in request, we assume service handles basic ordering
-        // but we reverse to ensure oldest-first processing for checkpointing if needed.
         const sortedMessages = [...messages].reverse();
 
         let latestCheckpoint = account.last_sync_checkpoint || '';

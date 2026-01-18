@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, LayoutDashboard, Settings, BarChart3, LogOut } from 'lucide-react';
+import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/mode-toggle';
 import { Button } from './components/ui/button';
@@ -15,6 +15,7 @@ import { Login } from './components/Login';
 import { getSupabaseConfig, validateSupabaseConnection } from './lib/supabase-config';
 import { supabase } from './lib/supabase';
 import { api } from './lib/api';
+import { cn } from './lib/utils';
 import {
     checkMigrationStatus,
     type MigrationStatus,
