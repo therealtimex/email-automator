@@ -48,13 +48,13 @@ export interface EmailContext {
 
 export class IntelligenceService {
     private client: OpenAI | null = null;
-    private model: string;
+    private model: string = 'gpt-4o-mini';
     private isConfigured: boolean = false;
 
     constructor(overrides?: { model?: string; baseUrl?: string; apiKey?: string }) {
         const apiKey = overrides?.apiKey || config.llm.apiKey;
         const baseUrl = overrides?.baseUrl || config.llm.baseUrl;
-        this.model = overrides?.model || config.llm.model;
+        this.model = overrides?.model || config.llm.model || 'gpt-4o-mini';
 
         // Allow local LLM servers (LM Studio, Ollama) or custom endpoints that don't need API keys
         // We assume any custom baseUrl might be a local/private instance.
@@ -111,12 +111,16 @@ Do NOT include any greetings, chatter, or special tokens like <|channel|> in you
 Return ONLY a valid JSON object.
 
 Definitions for Categories:
-- "important": Work-related, urgent, from known contacts
+- "spam": Junk, suspicious, unwanted
+- "newsletter": Subscribed content, digests
 - "promotional": Marketing, sales, discounts
 - "transactional": Receipts, shipping, confirmations
 - "social": LinkedIn, friends, social updates
-- "newsletter": Subscribed content
-- "spam": Junk, suspicious
+- "support": Help desk, customer service
+- "client": Business clients, customers
+- "internal": Company internal communications
+- "personal": Friends, family, personal matters
+- "other": Anything else
 
 Context:
 - Current Date: ${new Date().toISOString()}
@@ -156,13 +160,14 @@ REQUIRED JSON STRUCTURE:
 
         let rawResponse = '';
         try {
-            // Using raw completion call to handle garbage characters and strip tokens manually
+            // Request JSON response format for reliable parsing
             const response = await this.client!.chat.completions.create({
                 model: this.model,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: cleanedContent || '[Empty email body]' },
                 ],
+                response_format: { type: 'json_object' },
                 temperature: 0.1,
             });
 

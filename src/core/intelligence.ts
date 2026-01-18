@@ -22,7 +22,7 @@ export type EmailAnalysis = z.infer<typeof EmailAnalysisSchema>;
 
 export class IntelligenceLayer {
     private client: OpenAI | null = null;
-    private model: string;
+    private model: string = 'gpt-4o-mini';
 
     constructor() {
         if (!process.env.LLM_API_KEY) {
