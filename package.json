@@ -1,8 +1,8 @@
 {
   "name": "@realtimex/email-automator",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "type": "module",
-  "main": "api/server.ts",
+  "main": "dist/api/server.js",
   "bin": {
     "email-automator": "./bin/email-automator.js",
     "email-automator-setup": "./bin/email-automator-setup.js",
@@ -30,10 +30,11 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "tsx watch api/server.ts",
-    "build": "tsc && vite build",
+    "build": "npm run build:ui && npm run build:api",
+    "build:ui": "vite build",
     "build:api": "tsc -p tsconfig.api.json",
     "preview": "vite preview",
-    "serve": "tsx api/server.ts",
+    "serve": "node dist/api/server.js",
     "start": "node dist/api/server.js",
     "test": "vitest",
     "test:run": "vitest run",

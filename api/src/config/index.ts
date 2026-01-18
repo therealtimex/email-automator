@@ -35,9 +35,9 @@ export const config = {
     nodeEnv: process.env.NODE_ENV || 'development',
     isProduction: process.env.NODE_ENV === 'production',
 
-    // Paths
-    rootDir: join(__dirname, '..', '..', '..'),
-    scriptsDir: join(__dirname, '..', '..', '..', 'scripts'),
+    // Paths - Robust resolution for both TS source and compiled JS in dist/
+    rootDir: process.cwd(),
+    scriptsDir: join(process.cwd(), 'scripts'),
 
     // Supabase
     supabase: {

@@ -30,31 +30,11 @@ console.log(`📡 Port: ${port}`);
 if (noUi) console.log('🖥️  Mode: No-UI');
 console.log('');
 
-// Path to server
-const serverPath = join(__dirname, '..', 'api', 'server.ts');
+// Path to compiled server
+const serverPath = join(__dirname, '..', 'dist', 'api', 'server.js');
 
-// Robust tsx resolution
-function getTsxPath() {
-  // 1. Try local node_modules
-  const localTsx = join(__dirname, '..', 'node_modules', '.bin', 'tsx');
-  if (existsSync(localTsx)) return localTsx;
-
-  // 2. Try to find in PATH
-  try {
-    const pathTsx = execSync(process.platform === 'win32' ? 'where tsx' : 'which tsx').toString().trim().split('\n')[0];
-    if (pathTsx) return pathTsx;
-  } catch (e) {
-    // which failed
-  }
-
-  // 3. Fallback to just 'tsx' and hope for the best
-  return 'tsx';
-}
-
-const tsxPath = getTsxPath();
-
-// Start server
-const server = spawn(tsxPath, [serverPath, ...args], {
+// Start server with standard node
+const server = spawn(process.execPath, [serverPath, ...args], {
   stdio: 'inherit',
   env: { ...process.env, PORT: port },
 });
