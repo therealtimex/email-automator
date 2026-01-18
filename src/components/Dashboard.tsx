@@ -216,8 +216,8 @@ export function Dashboard() {
 
     // Realtime subscription for live email updates
     const handleRealtimeInsert = useCallback((email: Email) => {
-        dispatch({ type: 'UPDATE_EMAIL', payload: email });
-        toast.info('New email received');
+        dispatch({ type: 'ADD_EMAIL', payload: email });
+        toast.info('New email processed');
     }, [dispatch]);
 
     const handleRealtimeUpdate = useCallback((email: Email) => {

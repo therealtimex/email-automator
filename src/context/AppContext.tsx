@@ -60,6 +60,7 @@ type Action =
     | { type: 'SET_INITIALIZED'; payload: boolean }
     | { type: 'SET_ERROR'; payload: string | null }
     | { type: 'SET_EMAILS'; payload: { emails: Email[]; total: number; offset: number } }
+    | { type: 'ADD_EMAIL'; payload: Email }
     | { type: 'UPDATE_EMAIL'; payload: Email }
     | { type: 'SET_PROFILE'; payload: Profile }
     | { type: 'UPDATE_PROFILE'; payload: Profile }
@@ -96,6 +97,12 @@ function reducer(state: AppState, action: Action): AppState {
                 emails: action.payload.emails,
                 emailsTotal: action.payload.total,
                 emailsOffset: action.payload.offset,
+            };
+        case 'ADD_EMAIL':
+            return {
+                ...state,
+                emails: [action.payload, ...state.emails],
+                emailsTotal: state.emailsTotal + 1,
             };
         case 'UPDATE_EMAIL':
             return {
