@@ -32,8 +32,13 @@ console.log('');
 // Path to server
 const serverPath = join(__dirname, '..', 'api', 'server.ts');
 
-// Start server with tsx
-const server = spawn('npx', ['tsx', serverPath, ...args], {
+// Resolve tsx binary path
+// In npx/installed mode, it will be in ../node_modules/.bin/tsx
+// In dev mode, it will be in ../node_modules/.bin/tsx
+const tsxPath = join(__dirname, '..', 'node_modules', '.bin', 'tsx');
+
+// Start server with resolved tsx
+const server = spawn(tsxPath, [serverPath, ...args], {
   stdio: 'inherit',
   env: { ...process.env, PORT: port },
 });
