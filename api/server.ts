@@ -1,5 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import { config, validateConfig } from './src/config/index.js';
 import { errorHandler } from './src/middleware/errorHandler.js';
 import { apiRateLimit } from './src/middleware/rateLimit.js';
@@ -7,6 +10,9 @@ import routes from './src/routes/index.js';
 import { logger } from './src/utils/logger.js';
 import { getServerSupabase } from './src/services/supabase.js';
 import { startScheduler, stopScheduler } from './src/services/scheduler.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Validate configuration
 const configValidation = validateConfig();
@@ -60,11 +66,21 @@ app.use('/api', apiRateLimit);
 // API routes
 app.use('/api', routes);
 
-// 404 handler
-app.use((_req, res) => {
-    res.status(404).json({ 
-        success: false, 
-        error: { code: 'NOT_FOUND', message: 'Endpoint not found' } 
+// Serve static files in production or if dist exists
+const distPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
+
+// Handle client-side routing
+app.get(/.*/, (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(distPath, 'index.html'), (err) => {
+        if (err) {
+            // If dist doesn't exist, return 404 for non-API routes
+            res.status(404).json({ 
+                success: false, 
+                error: { code: 'NOT_FOUND', message: 'Frontend not built or endpoint not found' } 
+            });
+        }
     });
 });
 
@@ -83,7 +99,8 @@ process.on('SIGINT', shutdown);
 
 // Start server
 const server = app.listen(config.port, () => {
-    logger.info(`Server running at http://localhost:${config.port}`, {
+    const url = `http://localhost:${config.port}`;
+    logger.info(`Server running at ${url}`, {
         environment: config.nodeEnv,
         supabase: getServerSupabase() ? 'connected' : 'not configured',
     });
@@ -91,6 +108,12 @@ const server = app.listen(config.port, () => {
     // Start background scheduler
     if (getServerSupabase()) {
         startScheduler();
+    }
+
+    // Automatically open browser unless -n flag is provided
+    if (!config.noUi) {
+        const startCommand = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+        spawn(startCommand, [url], { detached: true }).unref();
     }
 });
 

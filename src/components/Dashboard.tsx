@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { useApp } from '../context/AppContext';
+import { api } from '../lib/api';
 import { toast } from './Toast';
 import { LoadingSpinner, CardLoader } from './LoadingSpinner';
 import { EmailAccount, Email, UserSettings, ProcessingEvent } from '../lib/types';

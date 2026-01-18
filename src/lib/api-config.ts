@@ -20,9 +20,14 @@ export function getApiConfig(): ApiConfig {
     
     const anonKey = supabaseConfig ? supabaseConfig.anonKey : '';
 
-    // Express API URL: http://localhost:3004 (Local App)
-    // Note: RealTimeX Desktop uses ports 3001/3002
-    const expressApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3004';
+    // Express API URL:
+    // 1. Priority: Environment variable override
+    // 2. Development: If on Vite dev server (5173), fallback to default API port (3004)
+    // 3. Production/Unified: Use the current window origin (same port deployment)
+    const isViteDev = window.location.port === '5173';
+    const defaultDevApi = 'http://localhost:3004';
+    
+    const expressApiUrl = import.meta.env.VITE_API_URL || (isViteDev ? defaultDevApi : window.location.origin);
 
     return {
         edgeFunctionsUrl,

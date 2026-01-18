@@ -7,21 +7,28 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-function parsePort(args: string[], envPort: string | undefined, defaultPort: number): number {
+function parseArgs(args: string[]): { port: number | null, noUi: boolean } {
     const portIndex = args.indexOf('--port');
+    let port = null;
     if (portIndex !== -1 && args[portIndex + 1]) {
-        const customPort = parseInt(args[portIndex + 1], 10);
-        if (!isNaN(customPort) && customPort > 0 && customPort < 65536) {
-            return customPort;
+        const p = parseInt(args[portIndex + 1], 10);
+        if (!isNaN(p) && p > 0 && p < 65536) {
+            port = p;
         }
     }
-    return envPort ? parseInt(envPort, 10) : defaultPort;
+    
+    const noUi = args.includes('--no-ui');
+    
+    return { port, noUi };
 }
+
+const cliArgs = parseArgs(process.argv.slice(2));
 
 export const config = {
     // Server
     // Default port 3004 (RealTimeX Desktop uses 3001/3002)
-    port: parsePort(process.argv.slice(2), process.env.PORT, 3004),
+    port: cliArgs.port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3004),
+    noUi: cliArgs.noUi,
     nodeEnv: process.env.NODE_ENV || 'development',
     isProduction: process.env.NODE_ENV === 'production',
 

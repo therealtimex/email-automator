@@ -108,7 +108,9 @@ export interface Rule {
     user_id: string;
     name: string;
     condition: Record<string, unknown>;
-    action: 'delete' | 'archive' | 'draft';
+    action: 'delete' | 'archive' | 'draft' | 'star' | 'read';
+    instructions?: string;
+    attachments?: any[];
     is_enabled: boolean;
     created_at: string;
 }

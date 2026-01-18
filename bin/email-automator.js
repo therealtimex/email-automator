@@ -22,15 +22,18 @@ if (portIndex !== -1 && args[portIndex + 1]) {
   port = args[portIndex + 1];
 }
 
-console.log('🚀 Starting Email Automator API...');
+const noUi = args.includes('--no-ui');
+
+console.log('🚀 Starting Email Automator...');
 console.log(`📡 Port: ${port}`);
+if (noUi) console.log('🖥️  Mode: No-UI');
 console.log('');
 
 // Path to server
 const serverPath = join(__dirname, '..', 'api', 'server.ts');
 
 // Start server with tsx
-const server = spawn('npx', ['tsx', serverPath, '--port', port], {
+const server = spawn('npx', ['tsx', serverPath, ...args], {
   stdio: 'inherit',
   env: { ...process.env, PORT: port },
 });

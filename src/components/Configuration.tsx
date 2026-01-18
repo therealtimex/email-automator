@@ -8,7 +8,7 @@ import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
-import { EmailAccount, Rule, UserSettings } from '../lib/types';
+import { EmailAccount, Rule, UserSettings, RuleAttachment } from '../lib/types';
 import {
     Dialog,
     DialogContent,
