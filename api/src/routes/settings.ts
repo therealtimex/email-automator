@@ -32,8 +32,6 @@ router.get('/',
         const settings = settingsData || {
             llm_model: null,
             llm_base_url: null,
-            auto_trash_spam: false,
-            smart_drafts: false,
             sync_interval_minutes: 5,
         };
 

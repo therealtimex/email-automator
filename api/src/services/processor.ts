@@ -384,21 +384,7 @@ export class EmailProcessorService {
         result: ProcessingResult,
         eventLogger: EventLogger | null
     ): Promise<void> {
-        // Auto-trash spam
-        if (settings?.auto_trash_spam && analysis.is_useless && analysis.category === 'spam') {
-            await this.executeAction(account, email, 'delete', undefined, eventLogger, 'Auto-trash spam setting');
-            result.deleted++;
-            return;
-        }
-
-        // Smart drafts
-        const shouldDraft = analysis.suggested_actions?.includes('reply');
-        if (settings?.smart_drafts && shouldDraft && analysis.draft_response) {
-            await this.executeAction(account, email, 'draft', analysis.draft_response, eventLogger, 'Smart drafts setting');
-            result.drafted++;
-        }
-
-        // User-defined rules
+        // User-defined and System rules (Unified)
         for (const rule of rules) {
             if (this.matchesCondition(email, analysis, rule.condition as any)) {
                 let draftContent = undefined;
@@ -549,7 +535,10 @@ export class EmailProcessorService {
                 } else if (action === 'archive') {
                     await this.gmailService.archiveMessage(account, email.external_id);
                 } else if (action === 'draft' && draftContent) {
-                    await this.gmailService.createDraft(account, email.external_id, draftContent, this.supabase, attachments);
+                    const draftId = await this.gmailService.createDraft(account, email.external_id, draftContent, this.supabase, attachments);
+                    if (eventLogger) {
+                        await eventLogger.info('Drafted', `Draft created successfully. ID: ${draftId}`, { draftId }, email.id);
+                    }
                 } else if (action === 'read') {
                     await this.gmailService.markAsRead(account, email.external_id);
                 } else if (action === 'star') {

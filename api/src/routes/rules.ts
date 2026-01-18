@@ -31,7 +31,7 @@ router.post('/',
     authMiddleware,
     validateBody(schemas.createRule),
     asyncHandler(async (req, res) => {
-        const { name, condition, action, is_enabled } = req.body;
+        const { name, condition, action, is_enabled, instructions, attachments } = req.body;
 
         const { data, error } = await req.supabase!
             .from('rules')
@@ -41,6 +41,8 @@ router.post('/',
                 condition,
                 action,
                 is_enabled,
+                instructions,
+                attachments,
             })
             .select()
             .single();
@@ -107,26 +109,38 @@ router.post('/:ruleId/toggle',
     validateParams(z.object({ ruleId: schemas.uuid })),
     asyncHandler(async (req, res) => {
         const { ruleId } = req.params;
+        const userId = req.user!.id;
 
         // Get current state
         const { data: rule, error: fetchError } = await req.supabase!
             .from('rules')
-            .select('is_enabled')
+            .select('name, is_enabled')
             .eq('id', ruleId)
-            .eq('user_id', req.user!.id)
+            .eq('user_id', userId)
             .single();
 
-        if (fetchError || !rule) throw new NotFoundError('Rule');
+        if (fetchError || !rule) {
+            logger.error('Toggle failed: Rule not found', { ruleId, userId });
+            throw new NotFoundError('Rule');
+        }
+
+        const nextState = !rule.is_enabled;
+        logger.info('Toggling rule', { ruleName: rule.name, from: rule.is_enabled, to: nextState });
 
         // Toggle
         const { data, error } = await req.supabase!
             .from('rules')
-            .update({ is_enabled: !rule.is_enabled })
+            .update({ is_enabled: nextState })
             .eq('id', ruleId)
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            logger.error('Database error during toggle', error);
+            throw error;
+        }
+
+        logger.info('Toggle successful', { ruleId, is_enabled: data.is_enabled });
 
         res.json({ rule: data });
     })

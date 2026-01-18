@@ -295,13 +295,22 @@ export class GmailService {
     ): Promise<string> {
         const gmail = await this.getAuthenticatedClient(account);
 
+        // Fetch original message to get threadId and Message-ID for threading
         const original = await gmail.users.messages.get({ userId: 'me', id: originalMessageId });
         const headers = original.data.payload?.headers || [];
         const getHeader = (name: string) => headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
 
         const toAddress = getHeader('From');
         const subject = getHeader('Subject');
+        const originalMsgId = getHeader('Message-ID');
         const threadId = original.data.threadId;
+
+        // Threading headers: In-Reply-To should be the Message-ID of the mail we reply to
+        const replyHeaders = [];
+        if (originalMsgId) {
+            replyHeaders.push(`In-Reply-To: ${originalMsgId}`);
+            replyHeaders.push(`References: ${originalMsgId}`);
+        }
 
         let rawMessage = '';
         const boundary = `----=_Part_${Math.random().toString(36).substring(2)}`;
@@ -311,8 +320,8 @@ export class GmailService {
             rawMessage = [
                 `To: ${toAddress}`,
                 `Subject: Re: ${subject}`,
-                `In-Reply-To: ${originalMessageId}`,
-                `References: ${originalMessageId}`,
+                ...replyHeaders,
+                'MIME-Version: 1.0',
                 `Content-Type: multipart/mixed; boundary="${boundary}"`,
                 '',
                 `--${boundary}`,
@@ -348,8 +357,9 @@ export class GmailService {
             rawMessage = [
                 `To: ${toAddress}`,
                 `Subject: Re: ${subject}`,
-                `In-Reply-To: ${originalMessageId}`,
-                `References: ${originalMessageId}`,
+                ...replyHeaders,
+                'MIME-Version: 1.0',
+                'Content-Type: text/plain; charset="UTF-8"',
                 '',
                 replyContent,
             ].join('\r\n');
@@ -371,8 +381,9 @@ export class GmailService {
             },
         });
 
-        logger.debug('Draft created', { draftId: draft.data.id, attachments: attachments?.length || 0 });
-        return draft.data.id!;
+        const draftId = draft.data.id || 'unknown';
+        logger.debug('Draft created', { draftId, threadId, attachments: attachments?.length || 0 });
+        return draftId;
     }
 
     async addLabel(account: EmailAccount, messageId: string, labelIds: string[]): Promise<void> {

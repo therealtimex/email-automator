@@ -242,35 +242,35 @@ class HybridApiClient {
     }
 
     // ============================================================================
-    // RULES ENDPOINTS (Edge Functions)
+    // RULES ENDPOINTS (Express API - Local App)
     // ============================================================================
 
     async getRules() {
-        return this.edgeRequest<{ rules: any[] }>('/api-v1-rules');
+        return this.expressRequest<{ rules: any[] }>('/api/rules');
     }
 
-    async createRule(rule: { name: string; condition: any; action: string; is_enabled?: boolean }) {
-        return this.edgeRequest<{ rule: any }>('/api-v1-rules', {
+    async createRule(rule: { name: string; condition: any; action: string; is_enabled?: boolean, instructions?: string, attachments?: any[] }) {
+        return this.expressRequest<{ rule: any }>('/api/rules', {
             method: 'POST',
             body: JSON.stringify(rule),
         });
     }
 
     async updateRule(ruleId: string, updates: any) {
-        return this.edgeRequest<{ rule: any }>(`/api-v1-rules/${ruleId}`, {
+        return this.expressRequest<{ rule: any }>(`/api/rules/${ruleId}`, {
             method: 'PATCH',
             body: JSON.stringify(updates),
         });
     }
 
     async deleteRule(ruleId: string) {
-        return this.edgeRequest<{ success: boolean }>(`/api-v1-rules/${ruleId}`, {
+        return this.expressRequest<{ success: boolean }>(`/api/rules/${ruleId}`, {
             method: 'DELETE',
         });
     }
 
     async toggleRule(ruleId: string) {
-        return this.edgeRequest<{ rule: any }>(`/api-v1-rules/${ruleId}/toggle`, {
+        return this.expressRequest<{ rule: any }>(`/api/rules/${ruleId}/toggle`, {
             method: 'POST',
         });
     }

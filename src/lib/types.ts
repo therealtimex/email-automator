@@ -44,6 +44,7 @@ export interface Rule {
     instructions?: string;
     attachments?: RuleAttachment[];
     is_enabled: boolean;
+    is_system?: boolean; // New flag for pre-defined rules
     created_at: string;
 }
 
@@ -58,6 +59,7 @@ export interface RuleCondition {
     older_than_days?: number;
     priority?: Priority;
     sentiment?: Sentiment;
+    suggested_actions?: EmailAction[];
 }
 
 export interface RuleAttachment {
@@ -73,8 +75,6 @@ export interface UserSettings {
     llm_model: string | null;
     llm_base_url: string | null;
     llm_api_key: string | null;
-    auto_trash_spam: boolean;
-    smart_drafts: boolean;
     sync_interval_minutes: number;
     preferences?: Record<string, any>;
 }

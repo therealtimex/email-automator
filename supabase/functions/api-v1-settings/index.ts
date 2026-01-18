@@ -118,8 +118,6 @@ Deno.serve(async (req) => {
       const settings = settingsData || {
         user_id: user.id,
         sync_interval_minutes: 5,
-        auto_trash_spam: false,
-        smart_drafts: false,
       };
       
       // Merge credentials
@@ -152,7 +150,7 @@ Deno.serve(async (req) => {
       } = updates;
 
       // Update user_settings
-      const { data, error } = await supabaseAdmin
+      const { data: updatedSettings, error } = await supabaseAdmin
         .from('user_settings')
         .upsert(
           {
@@ -171,7 +169,7 @@ Deno.serve(async (req) => {
       }
       
       // Handle Integrations (Google)
-      if (google_client_id || google_client_secret) {
+      if (google_client_id !== undefined || google_client_secret !== undefined) {
           const { data: existing } = await supabaseAdmin
             .from('integrations')
             .select('credentials')
@@ -180,8 +178,8 @@ Deno.serve(async (req) => {
             .maybeSingle();
             
           const credentials: any = {};
-          if (google_client_id) credentials.client_id = google_client_id;
-          if (google_client_secret) credentials.client_secret = google_client_secret;
+          if (google_client_id !== undefined) credentials.client_id = google_client_id;
+          if (google_client_secret !== undefined) credentials.client_secret = google_client_secret;
           
           const newCredentials = { ...(existing?.credentials || {}), ...credentials };
           
@@ -194,7 +192,7 @@ Deno.serve(async (req) => {
       }
 
       // Handle Integrations (Microsoft)
-      if (microsoft_client_id || microsoft_client_secret || microsoft_tenant_id) {
+      if (microsoft_client_id !== undefined || microsoft_client_secret !== undefined || microsoft_tenant_id !== undefined) {
           const { data: existing } = await supabaseAdmin
             .from('integrations')
             .select('credentials')
@@ -203,9 +201,9 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           const credentials: any = {};
-          if (microsoft_client_id) credentials.client_id = microsoft_client_id;
-          if (microsoft_client_secret) credentials.client_secret = microsoft_client_secret;
-          if (microsoft_tenant_id) credentials.tenant_id = microsoft_tenant_id;
+          if (microsoft_client_id !== undefined) credentials.client_id = microsoft_client_id;
+          if (microsoft_client_secret !== undefined) credentials.client_secret = microsoft_client_secret;
+          if (microsoft_tenant_id !== undefined) credentials.tenant_id = microsoft_tenant_id;
 
           const newCredentials = { ...(existing?.credentials || {}), ...credentials };
 
@@ -217,15 +215,26 @@ Deno.serve(async (req) => {
           }, { onConflict: 'user_id, provider' });
       }
 
-      // Merge back for response
-      const responseSettings = {
-          ...data,
-          google_client_id,
-          google_client_secret,
-          microsoft_client_id,
-          microsoft_client_secret,
-          microsoft_tenant_id
-      };
+      // Construct final response object by merging latest from both sources
+      const { data: finalIntegrations } = await supabaseAdmin
+        .from('integrations')
+        .select('*')
+        .eq('user_id', user.id);
+
+      const responseSettings = { ...updatedSettings };
+      
+      const google = finalIntegrations?.find((i: any) => i.provider === 'google');
+      if (google?.credentials) {
+          responseSettings.google_client_id = google.credentials.client_id;
+          responseSettings.google_client_secret = google.credentials.client_secret;
+      }
+      
+      const microsoft = finalIntegrations?.find((i: any) => i.provider === 'microsoft');
+      if (microsoft?.credentials) {
+          responseSettings.microsoft_client_id = microsoft.credentials.client_id;
+          responseSettings.microsoft_client_secret = microsoft.credentials.client_secret;
+          responseSettings.microsoft_tenant_id = microsoft.credentials.tenant_id;
+      }
 
       return createSuccessResponse({ settings: responseSettings });
     }

@@ -68,6 +68,7 @@ export function Configuration() {
     const [newRuleAttachments, setNewRuleAttachments] = useState<RuleAttachment[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [savingRule, setSavingRule] = useState(false);
+    const [loadingSetting, setLoadingSetting] = useState<string | null>(null);
 
     useEffect(() => {
         actions.fetchAccounts();
@@ -80,6 +81,28 @@ export function Configuration() {
             setLocalSettings(state.settings);
         }
     }, [state.settings]);
+
+    const handleToggleSpam = async () => {
+        const rule = state.rules.find(r => r.name === 'Auto-Trash Spam');
+        if (!rule) {
+            toast.error('System rule not found. Please sync your database.');
+            return;
+        }
+        setLoadingSetting('auto_trash_spam');
+        await actions.toggleRule(rule.id);
+        setLoadingSetting(null);
+    };
+
+    const handleToggleDrafts = async () => {
+        const rule = state.rules.find(r => r.name === 'Smart Drafts');
+        if (!rule) {
+            toast.error('System rule not found. Please sync your database.');
+            return;
+        }
+        setLoadingSetting('smart_drafts');
+        await actions.toggleRule(rule.id);
+        setLoadingSetting(null);
+    };
 
     // Ref for scrolling
     const credentialsRef = useRef<HTMLDivElement>(null);
@@ -1056,12 +1079,17 @@ export function Configuration() {
                                 </p>
                             </div>
                             <Button
-                                variant={localSettings.auto_trash_spam ? 'default' : 'outline'}
+                                variant={state.rules.find(r => r.name === 'Auto-Trash Spam')?.is_enabled ? 'default' : 'outline'}
                                 size="sm"
-                                onClick={() => setLocalSettings(s => ({ ...s, auto_trash_spam: !s.auto_trash_spam }))}
+                                onClick={handleToggleSpam}
+                                disabled={loadingSetting === 'auto_trash_spam'}
                             >
-                                <Power className="w-4 h-4 mr-1" />
-                                {localSettings.auto_trash_spam ? 'On' : 'Off'}
+                                {loadingSetting === 'auto_trash_spam' ? (
+                                    <LoadingSpinner size="sm" className="mr-1" />
+                                ) : (
+                                    <Power className="w-4 h-4 mr-1" />
+                                )}
+                                {state.rules.find(r => r.name === 'Auto-Trash Spam')?.is_enabled ? 'On' : 'Off'}
                             </Button>
                         </div>
 
@@ -1073,12 +1101,17 @@ export function Configuration() {
                                 </p>
                             </div>
                             <Button
-                                variant={localSettings.smart_drafts ? 'default' : 'outline'}
+                                variant={state.rules.find(r => r.name === 'Smart Drafts')?.is_enabled ? 'default' : 'outline'}
                                 size="sm"
-                                onClick={() => setLocalSettings(s => ({ ...s, smart_drafts: !s.smart_drafts }))}
+                                onClick={handleToggleDrafts}
+                                disabled={loadingSetting === 'smart_drafts'}
                             >
-                                <Power className="w-4 h-4 mr-1" />
-                                {localSettings.smart_drafts ? 'On' : 'Off'}
+                                {loadingSetting === 'smart_drafts' ? (
+                                    <LoadingSpinner size="sm" className="mr-1" />
+                                ) : (
+                                    <Power className="w-4 h-4 mr-1" />
+                                )}
+                                {state.rules.find(r => r.name === 'Smart Drafts')?.is_enabled ? 'On' : 'Off'}
                             </Button>
                         </div>
 
@@ -1097,7 +1130,9 @@ export function Configuration() {
                                 </p>
                             )}
 
-                            {state.rules.length > 0 && state.rules.map((rule: Rule) => (
+                            {state.rules.length > 0 && state.rules
+                                .filter(r => r.name !== 'Auto-Trash Spam' && r.name !== 'Smart Drafts')
+                                .map((rule: Rule) => (
                                 <div
                                     key={rule.id}
                                     className="p-3 bg-secondary/30 rounded-lg mb-2"
