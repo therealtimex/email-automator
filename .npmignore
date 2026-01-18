@@ -6,7 +6,6 @@
 
 # Build artifacts
 node_modules
-dist
 coverage
 .vite
 

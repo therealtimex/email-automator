@@ -43,6 +43,8 @@ The AI Email Automator is designed as a standalone "Agent" for the RealTimeX eco
 
 ## 🏁 Quick Start
 
+For detailed instructions on installation, configuration, and usage, please see the [**Email Automator Documentation Hub**](docs/README.md).
+
 ### Prerequisites
 - Node.js v20+
 - Supabase project with CLI access
