@@ -1,0 +1,45 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    /* Default (Light Mode) - Deep Black */
+    .icon-stroke { stroke: #1a1a1a; }
+    
+    /* Dark Mode - Near White */
+    @media (prefers-color-scheme: dark) {
+      .icon-stroke { stroke: #fbfbfb; }
+    }
+  </style>
+
+  <!-- Envelope Body -->
+  <!-- Thicker strokes (2px) ensure visibility at 16x16px -->
+  <path 
+    class="icon-stroke" 
+    d="M4 11C4 9.34315 5.34315 8 7 8H25C26.6569 8 28 9.34315 28 11V25C28 26.6569 26.6569 28 25 28H7C5.34315 28 4 26.6569 4 25V11Z" 
+    stroke-width="2.5" 
+    stroke-linejoin="round"
+  />
+
+  <!-- Envelope Flap Lines -->
+  <path 
+    class="icon-stroke" 
+    d="M4 11L11 17" 
+    stroke-width="2.5" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+  <path 
+    class="icon-stroke" 
+    d="M28 11L21 17" 
+    stroke-width="2.5" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+
+  <!-- The AI Spark -->
+  <!-- Placed at the top center, breaking the envelope boundary slightly -->
+  <path 
+    d="M16 2L17.5 5.5L21 7L17.5 8.5L16 12L14.5 8.5L11 7L14.5 5.5L16 2Z" 
+    fill="#9333ea" 
+    stroke="#ffffff" 
+    stroke-width="0.5"
+  />
+</svg>

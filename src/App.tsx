@@ -5,6 +5,7 @@ import { ModeToggle } from './components/mode-toggle';
 import { Button } from './components/ui/button';
 import { AppProvider, useApp } from './context/AppContext';
 import { MigrationProvider } from './context/MigrationContext';
+import { TerminalProvider } from './context/TerminalContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastContainer, toast } from './components/Toast';
 import { PageLoader } from './components/LoadingSpinner';
@@ -13,6 +14,7 @@ import { Dashboard } from './components/Dashboard';
 import { Configuration } from "./components/Configuration";
 import { AccountSettingsPage } from './components/AccountSettingsPage';
 import { Login } from './components/Login';
+import { Logo } from './components/Logo';
 import { getSupabaseConfig, validateSupabaseConnection } from './lib/supabase-config';
 import { supabase } from './lib/supabase';
 import { api } from './lib/api';
@@ -184,8 +186,8 @@ function AppContent() {
                                 onClick={() => setActiveTab('dashboard')}
                                 className="text-xl font-bold flex items-center gap-2 hover:opacity-80 transition-opacity"
                             >
-                                <Mail className="w-5 h-5 text-primary" />
-                                <span className="hidden sm:inline">RealTimeX Email Automator</span>
+                                <Logo className="w-9 h-9" />
+                                <span className="hidden sm:inline">Email Automator</span>
                                 <span className="sm:hidden">Email AI</span>
                             </button>
                         </div>
@@ -606,10 +608,12 @@ function App() {
     return (
         <ThemeProvider defaultTheme="system" storageKey="email-automator-theme">
             <ErrorBoundary>
-                <AppProvider>
-                    <AppContent />
-                    <ToastContainer />
-                </AppProvider>
+                <TerminalProvider>
+                    <AppProvider>
+                        <AppContent />
+                        <ToastContainer />
+                    </AppProvider>
+                </TerminalProvider>
             </ErrorBoundary>
         </ThemeProvider>
     );

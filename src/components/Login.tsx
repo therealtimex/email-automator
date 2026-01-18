@@ -7,6 +7,7 @@ import { OtpInput } from './ui/otp-input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card';
 import { ModeToggle } from './mode-toggle';
 import { toast } from './Toast';
+import { Logo } from './Logo';
 
 interface LoginProps {
     onSuccess?: () => void;
@@ -177,10 +178,10 @@ export function Login({ onSuccess, onConfigure }: LoginProps) {
             <Card className="w-full max-w-md shadow-2xl">
                 <CardHeader className="text-center">
                     <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
-                        <Mail className="w-8 h-8 text-primary" />
+                        <Logo className="w-12 h-12" />
                     </div>
                     <CardTitle className="text-2xl">
-                        {!isInitialized ? 'Welcome to RealTimeX' : 'Welcome Back'}
+                        {!isInitialized ? 'Welcome to Email Automator' : 'Welcome Back'}
                     </CardTitle>
                     <CardDescription>
                         {!isInitialized

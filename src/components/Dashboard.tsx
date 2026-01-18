@@ -4,12 +4,14 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { useApp } from '../context/AppContext';
+import { useTerminal } from '../context/TerminalContext';
 import { api } from '../lib/api';
 import { toast } from './Toast';
 import { LoadingSpinner, CardLoader } from './LoadingSpinner';
 import { EmailAccount, Email, UserSettings, ProcessingEvent } from '../lib/types';
 import { cn } from '../lib/utils';
 import { useRealtimeEmails } from '../hooks/useRealtimeEmails';
+import { sounds } from '../lib/sounds';
 import {
     Dialog,
     DialogContent,
@@ -204,6 +206,7 @@ const ACTION_ICONS = {
 
 export function Dashboard() {
     const { state, actions, dispatch } = useApp();
+    const { openTerminal } = useTerminal();
     const [isLoading, setIsLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -217,7 +220,15 @@ export function Dashboard() {
     // Realtime subscription for live email updates
     const handleRealtimeInsert = useCallback((email: Email) => {
         dispatch({ type: 'ADD_EMAIL', payload: email });
-        toast.info('New email processed');
+        
+        // Play feedback
+        if (email.ai_analysis?.priority === 'High') {
+            sounds.playAlert();
+            toast.success('High Priority Email Processed!');
+        } else {
+            sounds.playNotify();
+            toast.info('New email processed');
+        }
     }, [dispatch]);
 
     const handleRealtimeUpdate = useCallback((email: Email) => {
@@ -261,10 +272,12 @@ export function Dashboard() {
             toast.warning('Please connect an email account first');
             return;
         }
+        openTerminal();
         setIsSyncing(true);
         const success = await actions.triggerSync();
         setIsSyncing(false);
         if (success) {
+            sounds.playSuccess();
             toast.success('Sync completed! Check your emails.');
         } else {
             toast.error('Sync failed. Check account status for details.');
@@ -401,7 +414,10 @@ export function Dashboard() {
                                 : 'Try syncing or adjusting your filters.'}
                         </p>
                         {state.accounts.length > 0 && (
-                            <Button onClick={handleSync} disabled={isSyncing}>
+                            <Button onClick={() => {
+                                openTerminal();
+                                handleSync();
+                            }} disabled={isSyncing}>
                                 <RefreshCw className={cn("w-4 h-4 mr-2", isSyncing && "animate-spin")} />
                                 Sync Now
                             </Button>
@@ -493,6 +509,7 @@ export function Dashboard() {
                     onSync={actions.triggerSync}
                     settings={state.settings}
                     onUpdateSettings={actions.updateSettings}
+                    openTerminal={openTerminal}
                 />
 
                 {/* Quick Stats */}
@@ -573,9 +590,10 @@ interface SyncSettingsProps {
     onSync: (accountId: string) => void;
     settings: UserSettings | null;
     onUpdateSettings: (updates: Partial<UserSettings>) => Promise<boolean>;
+    openTerminal: () => void;
 }
 
-function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings }: SyncSettingsProps) {
+function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, openTerminal }: SyncSettingsProps) {
     const [updating, setUpdating] = useState<string | null>(null);
     const [updatingSettings, setUpdatingSettings] = useState(false);
 
@@ -639,7 +657,10 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings }
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6"
-                                    onClick={() => onSync(account.id)}
+                                    onClick={() => {
+                                        openTerminal();
+                                        onSync(account.id);
+                                    }}
                                     disabled={account.last_sync_status === 'syncing'}
                                 >
                                     <RefreshCw className={cn("w-3 h-3", account.last_sync_status === 'syncing' && "animate-spin")} />

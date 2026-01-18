@@ -16,10 +16,11 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
+import { useTerminal } from '../context/TerminalContext';
 
 export function LiveTerminal() {
     const [events, setEvents] = useState<ProcessingEvent[]>([]);
-    const [isExpanded, setIsExpanded] = useState(false);
+    const { isExpanded, setIsExpanded } = useTerminal();
     const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
     
     // Initial fetch of recent events

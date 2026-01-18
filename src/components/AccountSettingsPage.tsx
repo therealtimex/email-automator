@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Shield, Database, Save, Loader2, LogOut, Trash2, Settings, CheckCircle, XCircle, ExternalLink, Key, Camera } from 'lucide-react';
+import { User, Shield, Database, Save, Loader2, LogOut, Trash2, Settings, CheckCircle, XCircle, ExternalLink, Key, Camera, Volume2, VolumeX } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,6 +11,7 @@ import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
 import { getSupabaseConfig, clearSupabaseConfig, getConfigSource } from '../lib/supabase-config';
 import { SetupWizard } from './SetupWizard';
+import { sounds } from '../lib/sounds';
 
 type SettingsTab = 'profile' | 'security' | 'database';
 
@@ -75,6 +76,7 @@ function ProfileSection() {
     const [lastName, setLastName] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [soundsEnabled, setSoundsEnabled] = useState(sounds.isEnabled());
 
     useEffect(() => {
         if (state.profile) {
@@ -82,6 +84,18 @@ function ProfileSection() {
             setLastName(state.profile.last_name || '');
         }
     }, [state.profile]);
+
+    const toggleSounds = () => {
+        const next = !soundsEnabled;
+        sounds.setEnabled(next);
+        setSoundsEnabled(next);
+        if (next) {
+            sounds.playSuccess();
+            toast.success('Sound effects enabled');
+        } else {
+            toast.info('Sound effects disabled');
+        }
+    };
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -186,6 +200,22 @@ function ProfileSection() {
                             <p className="text-[10px] text-muted-foreground">Email cannot be changed directly.</p>
                         </div>
                     </div>
+                </div>
+
+                <div className="pt-6 border-t flex items-center justify-between">
+                    <div className="space-y-0.5">
+                        <label className="text-sm font-medium">Sound & Haptics</label>
+                        <p className="text-xs text-muted-foreground">Audio feedback when processing emails and completing tasks.</p>
+                    </div>
+                    <Button 
+                        variant={soundsEnabled ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={toggleSounds}
+                        className="gap-2"
+                    >
+                        {soundsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                        {soundsEnabled ? 'Enabled' : 'Disabled'}
+                    </Button>
                 </div>
 
                 <div className="flex justify-end pt-4 border-t">

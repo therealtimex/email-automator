@@ -23,6 +23,7 @@ import {
     saveSupabaseConfig,
     validateSupabaseConnection,
 } from '../lib/supabase-config';
+import { Logo } from './Logo';
 
 type WizardStep = 'welcome' | 'credentials' | 'validating' | 'success';
 
@@ -187,7 +188,7 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
                     <>
                         <DialogHeader>
                             <div className="flex items-center gap-2 mb-2">
-                                <Database className="h-6 w-6 text-primary" />
+                                <Logo className="w-9 h-9" />
                                 <DialogTitle>Welcome to Email Automator</DialogTitle>
                             </div>
                             <DialogDescription>

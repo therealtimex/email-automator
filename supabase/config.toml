@@ -63,23 +63,23 @@ otp_length = 6
 otp_expiry = 3600
 
 [auth.email.template.invite]
-subject = "You have been invited to RealTimeX CRM"
+subject = "You have been invited to Email Automator"
 content_path = "supabase/templates/invite.html"
 
 [auth.email.template.confirmation]
-subject = "Confirm your RealTimeX CRM account"
+subject = "Confirm your Email Automator account"
 content_path = "supabase/templates/confirmation.html"
 
 [auth.email.template.recovery]
-subject = "Reset your RealTimeX CRM password"
+subject = "Reset your Email Automator password"
 content_path = "supabase/templates/recovery.html"
 
 [auth.email.template.magic_link]
-subject = "Login to RealTimeX CRM"
+subject = "Login to Email Automator"
 content_path = "supabase/templates/magic-link.html"
 
 [auth.email.template.email_change]
-subject = "Confirm your new email for RealTimeX CRM"
+subject = "Confirm your new email for Email Automator"
 content_path = "supabase/templates/email-change.html"
 
 [functions]

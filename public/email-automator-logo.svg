@@ -1,0 +1,51 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    /* Light Mode Default (Deep Black - oklch(0.205 0 0) approx) */
+    .primary-stroke { stroke: #1a1a1a; }
+    
+    /* Dark Mode (Near White - oklch(0.985 0 0) approx) */
+    @media (prefers-color-scheme: dark) {
+      .primary-stroke { stroke: #fbfbfb; }
+    }
+  </style>
+
+  <!-- Main Envelope Shape -->
+  <path 
+    class="primary-stroke"
+    d="M64 160C64 133.49 85.4903 112 112 112H400C426.51 112 448 133.49 448 160V352C448 378.51 426.51 400 400 400H112C85.4903 400 64 378.51 64 352V160Z" 
+    stroke-width="32" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+
+  <!-- The Flap (Open, signaling processing) -->
+  <path 
+    class="primary-stroke"
+    d="M64 160 L200 270" 
+    stroke-width="32" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+  <path 
+    class="primary-stroke"
+    d="M448 160 L312 270" 
+    stroke-width="32" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+
+  <!-- The AI Spark (The "Brain") - Constant Purple -->
+  <!-- Floating upwards out of the envelope -->
+  <path 
+    d="M256 128 C256 128 276 170 306 178 C276 186 256 228 256 228 C256 228 236 186 206 178 C236 170 256 128 256 128 Z" 
+    fill="#9333ea" 
+  >
+    <animateTransform 
+      attributeName="transform" 
+      type="translate" 
+      values="0 0; 0 -10; 0 0" 
+      dur="3s" 
+      repeatCount="indefinite"
+    />
+  </path>
+</svg>
