@@ -98,8 +98,10 @@ export interface Email {
     category: string | null;
     is_useless: boolean;
     ai_analysis: Record<string, unknown> | null;
-    suggested_action: string | null;
-    action_taken: string | null;
+    suggested_action: string | null; // Deprecated
+    suggested_actions?: string[];
+    action_taken: string | null; // Deprecated
+    actions_taken?: string[];
     created_at: string;
 }
 
@@ -118,6 +120,7 @@ export interface Rule {
 export interface ProcessingLog {
     id: string;
     user_id: string;
+    account_id: string | null;
     status: 'running' | 'success' | 'failed';
     started_at: string;
     completed_at: string | null;

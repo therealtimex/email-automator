@@ -32,6 +32,12 @@ BEGIN
             INSERT INTO rules (user_id, name, condition, action, is_enabled)
             VALUES (user_rec.id, 'Flag Important', '{"priority": "High"}', 'star', true);
         END IF;
+
+        -- Auto-Trash Old Newsletters (30 days)
+        IF NOT EXISTS (SELECT 1 FROM rules WHERE user_id = user_rec.id AND name = 'Auto-Trash Old Newsletters') THEN
+            INSERT INTO rules (user_id, name, condition, action, is_enabled)
+            VALUES (user_rec.id, 'Auto-Trash Old Newsletters', '{"category": "newsletter", "older_than_days": 30}', 'delete', true);
+        END IF;
     END LOOP;
 END $$;
 
@@ -63,7 +69,8 @@ BEGIN
     (new.id, 'Archive Newsletters', '{"category": "newsletter"}', 'archive', true),
     (new.id, 'Archive Receipts', '{"category": "transactional"}', 'archive', true),
     (new.id, 'Trash Promotions', '{"category": "promotional"}', 'delete', false),
-    (new.id, 'Flag Important', '{"priority": "High"}', 'star', true);
+    (new.id, 'Flag Important', '{"priority": "High"}', 'star', true),
+    (new.id, 'Auto-Trash Old Newsletters', '{"category": "newsletter", "older_than_days": 30}', 'delete', true);
 
   RETURN new;
 END;

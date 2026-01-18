@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload, Paperclip, X } from 'lucide-react';
+import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload, Paperclip, X, Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -63,6 +63,7 @@ export function Configuration() {
     const [newRuleKey, setNewRuleKey] = useState('category');
     const [newRuleValue, setNewRuleValue] = useState('newsletter');
     const [newRuleAction, setNewRuleAction] = useState('archive');
+    const [newRuleOlderThan, setNewRuleOlderThan] = useState('');
     const [newRuleInstructions, setNewRuleInstructions] = useState('');
     const [newRuleAttachments, setNewRuleAttachments] = useState<RuleAttachment[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -331,7 +332,11 @@ export function Configuration() {
 
         setSavingRule(true);
         try {
-            const condition: Record<string, string> = { [newRuleKey]: newRuleValue };
+            const condition: Record<string, any> = { [newRuleKey]: newRuleValue };
+            if (newRuleOlderThan) {
+                condition.older_than_days = parseInt(newRuleOlderThan, 10);
+            }
+
             const success = await actions.createRule({
                 name: newRuleName,
                 condition,
@@ -345,6 +350,7 @@ export function Configuration() {
                 toast.success('Rule created');
                 setShowRuleModal(false);
                 setNewRuleName('');
+                setNewRuleOlderThan('');
                 setNewRuleInstructions('');
                 setNewRuleAttachments([]);
                 actions.fetchRules();
@@ -801,6 +807,27 @@ export function Configuration() {
                                     />
                                 )}
                             </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                                <Clock className="w-4 h-4" />
+                                Only if email is older than... (Optional)
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    className="w-24"
+                                    value={newRuleOlderThan}
+                                    onChange={(e) => setNewRuleOlderThan(e.target.value)}
+                                />
+                                <span className="text-sm text-muted-foreground">days</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                                Leave empty or 0 to apply rule immediately upon receipt.
+                            </p>
                         </div>
 
                         <div className="space-y-2">

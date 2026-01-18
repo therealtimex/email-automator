@@ -91,6 +91,9 @@ export class EmailProcessorService {
                 await this.processOutlookAccount(refreshedAccount, rules || [], settings, result, eventLogger);
             }
 
+            // After processing new emails, run retention rules for this account
+            await this.runRetentionRules(refreshedAccount, rules || [], settings, result, eventLogger);
+
             // Update log and account on success
             if (log) {
                 await this.supabase
@@ -117,13 +120,15 @@ export class EmailProcessorService {
         } catch (error) {
             logger.error('Sync failed', error, { accountId });
 
+            const errMsg = error instanceof Error ? error.message : 'Unknown error';
+
             if (log) {
                 await this.supabase
                     .from('processing_logs')
                     .update({
                         status: 'failed',
                         completed_at: new Date().toISOString(),
-                        error_message: error instanceof Error ? error.message : 'Unknown error',
+                        error_message: errMsg,
                     })
                     .eq('id', log.id);
             }
@@ -132,11 +137,17 @@ export class EmailProcessorService {
                 .from('email_accounts')
                 .update({
                     last_sync_status: 'error',
-                    last_sync_error: error instanceof Error ? error.message : 'Unknown error'
+                    last_sync_error: errMsg
                 })
                 .eq('id', accountId);
 
-            throw error;
+            // If it's a fatal setup error (e.g. Account not found), throw it
+            if (errMsg.includes('Account not found') || errMsg.includes('access denied')) {
+                throw error;
+            }
+            
+            // Otherwise, increment error count and return partial results
+            result.errors++;
         }
 
         return result;
@@ -449,6 +460,12 @@ export class EmailProcessorService {
                 case 'body_contains':
                     if (!email.body_snippet?.toLowerCase().includes(val.toLowerCase())) return false;
                     break;
+                case 'older_than_days':
+                    if (!email.date) return false;
+                    const ageInMs = Date.now() - new Date(email.date).getTime();
+                    const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+                    if (ageInDays < (value as number)) return false;
+                    break;
                 case 'category':
                     if (analysis.category !== value) return false;
                     break;
@@ -467,6 +484,49 @@ export class EmailProcessorService {
             }
         }
         return true;
+    }
+
+    /**
+     * Scans already processed emails and applies rules that have a time-based condition (retention).
+     */
+    private async runRetentionRules(
+        account: EmailAccount,
+        rules: Rule[],
+        settings: any,
+        result: ProcessingResult,
+        eventLogger: EventLogger | null
+    ): Promise<void> {
+        // Find rules that have an age condition
+        const retentionRules = rules.filter(r => (r.condition as any).older_than_days !== undefined);
+        if (retentionRules.length === 0) return;
+
+        if (eventLogger) await eventLogger.info('Retention', `Checking retention rules for ${retentionRules.length} policies`);
+
+        // Fetch emails for this account that haven't had an action taken yet
+        const { data: processedEmails, error } = await this.supabase
+            .from('emails')
+            .select('*')
+            .eq('account_id', account.id)
+            .is('action_taken', null)
+            .order('date', { ascending: true });
+
+        if (error || !processedEmails) return;
+
+        for (const email of processedEmails) {
+            for (const rule of retentionRules) {
+                if (this.matchesCondition(email, email.ai_analysis as any, rule.condition as any)) {
+                    if (eventLogger) await eventLogger.info('Retention', `Applying retention rule: ${rule.name} to ${email.subject}`);
+                    
+                    // We don't support custom drafts in retention yet (usually retention is for delete/archive)
+                    await this.executeAction(account, email, rule.action, undefined, eventLogger, `Retention Rule: ${rule.name}`);
+                    
+                    if (rule.action === 'delete') result.deleted++;
+                    else if (rule.action === 'draft') result.drafted++;
+                    
+                    break; // Only one rule per email
+                }
+            }
+        }
     }
 
     private async executeAction(
@@ -509,10 +569,24 @@ export class EmailProcessorService {
                 }
             }
 
-            // Update email record
+            // Update email record - update both singular (legacy) and plural columns
+            const { data: currentEmail } = await this.supabase
+                .from('emails')
+                .select('actions_taken')
+                .eq('id', email.id)
+                .single();
+
+            const actionsTaken = currentEmail?.actions_taken || [];
+            if (!actionsTaken.includes(action)) {
+                actionsTaken.push(action);
+            }
+
             await this.supabase
                 .from('emails')
-                .update({ action_taken: action })
+                .update({ 
+                    action_taken: action,
+                    actions_taken: actionsTaken
+                })
                 .eq('id', email.id);
 
             logger.debug('Action executed', { emailId: email.id, action });
@@ -523,9 +597,10 @@ export class EmailProcessorService {
         } catch (error) {
             logger.error('Failed to execute action', error, { emailId: email.id, action });
             if (eventLogger) {
-                await eventLogger.error('Action Failed', error, email.id);
+                const errMsg = error instanceof Error ? error.message : String(error);
+                await eventLogger.error('Action Failed', { error: errMsg, action }, email.id);
             }
-            throw error;
+            // Do NOT throw here - we want to continue with other emails/actions
         }
     }
 }

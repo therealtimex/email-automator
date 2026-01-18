@@ -20,14 +20,19 @@ export function getApiConfig(): ApiConfig {
     
     const anonKey = supabaseConfig ? supabaseConfig.anonKey : '';
 
-    // Express API URL:
-    // 1. Priority: Environment variable override
-    // 2. Development: If on Vite dev server (5173), fallback to default API port (3004)
-    // 3. Production/Unified: Use the current window origin (same port deployment)
+    // Express API URL Discovery:
+    // 1. If we are in Vite Dev Mode (port 5173), use VITE_API_URL or default 3004
+    // 2. If we are running on the Unified Server (production/npx), use the current window origin
     const isViteDev = window.location.port === '5173';
-    const defaultDevApi = 'http://localhost:3004';
+    const envApiUrl = import.meta.env.VITE_API_URL;
     
-    const expressApiUrl = import.meta.env.VITE_API_URL || (isViteDev ? defaultDevApi : window.location.origin);
+    let expressApiUrl = '';
+    if (isViteDev) {
+        expressApiUrl = envApiUrl || 'http://localhost:3004';
+    } else {
+        // Use current window origin (e.g. http://localhost:3008)
+        expressApiUrl = window.location.origin;
+    }
 
     return {
         edgeFunctionsUrl,

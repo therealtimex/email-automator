@@ -55,6 +55,7 @@ export interface RuleCondition {
     sender_email?: string;
     subject_contains?: string;
     body_contains?: string;
+    older_than_days?: number;
     priority?: Priority;
     sentiment?: Sentiment;
 }

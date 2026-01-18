@@ -543,6 +543,20 @@ export function Dashboard() {
                                             </ul>
                                         </div>
                                     )}
+                                    {selectedEmail.ai_analysis.draft_response && (
+                                        <div className="mt-4 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
+                                            <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400">
+                                                <Send className="w-3.5 h-3.5" />
+                                                <span className="text-xs font-bold uppercase">AI Draft Reply</span>
+                                            </div>
+                                            <p className="text-xs leading-relaxed whitespace-pre-wrap italic text-foreground/80">
+                                                {selectedEmail.ai_analysis.draft_response}
+                                            </p>
+                                            <p className="mt-2 text-[9px] text-muted-foreground">
+                                                * This draft is already saved in your {selectedEmail.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook'} Drafts folder.
+                                            </p>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
