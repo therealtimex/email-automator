@@ -283,6 +283,10 @@ class HybridApiClient {
         return this.edgeRequest<{ settings: any }>('/api-v1-settings');
     }
 
+    async getRunEvents(runId: string) {
+        return this.edgeRequest<{ events: any[] }>(`/api-v1-settings/logs/${runId}/events`);
+    }
+
     async updateSettings(settings: any) {
         return this.edgeRequest<{ settings: any }>('/api-v1-settings', {
             method: 'PATCH',

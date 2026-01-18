@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock } from 'lucide-react';
+import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock, Cpu, Brain, Zap, AlertCircle, Info, Code, CheckCircle2 } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/mode-toggle';
 import { Button } from './components/ui/button';
@@ -24,6 +24,14 @@ import {
 import { MigrationBanner } from './components/migration/MigrationBanner';
 import { MigrationModal } from './components/migration/MigrationModal';
 import { LiveTerminal } from './components/LiveTerminal';
+import { ProcessingEvent } from './lib/types';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from './components/ui/dialog';
 
 type TabType = 'dashboard' | 'config' | 'analytics';
 
@@ -261,8 +269,155 @@ function AppContent() {
     );
 }
 
+function RunTraceModal({ 
+    runId, 
+    accountEmail,
+    isOpen, 
+    onOpenChange 
+}: { 
+    runId: string | null, 
+    accountEmail?: string,
+    isOpen: boolean, 
+    onOpenChange: (open: boolean) => void 
+}) {
+    const [events, setEvents] = useState<ProcessingEvent[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && runId) {
+            fetchEvents();
+        }
+    }, [isOpen, runId]);
+
+    const fetchEvents = async () => {
+        if (!runId) return;
+        setIsLoading(true);
+        try {
+            const response = await api.getRunEvents(runId);
+            if (response.data) {
+                setEvents(response.data.events);
+            }
+        } catch (error) {
+            console.error('Failed to fetch run trace:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const getIcon = (type: string) => {
+        switch (type) {
+            case 'analysis': return <Brain className="w-4 h-4 text-purple-500" />;
+            case 'action': return <Zap className="w-4 h-4 text-emerald-500" />;
+            case 'error': return <AlertCircle className="w-4 h-4 text-red-500" />;
+            default: return <Info className="w-4 h-4 text-blue-500" />;
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-6 border-b">
+                    <div className="flex items-center gap-2">
+                        <Cpu className="w-5 h-5 text-primary" />
+                        <DialogTitle>Sync Run Trace</DialogTitle>
+                    </div>
+                    <DialogDescription>
+                        {accountEmail ? `Full log for account: ${accountEmail}` : 'Historical log for this synchronization run.'}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-secondary/5">
+                    {isLoading ? (
+                        <div className="py-20 flex justify-center"><PageLoader text="Loading trace..." /></div>
+                    ) : events.length === 0 ? (
+                        <div className="py-20 text-center text-muted-foreground italic font-mono text-sm">
+                            No granular trace events found for this run.
+                        </div>
+                    ) : (
+                        events.map((event, i) => (
+                            <div key={event.id} className="relative pl-8">
+                                {/* Timeline Line */}
+                                {i !== events.length - 1 && (
+                                    <div className="absolute left-[15px] top-8 bottom-[-24px] w-px bg-border" />
+                                )}
+                                
+                                {/* Icon Badge */}
+                                <div className="absolute left-0 top-0 w-8 h-8 rounded-full border bg-background flex items-center justify-center z-10 shadow-sm">
+                                    {getIcon(event.event_type)}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/70">
+                                                {event.agent_state}
+                                            </span>
+                                            {(event as any).emails?.subject && (
+                                                <span className="text-[10px] text-primary font-medium truncate max-w-[300px]">
+                                                    Re: {(event as any).emails.subject}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                            <Clock className="w-3 h-3" />
+                                            {new Date(event.created_at).toLocaleTimeString()}
+                                        </span>
+                                    </div>
+
+                                    {/* Event Details */}
+                                    <div className="bg-card border rounded-lg p-4 shadow-sm">
+                                        {event.event_type === 'info' && (
+                                            <p className="text-sm text-foreground/90">{event.details?.message}</p>
+                                        )}
+
+                                        {event.event_type === 'analysis' && (
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-foreground italic leading-relaxed">
+                                                    "{event.details?.summary}"
+                                                </p>
+                                                <div className="flex gap-2">
+                                                    <span className="text-[9px] bg-secondary px-1.5 py-0.5 rounded font-bold uppercase">
+                                                        {event.details?.category}
+                                                    </span>
+                                                    {event.details?.suggested_actions?.map((a: string) => (
+                                                        <span key={a} className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold uppercase">
+                                                            {a}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {event.event_type === 'action' && (
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 capitalize">
+                                                    Executed: {event.details?.action}
+                                                </p>
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                            </div>
+                                        )}
+
+                                        {event.event_type === 'error' && (
+                                            <p className="text-sm text-red-600 dark:text-red-400 font-bold">
+                                                {event.details?.error}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function AnalyticsPage() {
     const { state, actions } = useApp();
+    const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+    const [selectedAccountEmail, setSelectedAccountEmail] = useState<string | undefined>(undefined);
+    const [isRunTraceOpen, setIsRunTraceOpen] = useState(false);
 
     useEffect(() => {
         actions.fetchStats();
@@ -271,6 +426,12 @@ function AnalyticsPage() {
     if (!state.stats) {
         return <PageLoader text="Loading analytics..." />;
     }
+
+    const handleViewRunTrace = (runId: string, email?: string) => {
+        setSelectedRunId(runId);
+        setSelectedAccountEmail(email);
+        setIsRunTraceOpen(true);
+    };
 
     const { stats } = state;
 
@@ -355,7 +516,11 @@ function AnalyticsPage() {
                                 : null;
                                 
                             return (
-                                <div key={log.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg hover:bg-secondary/30 transition-colors gap-3">
+                                <div 
+                                    key={log.id} 
+                                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg hover:bg-secondary/30 transition-colors gap-3 cursor-pointer group"
+                                    onClick={() => handleViewRunTrace(log.id, log.email_accounts?.email_address)}
+                                >
                                     <div className="flex items-center gap-3">
                                         <div className={cn(
                                             "w-2.5 h-2.5 rounded-full",
@@ -363,7 +528,7 @@ function AnalyticsPage() {
                                             log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] animate-pulse'
                                         )} />
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-medium">
+                                            <span className="text-sm font-medium group-hover:text-primary transition-colors">
                                                 {log.email_accounts?.email_address || 'System Sync'}
                                             </span>
                                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -391,6 +556,13 @@ function AnalyticsPage() {
                     </div>
                 )}
             </div>
+
+            <RunTraceModal 
+                runId={selectedRunId} 
+                accountEmail={selectedAccountEmail}
+                isOpen={isRunTraceOpen} 
+                onOpenChange={setIsRunTraceOpen} 
+            />
         </div>
     );
 }

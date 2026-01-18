@@ -86,6 +86,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    // GET /api-v1-settings/logs/:id/events - Get events for a specific sync run
+    if (req.method === 'GET' && pathParts[1] === 'logs' && pathParts[3] === 'events') {
+      const runId = pathParts[2];
+      const { data, error } = await supabaseAdmin
+        .from('processing_events')
+        .select('*, emails(subject)')
+        .eq('run_id', runId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Database error:', error);
+        return createErrorResponse(500, 'Failed to fetch run events');
+      }
+
+      return createSuccessResponse({ events: data || [] });
+    }
+
     // GET /api-v1-settings - Get settings
     if (req.method === 'GET' && pathParts.length === 1) {
       // Fetch settings and integrations
