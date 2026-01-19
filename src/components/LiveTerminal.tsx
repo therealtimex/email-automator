@@ -217,6 +217,11 @@ export function LiveTerminal() {
                                             ))}
                                         </div>
                                     )}
+                                    {event.details.usage && (
+                                        <div className="pt-1.5 flex items-center gap-3 text-[9px] text-muted-foreground/70 border-t border-purple-500/10 mt-1">
+                                            <span>Tokens: {event.details.usage.prompt_tokens} (in) + {event.details.usage.completion_tokens} (out) = <span className="text-purple-500 font-bold">{event.details.usage.total_tokens}</span></span>
+                                        </div>
+                                    )}
                                 </div>
                             ) : event.event_type === 'action' && event.details ? (
                                 <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">

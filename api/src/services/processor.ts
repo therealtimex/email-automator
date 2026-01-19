@@ -55,8 +55,8 @@ export class EmailProcessorService {
                 throw new Error('Account not found or access denied');
             }
 
-            logger.info('Retrieved account settings', { 
-                accountId: account.id, 
+            logger.info('Retrieved account settings', {
+                accountId: account.id,
                 sync_start_date: account.sync_start_date,
                 last_sync_checkpoint: account.last_sync_checkpoint
             });
@@ -104,7 +104,7 @@ export class EmailProcessorService {
             await this.runRetentionRules(refreshedAccount, rules || [], settings, result, eventLogger);
 
             // Trigger background worker (async) to process the queue
-            this.processQueue(userId, settings).catch(err => 
+            this.processQueue(userId, settings).catch(err =>
                 logger.error('Background worker failed', err)
             );
 
@@ -160,7 +160,7 @@ export class EmailProcessorService {
             if (errMsg.includes('Account not found') || errMsg.includes('access denied')) {
                 throw error;
             }
-            
+
             // Otherwise, increment error count and return partial results
             result.errors++;
         }
@@ -199,7 +199,7 @@ export class EmailProcessorService {
         const windowSizeMs = 7 * 24 * 60 * 60 * 1000;
         const nowMs = Date.now();
         const tomorrowMs = nowMs + (24 * 60 * 60 * 1000);
-        
+
         let currentStartMs = effectiveStartMs;
         let messages: GmailMessage[] = [];
         let hasMore = false;
@@ -231,7 +231,7 @@ export class EmailProcessorService {
             logger.info('No emails in 7-day window, skipping forward', { start: new Date(currentStartMs).toISOString() });
             currentStartMs = effectiveEndMs;
             attempts++;
-            
+
             if (eventLogger && attempts % 3 === 0) {
                 await eventLogger.info('Sync', `Scanning history... reached ${new Date(currentStartMs).toLocaleDateString()}`);
             }
@@ -262,17 +262,17 @@ export class EmailProcessorService {
 
         // Update checkpoint once at the end of the batch if we made progress
         if (maxInternalDate > effectiveStartMs) {
-            logger.info('Updating Gmail checkpoint', { 
-                accountId: account.id, 
+            logger.info('Updating Gmail checkpoint', {
+                accountId: account.id,
                 oldCheckpoint: account.last_sync_checkpoint,
-                newCheckpoint: maxInternalDate.toString() 
+                newCheckpoint: maxInternalDate.toString()
             });
-            
+
             const { error: updateError } = await this.supabase
                 .from('email_accounts')
                 .update({ last_sync_checkpoint: maxInternalDate.toString() })
                 .eq('id', account.id);
-            
+
             if (updateError) {
                 logger.error('Failed to update Gmail checkpoint', updateError);
             }
@@ -346,12 +346,12 @@ export class EmailProcessorService {
 
         // Update checkpoint once at the end of the batch if we made progress
         if (latestCheckpoint && latestCheckpoint !== effectiveStartIso) {
-            logger.info('Updating Outlook checkpoint', { 
-                accountId: account.id, 
+            logger.info('Updating Outlook checkpoint', {
+                accountId: account.id,
                 oldCheckpoint: account.last_sync_checkpoint,
-                newCheckpoint: latestCheckpoint 
+                newCheckpoint: latestCheckpoint
             });
-            
+
             const { error: updateError } = await this.supabase
                 .from('email_accounts')
                 .update({ last_sync_checkpoint: latestCheckpoint })
@@ -387,11 +387,11 @@ export class EmailProcessorService {
         if (existing) {
             logger.debug('Message already processed', { messageId: message.id });
             if (eventLogger) await eventLogger.info('Skipped', `Already processed ID: ${message.id}`);
-            
+
             // Still need to return the date for checkpointing even if skipped
-            const rawMime = 'raw' in message 
-                ? (account.provider === 'gmail' 
-                    ? Buffer.from(message.raw, 'base64').toString('utf-8') 
+            const rawMime = 'raw' in message
+                ? (account.provider === 'gmail'
+                    ? Buffer.from(message.raw, 'base64').toString('utf-8')
                     : message.raw)
                 : '';
             if (rawMime) {
@@ -400,11 +400,11 @@ export class EmailProcessorService {
             }
             return;
         }
-        
+
         // Extract raw content string (Gmail is base64url, Outlook is raw text from $value)
-        const rawMime = 'raw' in message 
-            ? (account.provider === 'gmail' 
-                ? Buffer.from(message.raw, 'base64').toString('utf-8') 
+        const rawMime = 'raw' in message
+            ? (account.provider === 'gmail'
+                ? Buffer.from(message.raw, 'base64').toString('utf-8')
                 : message.raw)
             : '';
 
@@ -462,7 +462,7 @@ export class EmailProcessorService {
         if (eventLogger) await eventLogger.info('Ingested', `Successfully ingested email: ${subject}`, { filePath }, savedEmail.id);
 
         result.processed++;
-        
+
         return { date };
     }
 
@@ -522,7 +522,7 @@ export class EmailProcessorService {
                 .select('processing_status')
                 .eq('id', email.id)
                 .single();
-            
+
             if (current?.processing_status !== 'pending') {
                 if (log) await this.supabase.from('processing_logs').delete().eq('id', log.id);
                 return;
@@ -539,7 +539,7 @@ export class EmailProcessorService {
             if (!email.file_path) throw new Error('No file path found for email');
             const rawMime = await this.storageService.readEmail(email.file_path);
             const parsed = await simpleParser(rawMime);
-            
+
             // Extract clean content (prioritize text)
             const cleanContent = parsed.text || parsed.textAsHtml || '';
 
@@ -561,7 +561,7 @@ export class EmailProcessorService {
             // 4. Fetch pre-compiled rule context (fast path - no loop/formatting)
             // Falls back to building context if not cached
             let compiledContext: string | null = settings?.compiled_rule_context || null;
-            
+
             // Fetch rules for action execution (need attachments, instructions)
             const { data: rules } = await this.supabase
                 .from('rules')
@@ -572,15 +572,44 @@ export class EmailProcessorService {
 
             // Fallback: build context if not pre-compiled
             if (!compiledContext && rules && rules.length > 0) {
-                compiledContext = rules.map((r, i) => 
-                    `Rule ${i + 1} [ID: ${r.id}]\n` +
-                    `  Name: ${r.name}\n` +
-                    (r.description ? `  Description: ${r.description}\n` : '') +
-                    (r.intent ? `  Intent: ${r.intent}\n` : '') +
-                    `  Actions: ${r.actions?.join(', ') || r.action || 'none'}\n` +
-                    (r.instructions ? `  Draft Instructions: ${r.instructions}\n` : '') +
-                    '\n'
-                ).join('');
+                compiledContext = rules.map((r, i) => {
+                    // Build human-readable condition text
+                    let conditionText = '';
+                    if (r.condition) {
+                        const cond = r.condition as any;
+                        if (cond.field) {
+                            conditionText = `When ${cond.field}`;
+                            if (cond.operator === 'equals') {
+                                conditionText += ` equals "${cond.value}"`;
+                            } else if (cond.operator === 'contains') {
+                                conditionText += ` contains "${cond.value}"`;
+                            } else if (cond.operator === 'domain_equals') {
+                                conditionText += ` domain equals "${cond.value}"`;
+                            } else {
+                                conditionText += ` ${cond.operator} "${cond.value}"`;
+                            }
+                        }
+                        if (cond.is_useless === true) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + 'email is useless/low-value';
+                        }
+                        if (cond.ai_priority) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `AI priority is "${cond.ai_priority}"`;
+                        }
+                        // Extract older_than_days from condition JSONB
+                        if (cond.older_than_days) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `email is older than ${cond.older_than_days} days`;
+                        }
+                    }
+
+                    return `Rule ${i + 1} [ID: ${r.id}]\n` +
+                        `  Name: ${r.name}\n` +
+                        (r.description ? `  Description: ${r.description}\n` : '') +
+                        (r.intent ? `  Intent: ${r.intent}\n` : '') +
+                        (conditionText ? `  Condition: ${conditionText}\n` : '') +
+                        `  Actions: ${r.actions?.join(', ') || r.action || 'none'}\n` +
+                        (r.instructions ? `  Draft Instructions: ${r.instructions}\n` : '') +
+                        '\n';
+                }).join('');
             }
 
             // 5. Context-Aware Analysis: AI evaluates email against user's rules
@@ -632,9 +661,9 @@ export class EmailProcessorService {
             // 7. Execute actions if rule matched with sufficient confidence
             if (account && analysis.matched_rule.rule_id && analysis.matched_rule.confidence >= 0.7) {
                 const matchedRule = rules?.find(r => r.id === analysis.matched_rule.rule_id);
-                
+
                 if (eventLogger) {
-                    await eventLogger.info('Rule Matched', 
+                    await eventLogger.info('Rule Matched',
                         `"${analysis.matched_rule.rule_name}" matched with ${(analysis.matched_rule.confidence * 100).toFixed(0)}% confidence`,
                         { reasoning: analysis.matched_rule.reasoning },
                         email.id
@@ -644,22 +673,22 @@ export class EmailProcessorService {
                 // Execute each action from the AI's decision
                 for (const action of analysis.actions_to_execute) {
                     if (action === 'none') continue;
-                    
+
                     // Use AI-generated draft content if available
                     const draftContent = action === 'draft' ? analysis.draft_content : undefined;
-                    
+
                     await this.executeAction(
-                        account, 
-                        email, 
-                        action as any, 
-                        draftContent, 
-                        eventLogger, 
+                        account,
+                        email,
+                        action as any,
+                        draftContent,
+                        eventLogger,
                         `Rule: ${matchedRule?.name || analysis.matched_rule.rule_name}`,
                         matchedRule?.attachments
                     );
                 }
             } else if (eventLogger && rules && rules.length > 0) {
-                await eventLogger.info('No Match', 
+                await eventLogger.info('No Match',
                     analysis.matched_rule.reasoning,
                     { confidence: analysis.matched_rule.confidence },
                     email.id
@@ -670,10 +699,10 @@ export class EmailProcessorService {
             if (log) {
                 await this.supabase
                     .from('processing_logs')
-                    .update({ 
-                        status: 'success', 
+                    .update({
+                        status: 'success',
                         completed_at: new Date().toISOString(),
-                        emails_processed: 1 
+                        emails_processed: 1
                     })
                     .eq('id', log.id);
             }
@@ -681,13 +710,13 @@ export class EmailProcessorService {
         } catch (error) {
             logger.error('Failed to process pending email', error, { emailId: email.id });
             if (eventLogger) await eventLogger.error('Processing Failed', error, email.id);
-            
+
             // Mark log as failed
             if (log) {
                 await this.supabase
                     .from('processing_logs')
-                    .update({ 
-                        status: 'failed', 
+                    .update({
+                        status: 'failed',
                         completed_at: new Date().toISOString(),
                         error_message: error instanceof Error ? error.message : String(error)
                     })
@@ -696,7 +725,7 @@ export class EmailProcessorService {
 
             await this.supabase
                 .from('emails')
-                .update({ 
+                .update({
                     processing_status: 'failed',
                     processing_error: error instanceof Error ? error.message : String(error),
                     retry_count: (email.retry_count || 0) + 1
@@ -766,10 +795,10 @@ export class EmailProcessorService {
 
     private matchesCondition(email: Partial<Email>, analysis: EmailAnalysis, condition: Record<string, unknown>): boolean {
         if (!analysis) return false;
-        
+
         for (const [key, value] of Object.entries(condition)) {
             const val = value as string;
-            
+
             switch (key) {
                 case 'sender_email':
                     if (email.sender?.toLowerCase() !== val.toLowerCase()) return false;
@@ -810,7 +839,7 @@ export class EmailProcessorService {
                     // Handle array membership check (e.g. if condition expects "reply" to be in actions)
                     const requiredActions = Array.isArray(value) ? value : [value];
                     const actualActions = analysis.suggested_actions || [];
-                    const hasAllActions = requiredActions.every(req => 
+                    const hasAllActions = requiredActions.every(req =>
                         actualActions.includes(req as any)
                     );
                     if (!hasAllActions) return false;
@@ -936,7 +965,7 @@ export class EmailProcessorService {
                 .eq('id', email.id);
 
             logger.debug('Action executed', { emailId: email.id, action });
-            
+
             if (eventLogger) {
                 await eventLogger.action('Acted', email.id, action, reason);
             }

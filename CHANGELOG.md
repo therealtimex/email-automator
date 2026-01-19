@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.6.6] - 2026-01-18
+
+### Added
+- **Token Tracking**: Added real-time tracking and display of LLM token usage.
+  - Backend now captures prompt and completion tokens from LLM responses.
+  - UI displays token breakdown in the **AI Processing Trace** modal.
+  - Live Terminal shows a compact token summary for every analysis event.
+
 ## [2.6.5] - 2026-01-18
 
 ### Changed

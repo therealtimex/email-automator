@@ -211,7 +211,8 @@ REQUIRED JSON STRUCTURE:
             });
 
             rawResponse = response.choices[0]?.message?.content || '';
-            console.log('[Intelligence] Raw LLM Response received (length:', rawResponse.length, ')');
+            const usage = response.usage;
+            console.log('[Intelligence] Raw LLM Response received (length:', rawResponse.length, ')', { usage });
 
             // Clean the response: Find first '{' and last '}'
             let jsonStr = rawResponse.trim();
@@ -235,7 +236,8 @@ REQUIRED JSON STRUCTURE:
             if (eventLogger && emailId) {
                 await eventLogger.analysis('Decided', emailId, {
                     ...validated,
-                    _raw_response: rawResponse
+                    _raw_response: rawResponse,
+                    usage: usage // Include token usage
                 });
             }
 
@@ -431,7 +433,8 @@ Return ONLY valid JSON.`;
             });
 
             rawResponse = response.choices[0]?.message?.content || '';
-            console.log('[Intelligence] Context-aware response received (length:', rawResponse.length, ')');
+            const usage = response.usage;
+            console.log('[Intelligence] Context-aware response received (length:', rawResponse.length, ')', { usage });
 
             // Parse JSON from response
             let jsonStr = rawResponse.trim();
@@ -455,7 +458,8 @@ Return ONLY valid JSON.`;
             if (eventLogger && emailId) {
                 await eventLogger.analysis('Decided', emailId, {
                     ...validated,
-                    _raw_response: rawResponse
+                    _raw_response: rawResponse,
+                    usage: usage // Include token usage
                 });
             }
 

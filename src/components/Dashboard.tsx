@@ -169,6 +169,23 @@ export function AITraceModal({
                                                         </pre>
                                                     </div>
                                                 )}
+
+                                                {event.details?.usage && (
+                                                    <div className="flex gap-4 pt-2 border-t border-border/50">
+                                                        <div className="text-[10px]">
+                                                            <span className="text-muted-foreground mr-1">Prompt:</span>
+                                                            <span className="font-mono font-bold">{event.details.usage.prompt_tokens}</span>
+                                                        </div>
+                                                        <div className="text-[10px]">
+                                                            <span className="text-muted-foreground mr-1">Completion:</span>
+                                                            <span className="font-mono font-bold">{event.details.usage.completion_tokens}</span>
+                                                        </div>
+                                                        <div className="text-[10px]">
+                                                            <span className="text-muted-foreground mr-1">Total:</span>
+                                                            <span className="font-mono font-bold text-primary">{event.details.usage.total_tokens}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 
