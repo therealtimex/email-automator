@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.5.7] - 2026-01-18
+
+### Fixed
+- **Gmail Sync Order**: Fixed major flaw where sync would still fetch recent emails instead of older ones during a "rewind" (historical sync).
+  - Switched to an exhaustive ID collection strategy (collecting up to 50,000 IDs per search).
+  - The system now correctly identifies the absolute oldest emails matching the query by reversing the complete result set before processing.
+  - Optimized hydration to only fetch content for the specifically requested number of emails, significantly improving speed.
+
 ## [2.5.6] - 2026-01-18
 
 ### Fixed

@@ -213,13 +213,12 @@ export class EmailProcessorService {
             effectiveDate: new Date(effectiveStartMs).toISOString()
         });
 
-        // Use "Fetch IDs → Sort → Hydrate" strategy to get OLDEST emails first
-        // Gmail API always returns newest first, so we must fetch all IDs, sort, then hydrate
+        // Use "Fetch IDs → Reverse → Hydrate" strategy to get OLDEST emails first
+        // Gmail API always returns newest first, so we fetch all IDs and reverse
         // This prevents skipping emails when using max_emails pagination
         const { messages, hasMore } = await this.gmailService.fetchMessagesOldestFirst(account, {
             limit: batchSize,
             query: query || undefined,
-            maxIdsToFetch: 1000, // Safety limit for ID fetching
         });
 
         if (eventLogger) {

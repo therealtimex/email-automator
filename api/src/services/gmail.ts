@@ -173,109 +173,56 @@ export class GmailService {
         return data;
     }
 
-    async fetchMessages(
-        account: EmailAccount,
-        options: { maxResults?: number; query?: string; pageToken?: string } = {}
-    ): Promise<{ messages: GmailMessage[]; nextPageToken?: string }> {
-        const gmail = await this.getAuthenticatedClient(account);
-        const { maxResults = config.processing.batchSize, query, pageToken } = options;
-
-        const response = await gmail.users.messages.list({
-            userId: 'me',
-            maxResults,
-            q: query,
-            pageToken,
-        });
-
-        const messages: GmailMessage[] = [];
-
-        for (const msg of response.data.messages || []) {
-            if (!msg.id) continue;
-
-            try {
-                const detail = await gmail.users.messages.get({
-                    userId: 'me',
-                    id: msg.id,
-                    format: 'raw',
-                });
-
-                if (detail.data.raw) {
-                    messages.push({
-                        id: detail.data.id!,
-                        threadId: detail.data.threadId!,
-                        internalDate: detail.data.internalDate!,
-                        raw: detail.data.raw
-                    });
-                }
-            } catch (error) {
-                logger.warn('Failed to fetch message details', { messageId: msg.id, error });
-            }
-        }
-
-        return {
-            messages,
-            nextPageToken: response.data.nextPageToken ?? undefined,
-        };
-    }
-
     /**
-     * Fetch messages in OLDEST-FIRST order using "Fetch IDs → Sort → Hydrate" strategy.
+     * Fetch messages in OLDEST-FIRST order using "Fetch IDs → Reverse → Hydrate" strategy.
      *
-     * Gmail API always returns newest first and doesn't support sorting.
-     * To process oldest emails first (critical for checkpoint-based sync), we:
-     * 1. Fetch ALL message IDs matching the query (lightweight, paginated)
-     * 2. Sort by internalDate ascending (oldest first)
+     * Gmail API always returns newest first. To process absolute oldest emails first:
+     * 1. Fetch ALL message IDs matching the query (lightweight)
+     * 2. Reverse the list (turning Newest-First into Oldest-First)
      * 3. Take first N messages (limit)
-     * 4. Hydrate only those N messages with full details
-     *
-     * This ensures we never skip emails when using max_emails pagination.
+     * 4. Hydrate ONLY those N messages
      */
     async fetchMessagesOldestFirst(
         account: EmailAccount,
-        options: { limit: number; query?: string; maxIdsToFetch?: number }
+        options: { limit: number; query?: string }
     ): Promise<{ messages: GmailMessage[]; hasMore: boolean }> {
-        const { limit, query, maxIdsToFetch = 1000 } = options;
+        const { limit, query } = options;
 
-        // Step 1: Fetch all message IDs (lightweight)
-        const allIds = await this.fetchAllMessageIds(account, query, maxIdsToFetch);
+        // Step 1: Fetch IDs (No hydration yet, so this is fast)
+        const allIds = await this.fetchAllMessageIds(account, query);
 
         if (allIds.length === 0) {
             return { messages: [], hasMore: false };
         }
 
-        logger.debug('Fetched message IDs', { count: allIds.length, query });
+        // Step 2: Reverse to get oldest first
+        allIds.reverse();
 
-        // Step 2: Sort by internalDate ascending (oldest first)
-        allIds.sort((a, b) => parseInt(a.internalDate) - parseInt(b.internalDate));
-
-        // Step 3: Take first N IDs
+        // Step 3: Take the window we need
         const idsToHydrate = allIds.slice(0, limit);
         const hasMore = allIds.length > limit;
 
-        // Step 4: Hydrate those specific messages
-        const messages = await this.hydrateMessages(account, idsToHydrate.map(m => m.id));
+        logger.debug('Hydrating oldest emails', { totalFound: allIds.length, hydrating: idsToHydrate.length });
 
-        // Re-sort hydrated messages by internalDate (maintain order)
-        messages.sort((a, b) => parseInt(a.internalDate) - parseInt(b.internalDate));
+        // Step 4: Hydrate only the target messages
+        const messages = await this.hydrateMessages(account, idsToHydrate);
 
         return { messages, hasMore };
     }
 
     /**
      * Fetch all message IDs matching a query (lightweight, paginated).
-     * Uses minimal fields for speed: only id and internalDate.
-     * Parallelizes API calls for better performance.
+     * Collects IDs only to remain fast even for large result sets.
      */
     private async fetchAllMessageIds(
         account: EmailAccount,
-        query: string | undefined,
-        maxIds: number
-    ): Promise<{ id: string; internalDate: string }[]> {
+        query: string | undefined
+    ): Promise<string[]> {
         const gmail = await this.getAuthenticatedClient(account);
-        const allMessageRefs: { id: string }[] = [];
+        const allIds: string[] = [];
         let pageToken: string | undefined;
+        const MAX_IDS = 50000; // Safety cap
 
-        // Step 1: Collect all message IDs (this is fast - just IDs)
         do {
             const response = await gmail.users.messages.list({
                 userId: 'me',
@@ -286,57 +233,22 @@ export class GmailService {
 
             const messageRefs = response.data.messages || [];
             for (const ref of messageRefs) {
-                if (ref.id && allMessageRefs.length < maxIds) {
-                    allMessageRefs.push({ id: ref.id });
-                }
+                if (ref.id) allIds.push(ref.id);
             }
 
             pageToken = response.data.nextPageToken ?? undefined;
-        } while (pageToken && allMessageRefs.length < maxIds);
+            
+            if (allIds.length % 5000 === 0) {
+                logger.debug('Collecting IDs...', { count: allIds.length });
+            }
+        } while (pageToken && allIds.length < MAX_IDS);
 
-        logger.info('Collected message IDs', { count: allMessageRefs.length });
-
-        // Step 2: Fetch internalDate in parallel batches
-        const BATCH_SIZE = 50; // Parallel requests per batch
-        const results: { id: string; internalDate: string }[] = [];
-
-        for (let i = 0; i < allMessageRefs.length; i += BATCH_SIZE) {
-            const batch = allMessageRefs.slice(i, i + BATCH_SIZE);
-
-            const batchResults = await Promise.all(
-                batch.map(async (ref) => {
-                    try {
-                        const msg = await gmail.users.messages.get({
-                            userId: 'me',
-                            id: ref.id,
-                            format: 'minimal', // Only returns id, threadId, labelIds, snippet, internalDate
-                        });
-
-                        if (msg.data.id && msg.data.internalDate) {
-                            return {
-                                id: msg.data.id,
-                                internalDate: msg.data.internalDate,
-                            };
-                        }
-                        return null;
-                    } catch (error) {
-                        logger.warn('Failed to fetch message metadata', { messageId: ref.id });
-                        return null;
-                    }
-                })
-            );
-
-            // Filter out nulls and add to results
-            results.push(...batchResults.filter((r): r is { id: string; internalDate: string } => r !== null));
-
-            logger.debug('Fetched batch', { batch: i / BATCH_SIZE + 1, total: Math.ceil(allMessageRefs.length / BATCH_SIZE) });
-        }
-
-        return results;
+        logger.info('Collected matching message IDs', { total: allIds.length, query });
+        return allIds;
     }
 
     /**
-     * Hydrate specific messages by ID (fetch full details).
+     * Hydrate specific messages by ID (fetch raw RFC822 data).
      */
     private async hydrateMessages(
         account: EmailAccount,
@@ -345,25 +257,33 @@ export class GmailService {
         const gmail = await this.getAuthenticatedClient(account);
         const messages: GmailMessage[] = [];
 
-        for (const id of messageIds) {
-            try {
-                const detail = await gmail.users.messages.get({
-                    userId: 'me',
-                    id,
-                    format: 'raw',
-                });
-
-                if (detail.data.raw) {
-                    messages.push({
-                        id: detail.data.id!,
-                        threadId: detail.data.threadId!,
-                        internalDate: detail.data.internalDate!,
-                        raw: detail.data.raw
+        // Hydrate in small parallel batches to avoid rate limits
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < messageIds.length; i += BATCH_SIZE) {
+            const batch = messageIds.slice(i, i + BATCH_SIZE);
+            const hydrated = await Promise.all(batch.map(async (id) => {
+                try {
+                    const detail = await gmail.users.messages.get({
+                        userId: 'me',
+                        id,
+                        format: 'raw',
                     });
+
+                    if (detail.data.raw) {
+                        return {
+                            id: detail.data.id!,
+                            threadId: detail.data.threadId!,
+                            internalDate: detail.data.internalDate!,
+                            raw: detail.data.raw
+                        };
+                    }
+                } catch (error) {
+                    logger.warn('Failed to hydrate message', { messageId: id, error });
                 }
-            } catch (error) {
-                logger.warn('Failed to hydrate message', { messageId: id, error });
-            }
+                return null;
+            }));
+            
+            messages.push(...hydrated.filter((m): m is GmailMessage => m !== null));
         }
 
         return messages;
