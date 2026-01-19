@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.6.5] - 2026-01-18
+
+### Changed
+- **Smarter Content Cleaning**: Major refactor of `ContentCleaner` to be format-aware and more precise.
+  - **HTML Detection**: Only applies HTML-to-Markdown conversion if the content actually contains HTML, preserving the quality of plain-text emails.
+  - **Accurate Truncation**: Improved detection of "Reply Headers" (e.g., `-----Original Message-----`, `On ... wrote:`) to strictly cut out email history and focus on the latest message.
+  - **Boilerplate Filtering**: Replaced aggressive footer stripping with a more surgical approach that preserves short actionable sentences while still removing common noise (Privacy Policy, View in Browser, etc.).
+
 ## [2.6.4] - 2026-01-18
 
 ### Added

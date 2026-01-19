@@ -38,7 +38,7 @@ export const ContextAwareAnalysisSchema = z.object({
         .describe('The category of the email'),
     priority: z.enum(['High', 'Medium', 'Low'])
         .describe('The urgency of the email'),
-    
+
     // Rule Matching (core of context-aware engine)
     matched_rule: z.object({
         rule_id: z.string().nullable().describe('ID of the matched rule, or null if no match'),
@@ -46,11 +46,11 @@ export const ContextAwareAnalysisSchema = z.object({
         confidence: z.number().min(0).max(1).describe('Confidence score for the match (0-1)'),
         reasoning: z.string().describe('Explanation of why this rule was matched or why no rule matched'),
     }),
-    
+
     // Actions to execute (derived from matched rule)
     actions_to_execute: z.array(z.enum(['none', 'delete', 'archive', 'draft', 'read', 'star']))
         .describe('Actions to execute based on the matched rule'),
-    
+
     // Intent-aware draft content (if draft action is included)
     draft_content: z.string().optional()
         .describe('Generated draft reply if the action includes drafting'),
@@ -125,7 +125,7 @@ export class IntelligenceService {
 
     async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger, emailId?: string): Promise<EmailAnalysis | null> {
         console.log('[Intelligence] analyzeEmail called for:', context.subject);
-        
+
         if (!this.isReady()) {
             console.log('[Intelligence] Not ready, skipping');
             logger.warn('Intelligence service not ready, skipping analysis');
@@ -137,7 +137,7 @@ export class IntelligenceService {
 
         // 1. Prepare Content and Signals
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
-        
+
         const metadataSignals = [];
         if (context.metadata?.listUnsubscribe) metadataSignals.push('- Contains Unsubscribe header (High signal for Newsletter/Promo)');
         if (context.metadata?.autoSubmitted && context.metadata.autoSubmitted !== 'no') metadataSignals.push(`- Auto-Submitted: ${context.metadata.autoSubmitted}`);
@@ -186,7 +186,7 @@ REQUIRED JSON STRUCTURE:
         if (eventLogger) {
             console.log('[Intelligence] Logging "Thinking" event');
             try {
-                await eventLogger.info('Thinking', `Analyzing email: ${context.subject}`, { 
+                await eventLogger.info('Thinking', `Analyzing email: ${context.subject}`, {
                     model: this.model,
                     system_prompt: systemPrompt,
                     content_preview: cleanedContent,
@@ -212,12 +212,12 @@ REQUIRED JSON STRUCTURE:
 
             rawResponse = response.choices[0]?.message?.content || '';
             console.log('[Intelligence] Raw LLM Response received (length:', rawResponse.length, ')');
-            
+
             // Clean the response: Find first '{' and last '}'
             let jsonStr = rawResponse.trim();
             const startIdx = jsonStr.indexOf('{');
             const endIdx = jsonStr.lastIndexOf('}');
-            
+
             if (startIdx === -1 || endIdx === -1) {
                 throw new Error('Response did not contain a valid JSON object (missing curly braces)');
             }
@@ -235,7 +235,7 @@ REQUIRED JSON STRUCTURE:
             if (eventLogger && emailId) {
                 await eventLogger.analysis('Decided', emailId, {
                     ...validated,
-                    _raw_response: rawResponse 
+                    _raw_response: rawResponse
                 });
             }
 
@@ -304,7 +304,7 @@ Please write a reply.`,
         emailId?: string
     ): Promise<ContextAwareAnalysis | null> {
         console.log('[Intelligence] analyzeEmailWithRules called for:', context.subject);
-        
+
         if (!this.isReady()) {
             console.log('[Intelligence] Not ready, skipping');
             logger.warn('Intelligence service not ready, skipping analysis');
@@ -316,11 +316,11 @@ Please write a reply.`,
 
         // Prepare content
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
-        
+
         // Use pre-compiled context if string, otherwise build from RuleContext[] (backwards compat)
         let rulesContext: string;
         let rulesCount: number;
-        
+
         if (typeof compiledRulesContext === 'string') {
             // Fast path: use pre-compiled context
             rulesContext = compiledRulesContext || '\n[No rules defined - analyze email but take no actions]\n';
@@ -329,7 +329,7 @@ Please write a reply.`,
             // Backwards compatibility: build from RuleContext[]
             const rules = compiledRulesContext;
             rulesCount = rules.length;
-            rulesContext = rules.length > 0 
+            rulesContext = rules.length > 0
                 ? rules.map((r, i) => `
 ### Rule ${i + 1}: "${r.name}" (ID: ${r.id})
 - Description: ${r.description || 'No description provided'}
@@ -350,12 +350,37 @@ The user has defined the following automation rules. Your job is to:
 
 ${rulesContext}
 
+## Category Definitions (choose the most accurate)
+- **client**: Business inquiries, RFPs, quote requests, project discussions, potential customers reaching out
+- **support**: Help requests, bug reports, technical questions from existing users
+- **internal**: Messages from colleagues, team communications
+- **transactional**: Receipts, confirmations, shipping updates, account notifications
+- **newsletter**: Subscribed content, digests, updates from services you signed up for
+- **promotional**: UNSOLICITED marketing, cold sales pitches, ads - NOT legitimate business inquiries
+- **spam**: Scams, phishing, junk mail
+- **social**: Social media notifications, friend requests
+- **personal**: Friends, family, personal matters
+- **other**: Anything that doesn't fit above
+
 ## Matching Guidelines
 - A "decline sales" rule should match ANY sales pitch, not just ones with "sales" in the subject
 - Match the rule that best fits the USER'S INTENT
 - Only match if you are confident (>= 0.7 confidence)
 - If no rule clearly matches, return null for rule_id
 - If a matched rule includes "draft" action, generate an appropriate draft using the rule's intent
+
+## CRITICAL: Distinguish Between Inbound vs Outbound
+**INBOUND (Client Inquiries - NOT promotional):**
+- User is RECEIVING a request for quote/proposal/service
+- Examples: "Please send me a quote", "RFP: [project]", "Can you provide pricing", "I need a quote asap"
+- Category: client, support, or transactional (NEVER promotional)
+
+**OUTBOUND (Sales/Marketing - IS promotional):**
+- User is RECEIVING a sales pitch or marketing message
+- Examples: "Get a FREE quote today!", "Limited offer", "Don't miss out", "Special discount"
+- Category: promotional, spam, or newsletter
+
+**Key Distinction:** If someone is ASKING the user for something (quote, proposal, service), it's a CLIENT INQUIRY, not promotional content.
 
 ## Email Context
 - Current Date: ${new Date().toISOString()}
@@ -383,7 +408,7 @@ Return ONLY valid JSON.`;
         // Log thinking phase
         if (eventLogger) {
             try {
-                await eventLogger.info('Thinking', `Context-aware analysis: ${context.subject}`, { 
+                await eventLogger.info('Thinking', `Context-aware analysis: ${context.subject}`, {
                     model: this.model,
                     system_prompt: systemPrompt,
                     content_preview: cleanedContent,
@@ -407,12 +432,12 @@ Return ONLY valid JSON.`;
 
             rawResponse = response.choices[0]?.message?.content || '';
             console.log('[Intelligence] Context-aware response received (length:', rawResponse.length, ')');
-            
+
             // Parse JSON from response
             let jsonStr = rawResponse.trim();
             const startIdx = jsonStr.indexOf('{');
             const endIdx = jsonStr.lastIndexOf('}');
-            
+
             if (startIdx === -1 || endIdx === -1) {
                 throw new Error('Response did not contain a valid JSON object');
             }
@@ -430,7 +455,7 @@ Return ONLY valid JSON.`;
             if (eventLogger && emailId) {
                 await eventLogger.analysis('Decided', emailId, {
                     ...validated,
-                    _raw_response: rawResponse 
+                    _raw_response: rawResponse
                 });
             }
 
