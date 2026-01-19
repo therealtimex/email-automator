@@ -8,9 +8,9 @@ export function ModeToggle() {
     return (
         <Button
             variant="ghost"
-            size="icon"
+            size="sm"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground w-8 px-0"
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
         >
             {theme === 'dark' ? (

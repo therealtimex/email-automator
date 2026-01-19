@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, X } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -421,24 +421,24 @@ export function Dashboard() {
                 )}
 
                 {/* Search and Filters */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-3 items-center">
+                    <form onSubmit={handleSearch} className="flex-1 flex gap-2 w-full">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search emails..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9"
+                                className="pl-9 h-9"
                             />
                         </div>
-                        <Button type="submit" size="sm">Search</Button>
+                        <Button type="submit" size="sm" className="h-9 px-4">Search</Button>
                     </form>
                     
                     {/* Sort Controls */}
-                    <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-md border border-border/50">
+                    <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-md border border-border/50 h-9">
                         <select 
-                            className="bg-transparent text-xs font-medium border-none focus:ring-0 cursor-pointer pl-2 pr-8 h-7"
+                            className="bg-transparent text-xs font-medium border-none focus:ring-0 cursor-pointer pl-2 pr-8 h-full"
                             value={state.sortBy}
                             onChange={(e) => handleSortChange(e.target.value as 'date' | 'created_at')}
                         >
@@ -448,11 +448,15 @@ export function Dashboard() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7"
+                            className="h-7 w-7 text-primary"
                             onClick={toggleSortOrder}
-                            title={state.sortOrder === 'asc' ? "Oldest First" : "Newest First"}
+                            title={state.sortOrder === 'asc' ? "Sorting: Oldest First" : "Sorting: Newest First"}
                         >
-                            <ArrowUpDown className={cn("w-3.5 h-3.5", state.sortOrder === 'asc' && "rotate-180")} />
+                            {state.sortOrder === 'asc' ? (
+                                <ArrowUp className="w-3.5 h-3.5" />
+                            ) : (
+                                <ArrowDown className="w-3.5 h-3.5" />
+                            )}
                         </Button>
                     </div>
                 </div>

@@ -186,23 +186,28 @@ function AppContent() {
                                 onClick={() => setActiveTab('dashboard')}
                                 className="text-xl font-bold flex items-center gap-2 hover:opacity-80 transition-opacity"
                             >
-                                <Logo className="w-9 h-9" />
+                                <Logo className="w-8 h-8" />
                                 <span className="hidden sm:inline">Email Automator</span>
                                 <span className="sm:hidden">Email AI</span>
                             </button>
                             
                             {/* Real-time Status Indicator */}
                             <div className={cn(
-                                "flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border transition-colors",
+                                "flex items-center gap-1.5 px-2 h-6 rounded-full text-[10px] font-bold border transition-colors",
                                 isSubscribed 
                                     ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400" 
                                     : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:text-yellow-400"
                             )}>
-                                <div className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
-                                    isSubscribed ? "bg-emerald-500 animate-pulse" : "bg-yellow-500"
-                                )} />
-                                <span className="hidden xs:inline">{isSubscribed ? "LIVE" : "OFFLINE"}</span>
+                                <div className="relative flex items-center justify-center">
+                                    {isSubscribed && (
+                                        <span className="absolute inline-flex h-3 w-3 rounded-full bg-emerald-500/40 animate-ping" />
+                                    )}
+                                    <div className={cn(
+                                        "relative w-2 h-2 rounded-full",
+                                        isSubscribed ? "bg-emerald-500" : "bg-yellow-500"
+                                    )} />
+                                </div>
+                                <span className="hidden xs:inline leading-none">{isSubscribed ? "LIVE" : "OFFLINE"}</span>
                             </div>
                         </div>
 
@@ -255,7 +260,7 @@ function AppContent() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={handleLogout}
-                                className="text-muted-foreground hover:text-foreground"
+                                className="text-muted-foreground hover:text-foreground w-8 px-0"
                                 title="Sign out"
                             >
                                 <LogOut className="w-4 h-4" />
