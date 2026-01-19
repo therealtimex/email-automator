@@ -151,7 +151,8 @@ REQUIRED JSON STRUCTURE:
                 await eventLogger.info('Thinking', `Analyzing email: ${context.subject}`, { 
                     model: this.model,
                     system_prompt: systemPrompt,
-                    content_preview: cleanedContent
+                    content_preview: cleanedContent,
+                    content_length: cleanedContent.length
                 }, emailId);
             } catch (err) {
                 console.error('[Intelligence] Failed to log thinking event:', err);

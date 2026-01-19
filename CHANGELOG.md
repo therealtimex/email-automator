@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.5.6] - 2026-01-18
+
+### Fixed
+- **Content Cleaning**: Fixed bug in `ContentCleaner` where over-aggressive filtering could strip the entire email body (especially newsletters with Unsubscribe links).
+  - Added a safety fallback to return the original text if cleaning results in an empty string.
+  - Relaxed footer detection patterns to reduce false positives.
+- **AI Diagnostics**: Added `content_length` to the AI "Thinking" log to help troubleshoot data flow issues in the Live Terminal.
+
 ## [2.5.5] - 2026-01-18
 
 ### Fixed

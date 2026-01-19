@@ -5,11 +5,12 @@ export class ContentCleaner {
      */
     static cleanEmailBody(text: string): string {
         if (!text) return "";
+        const originalText = text;
 
         // 0. Lightweight HTML -> Markdown Conversion
         
         // Structure: <br>, <p> -> Newlines
-        text = text.replace(/<br\s*\/?\?>/gi, '\n');
+        text = text.replace(/<br\s*\/?>/gi, '\n');
         text = text.replace(/<\/p>/gi, '\n\n');
         text = text.replace(/<p.*?>/gi, ''); // Open p tags just gone
         
@@ -72,13 +73,13 @@ export class ContentCleaner {
             }
                 
             // 3. Check for specific reply separators
-            // If we hit a reply header, we truncate the rest (Aggressive strategy per Python code)
+            // If we hit a reply header, we truncate the rest
             if (/^On .* wrote:$/i.test(lineStripped)) {
                 break;
             }
 
-            // 4. Footer removal (simple check on short lines)
-            if (lineStripped.length < 100) {
+            // 4. Footer removal (only on very short lines to avoid stripping body content)
+            if (lineStripped.length < 60) {
                 let isFooter = false;
                 for (const pattern of footerPatterns) {
                     if (pattern.test(lineStripped)) {
@@ -97,11 +98,15 @@ export class ContentCleaner {
         // Reassemble
         text = cleanedLines.join('\n');
         
+        // Safety Fallback: If cleaning stripped everything, return original (truncated)
+        if (!text.trim() || text.length < 10) {
+            text = originalText.substring(0, 3000);
+        }
+
         // Collapse multiple newlines
         text = text.replace(/\n{3,}/g, '\n\n');
 
-        // Sanitize LLM Special Tokens (Prevent Prompt Injection/Confusion)
-        // Break sequences like <|channel|>, [INST], <s>
+        // Sanitize LLM Special Tokens
         text = text.replace(/<\|/g, '< |'); 
         text = text.replace(/\|>/g, '| >');
         text = text.replace(/\[INST\]/gi, '[ INST ]');
