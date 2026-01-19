@@ -39,7 +39,7 @@ import {
 type TabType = 'dashboard' | 'config' | 'analytics' | 'account';
 
 function AppContent() {
-    const { state, actions } = useApp();
+    const { state, isSubscribed, actions } = useApp();
     const [needsSetup, setNeedsSetup] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
     const [checkingConfig, setCheckingConfig] = useState(true);
@@ -190,6 +190,20 @@ function AppContent() {
                                 <span className="hidden sm:inline">Email Automator</span>
                                 <span className="sm:hidden">Email AI</span>
                             </button>
+                            
+                            {/* Real-time Status Indicator */}
+                            <div className={cn(
+                                "flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border transition-colors",
+                                isSubscribed 
+                                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400" 
+                                    : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:text-yellow-400"
+                            )}>
+                                <div className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isSubscribed ? "bg-emerald-500 animate-pulse" : "bg-yellow-500"
+                                )} />
+                                <span className="hidden xs:inline">{isSubscribed ? "LIVE" : "OFFLINE"}</span>
+                            </div>
                         </div>
 
                         <div className="flex gap-4 items-center">

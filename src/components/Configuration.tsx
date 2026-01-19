@@ -1279,6 +1279,23 @@ export function Configuration() {
                         </p>
                     </div>
 
+                    <div className="space-y-2 pt-2 border-t border-border/50">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            Background Sync Interval (minutes)
+                        </label>
+                        <Input
+                            type="number"
+                            min={1}
+                            max={1440}
+                            value={localSettings.sync_interval_minutes || 5}
+                            onChange={(e) => setLocalSettings(s => ({ ...s, sync_interval_minutes: parseInt(e.target.value, 10) || 5 }))}
+                        />
+                        <p className="text-[10px] text-muted-foreground italic">
+                            How often the system checks for new emails in the background.
+                        </p>
+                    </div>
+
                     <div className="flex justify-end mt-4 gap-2">
                         <Button
                             variant="outline"

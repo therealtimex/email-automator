@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -10,7 +10,6 @@ import { toast } from './Toast';
 import { LoadingSpinner, CardLoader } from './LoadingSpinner';
 import { EmailAccount, Email, UserSettings, ProcessingEvent } from '../lib/types';
 import { cn } from '../lib/utils';
-import { useRealtimeEmails } from '../hooks/useRealtimeEmails';
 import { sounds } from '../lib/sounds';
 import {
     Dialog,
@@ -220,37 +219,6 @@ export function Dashboard() {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [isTraceOpen, setIsTraceOpen] = useState(false);
     const [traceEmail, setTraceEmail] = useState<Email | null>(null);
-
-    // Realtime subscription for live email updates
-    const handleRealtimeInsert = useCallback((email: Email) => {
-        dispatch({ type: 'ADD_EMAIL', payload: email });
-        
-        // Play feedback
-        if (email.ai_analysis?.priority === 'High') {
-            sounds.playAlert();
-            toast.success('High Priority Email Processed!');
-        } else {
-            sounds.playNotify();
-            toast.info('New email processed');
-        }
-    }, [dispatch]);
-
-    const handleRealtimeUpdate = useCallback((email: Email) => {
-        dispatch({ type: 'UPDATE_EMAIL', payload: email });
-    }, [dispatch]);
-
-    const handleRealtimeDelete = useCallback((emailId: string) => {
-        // Refresh the list when an email is deleted
-        loadEmails(state.emailsOffset);
-    }, [state.emailsOffset]);
-
-    const { isSubscribed } = useRealtimeEmails({
-        userId: state.user?.id,
-        onInsert: handleRealtimeInsert,
-        onUpdate: handleRealtimeUpdate,
-        onDelete: handleRealtimeDelete,
-        enabled: state.isAuthenticated,
-    });
 
     useEffect(() => {
         // Only fetch emails if user is authenticated
@@ -548,30 +516,64 @@ export function Dashboard() {
 
             {/* Sidebar */}
             <aside className="space-y-6">
-                {/* Connection Status */}
-                <Card className={cn(
-                    "p-6 border-primary/20",
-                    isSubscribed ? "bg-primary/5" : "bg-muted/50"
-                )}>
-                    <h3 className="font-semibold text-primary mb-1">Realtime Sync</h3>
-                    <p className="text-muted-foreground text-xs mb-3">
-                        {isSubscribed
-                            ? "Live updates enabled"
-                            : "Waiting for connection..."}
-                    </p>
-                    <div className={cn(
-                        "flex items-center gap-2 text-[10px] font-mono w-fit px-2 py-1 rounded-full border",
-                        isSubscribed
-                            ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-                            : "text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
-                    )}>
-                        <div className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            isSubscribed ? "bg-emerald-500 animate-pulse" : "bg-yellow-500"
-                        )} />
-                        {isSubscribed ? "CONNECTED" : "DISCONNECTED"}
-                    </div>
-                </Card>
+                {/* Selected Email Detail */}
+                {selectedEmail && (
+                    <Card className="p-6 border-primary/20 bg-primary/5 animate-in slide-in-from-right-5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold">Email Details</h3>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 w-6 p-0"
+                                onClick={() => setSelectedEmail(null)}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                        <div className="space-y-3 text-sm">
+                            <div>
+                                <span className="text-muted-foreground">From:</span>
+                                <p className="font-medium truncate">{selectedEmail.sender}</p>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground">Subject:</span>
+                                <p className="font-medium">{selectedEmail.subject}</p>
+                            </div>
+                            {selectedEmail.ai_analysis && (
+                                <>
+                                    <div>
+                                        <span className="text-muted-foreground">Summary:</span>
+                                        <p className="text-xs mt-1">{selectedEmail.ai_analysis.summary}</p>
+                                    </div>
+                                    {selectedEmail.ai_analysis.key_points && (
+                                        <div>
+                                            <span className="text-muted-foreground">Key Points:</span>
+                                            <ul className="text-xs mt-1 list-disc list-inside">
+                                                {selectedEmail.ai_analysis.key_points.map((point, i) => (
+                                                    <li key={i}>{point}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {selectedEmail.ai_analysis.draft_response && (
+                                        <div className="mt-4 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
+                                            <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400">
+                                                <Send className="w-3.5 h-3.5" />
+                                                <span className="text-xs font-bold uppercase">AI Draft Reply</span>
+                                            </div>
+                                            <p className="text-xs leading-relaxed whitespace-pre-wrap italic text-foreground/80">
+                                                {selectedEmail.ai_analysis.draft_response}
+                                            </p>
+                                            <p className="mt-2 text-[9px] text-muted-foreground">
+                                                * This draft is already saved in your {selectedEmail.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook'} Drafts folder.
+                                            </p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </Card>
+                )}
 
                 {/* Sync Settings per Account */}
                 <SyncSettings
@@ -646,55 +648,6 @@ export function Dashboard() {
                         </div>
                     </div>
                 </Card>
-
-                {/* Selected Email Detail */}
-                {selectedEmail && (
-                    <Card className="p-6">
-                        <h3 className="font-semibold mb-4">Email Details</h3>
-                        <div className="space-y-3 text-sm">
-                            <div>
-                                <span className="text-muted-foreground">From:</span>
-                                <p className="font-medium truncate">{selectedEmail.sender}</p>
-                            </div>
-                            <div>
-                                <span className="text-muted-foreground">Subject:</span>
-                                <p className="font-medium">{selectedEmail.subject}</p>
-                            </div>
-                            {selectedEmail.ai_analysis && (
-                                <>
-                                    <div>
-                                        <span className="text-muted-foreground">Summary:</span>
-                                        <p className="text-xs mt-1">{selectedEmail.ai_analysis.summary}</p>
-                                    </div>
-                                    {selectedEmail.ai_analysis.key_points && (
-                                        <div>
-                                            <span className="text-muted-foreground">Key Points:</span>
-                                            <ul className="text-xs mt-1 list-disc list-inside">
-                                                {selectedEmail.ai_analysis.key_points.map((point, i) => (
-                                                    <li key={i}>{point}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    {selectedEmail.ai_analysis.draft_response && (
-                                        <div className="mt-4 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
-                                            <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400">
-                                                <Send className="w-3.5 h-3.5" />
-                                                <span className="text-xs font-bold uppercase">AI Draft Reply</span>
-                                            </div>
-                                            <p className="text-xs leading-relaxed whitespace-pre-wrap italic text-foreground/80">
-                                                {selectedEmail.ai_analysis.draft_response}
-                                            </p>
-                                            <p className="mt-2 text-[9px] text-muted-foreground">
-                                                * This draft is already saved in your {selectedEmail.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook'} Drafts folder.
-                                            </p>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </Card>
-                )}
             </aside>
         </div>
     );
@@ -746,30 +699,6 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, 
                 Sync Scope
             </h3>
 
-            <div className="mb-6 p-3 bg-muted/30 rounded-lg space-y-2">
-                <div className="flex justify-between items-center">
-                    <label className="text-[11px] font-medium flex items-center gap-1">
-                        Sync Interval (min)
-                    </label>
-                    {updatingSettings && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
-                </div>
-                <Input
-                    type="number"
-                    min={1}
-                    max={60}
-                    className="h-8 text-xs"
-                    value={settings?.sync_interval_minutes || 5}
-                    onChange={async (e) => {
-                        const val = parseInt(e.target.value, 10) || 5;
-                        setUpdatingSettings(true);
-                        await onUpdateSettings({ sync_interval_minutes: val });
-                        setUpdatingSettings(false);
-                    }}
-                />
-                <p className="text-[9px] text-muted-foreground">
-                    Background sync frequency for all accounts.
-                </p>
-            </div>
             <div className="space-y-6">
                 {accounts.map(account => (
                     <div key={account.id} className="space-y-3 pb-4 border-b last:border-0 last:pb-0">

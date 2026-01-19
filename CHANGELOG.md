@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.6.2] - 2026-01-18
+
+### Added
+- **Top Bar Sync Status**: Moved the real-time sync indicator to the global top bar. It now appears as a subtle, Gmail-style "LIVE" badge when connected.
+- **Improved Sidebar Order**: Reordered the Dashboard sidebar to show "Email Details" at the very top when an email is selected, reducing the need for scrolling.
+
+### Changed
+- **Settings Migration**: Moved the "Background Sync Interval" setting from the Dashboard to the Configuration page to keep the main view focused on active tasks.
+
 ## [2.6.1] - 2026-01-18
 
 ### Changed

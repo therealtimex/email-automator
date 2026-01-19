@@ -1,8 +1,11 @@
-import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { api, initializeApi } from '../lib/api';
 import { Email, EmailAccount, Rule, UserSettings, Stats, Profile } from '../lib/types';
 import { getSupabaseConfig } from '../lib/supabase-config';
+import { useRealtimeEmails } from '../hooks/useRealtimeEmails';
+import { sounds } from '../lib/sounds';
+import { toast } from '../components/Toast';
 
 // Helper to extract error message from API response error
 function getErrorMessage(error: { message?: string; code?: string } | string | undefined, fallback: string): string {
@@ -162,6 +165,7 @@ function reducer(state: AppState, action: Action): AppState {
 // Context
 interface AppContextType {
     state: AppState;
+    isSubscribed: boolean;
     dispatch: React.Dispatch<Action>;
     actions: {
         fetchEmails: (params?: { category?: string; search?: string; offset?: number; sortBy?: 'date' | 'created_at'; sortOrder?: 'asc' | 'desc' }) => Promise<void>;
@@ -186,6 +190,37 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(reducer, initialState);
+
+    // Realtime subscription logic
+    const handleRealtimeInsert = useCallback((email: Email) => {
+        dispatch({ type: 'ADD_EMAIL', payload: email });
+        
+        // Play feedback
+        if (email.ai_analysis?.priority === 'High') {
+            sounds.playAlert();
+            toast.success('High Priority Email Processed!');
+        } else {
+            sounds.playNotify();
+            toast.info('New email processed');
+        }
+    }, [dispatch]);
+
+    const handleRealtimeUpdate = useCallback((email: Email) => {
+        dispatch({ type: 'UPDATE_EMAIL', payload: email });
+    }, [dispatch]);
+
+    const handleRealtimeDelete = useCallback((_emailId: string) => {
+        // We could manually remove from state, but refresh is safer for pagination
+        // fetchEmails is available below in actions
+    }, [dispatch]);
+
+    const { isSubscribed } = useRealtimeEmails({
+        userId: state.user?.id,
+        onInsert: handleRealtimeInsert,
+        onUpdate: handleRealtimeUpdate,
+        onDelete: handleRealtimeDelete,
+        enabled: state.isAuthenticated,
+    });
 
     // Initialize auth
     useEffect(() => {
@@ -417,7 +452,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <AppContext.Provider value={{ state, dispatch, actions }}>
+        <AppContext.Provider value={{ state, isSubscribed, dispatch, actions }}>
             {children}
         </AppContext.Provider>
     );
