@@ -68,7 +68,12 @@ router.patch('/:ruleId',
     validateBody(schemas.updateRule),
     asyncHandler(async (req, res) => {
         const { ruleId } = req.params;
-        const updates = req.body;
+        const updates = { ...req.body };
+
+        // Ensure legacy action is in sync if actions array is provided
+        if (updates.actions && Array.isArray(updates.actions) && updates.actions.length > 0) {
+            updates.action = updates.actions[0];
+        }
 
         const { data, error } = await req.supabase!
             .from('rules')
@@ -81,7 +86,7 @@ router.patch('/:ruleId',
         if (error) throw error;
         if (!data) throw new NotFoundError('Rule');
 
-        logger.info('Rule updated', { ruleId, userId: req.user!.id });
+        logger.info('Rule updated', { ruleId, actions: data.actions, userId: req.user!.id });
 
         res.json({ rule: data });
     })

@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.6.4] - 2026-01-18
+
+### Added
+- **Rule Editing**: Users can now edit existing automation rules (both custom and system defaults).
+  - Added "Edit" button to rules in the Configuration list.
+  - Refactored Rule Modal to support both creation and modification.
+  - Added `updateRule` action to frontend and backend for full CRUD support.
+
+## [2.6.3] - 2026-01-18
+
+### Fixed
+- **UI UX**: Improved "Create Auto-Pilot Rule" modal by adding a maximum height and scrollability. This ensures the modal remains usable and the "Create Rule" button stays accessible even when selecting multiple actions or adding long instructions.
+
 ## [2.6.2] - 2026-01-18
 
 ### Added

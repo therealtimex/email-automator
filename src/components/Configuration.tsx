@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload, Paperclip, X, Clock } from 'lucide-react';
+import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload, Paperclip, X, Clock, Edit2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -69,6 +69,7 @@ export function Configuration() {
     const [isUploading, setIsUploading] = useState(false);
     const [savingRule, setSavingRule] = useState(false);
     const [loadingSetting, setLoadingSetting] = useState<string | null>(null);
+    const [editingRule, setEditingRule] = useState<Rule | null>(null);
 
     useEffect(() => {
         actions.fetchAccounts();
@@ -102,6 +103,29 @@ export function Configuration() {
         setLoadingSetting('smart_drafts');
         await actions.toggleRule(rule.id);
         setLoadingSetting(null);
+    };
+
+    const handleEditClick = (rule: Rule) => {
+        setEditingRule(rule);
+        setNewRuleName(rule.name);
+        
+        // Extract condition details
+        const condition = rule.condition as any;
+        const keys = Object.keys(condition).filter(k => k !== 'older_than_days');
+        const mainKey = keys[0] || 'category';
+        setNewRuleKey(mainKey);
+        setNewRuleValue(condition[mainKey] || '');
+        setNewRuleOlderThan(condition.older_than_days?.toString() || '');
+        
+        // Actions
+        const ruleActions = rule.actions && rule.actions.length > 0
+            ? rule.actions
+            : (rule.action ? [rule.action] : ['archive']);
+        setNewRuleActions(ruleActions);
+        
+        setNewRuleInstructions(rule.instructions || '');
+        setNewRuleAttachments(rule.attachments || []);
+        setShowRuleModal(true);
     };
 
     // Ref for scrolling
@@ -347,7 +371,7 @@ export function Configuration() {
         }, 15 * 60 * 1000);
     };
 
-    const handleCreateRule = async () => {
+    const handleSaveRule = async () => {
         if (!newRuleName) {
             toast.error('Please name your rule');
             return;
@@ -367,18 +391,26 @@ export function Configuration() {
 
             const hasDraftAction = newRuleActions.includes('draft');
 
-            const success = await actions.createRule({
+            const ruleData = {
                 name: newRuleName,
                 condition,
                 actions: newRuleActions as any[],
                 instructions: hasDraftAction ? newRuleInstructions : undefined,
                 attachments: hasDraftAction ? newRuleAttachments : [],
                 is_enabled: true
-            });
+            };
+
+            let success = false;
+            if (editingRule) {
+                success = await actions.updateRule(editingRule.id, ruleData);
+            } else {
+                success = await actions.createRule(ruleData);
+            }
 
             if (success) {
-                toast.success('Rule created');
+                toast.success(editingRule ? 'Rule updated' : 'Rule created');
                 setShowRuleModal(false);
+                setEditingRule(null);
                 setNewRuleName('');
                 setNewRuleActions(['archive']);
                 setNewRuleOlderThan('');
@@ -386,10 +418,10 @@ export function Configuration() {
                 setNewRuleAttachments([]);
                 actions.fetchRules();
             } else {
-                toast.error('Failed to create rule');
+                toast.error(`Failed to ${editingRule ? 'update' : 'create'} rule`);
             }
         } catch (error) {
-            toast.error('Failed to create rule');
+            toast.error('An error occurred while saving the rule');
         } finally {
             setSavingRule(false);
         }
@@ -739,16 +771,19 @@ export function Configuration() {
             </Dialog>
 
             {/* Create Rule Modal */}
-            <Dialog open={showRuleModal} onOpenChange={setShowRuleModal}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Create Auto-Pilot Rule</DialogTitle>
+            <Dialog open={showRuleModal} onOpenChange={(open) => {
+                setShowRuleModal(open);
+                if (!open) setEditingRule(null);
+            }}>
+                <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0">
+                    <DialogHeader className="p-6 border-b">
+                        <DialogTitle>{editingRule ? 'Edit Auto-Pilot Rule' : 'Create Auto-Pilot Rule'}</DialogTitle>
                         <DialogDescription>
                             Define a condition based on AI analysis to trigger an action.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4 py-4">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Rule Name</label>
                             <Input
@@ -966,13 +1001,13 @@ export function Configuration() {
                         )}
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="p-6 border-t bg-secondary/5">
                         <Button variant="outline" onClick={() => setShowRuleModal(false)}>
                             Cancel
                         </Button>
-                        <Button onClick={handleCreateRule} disabled={savingRule}>
-                            {savingRule ? <LoadingSpinner size="sm" className="mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                            Create Rule
+                        <Button onClick={handleSaveRule} disabled={savingRule}>
+                            {savingRule ? <LoadingSpinner size="sm" className="mr-2" /> : (editingRule ? <Check className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />)}
+                            {editingRule ? 'Save Changes' : 'Create Rule'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1110,19 +1145,33 @@ export function Configuration() {
                                     Automatically delete emails categorized as spam
                                 </p>
                             </div>
-                            <Button
-                                variant={state.rules.find(r => r.name === 'Auto-Trash Spam')?.is_enabled ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={handleToggleSpam}
-                                disabled={loadingSetting === 'auto_trash_spam'}
-                            >
-                                {loadingSetting === 'auto_trash_spam' ? (
-                                    <LoadingSpinner size="sm" className="mr-1" />
-                                ) : (
-                                    <Power className="w-4 h-4 mr-1" />
-                                )}
-                                {state.rules.find(r => r.name === 'Auto-Trash Spam')?.is_enabled ? 'On' : 'Off'}
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    onClick={() => {
+                                        const rule = state.rules.find(r => r.name === 'Auto-Trash Spam');
+                                        if (rule) handleEditClick(rule);
+                                    }}
+                                    title="Edit Logic"
+                                >
+                                    <Edit2 className="w-4 h-4 text-muted-foreground" />
+                                </Button>
+                                <Button
+                                    variant={state.rules.find(r => r.name === 'Auto-Trash Spam')?.is_enabled ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={handleToggleSpam}
+                                    disabled={loadingSetting === 'auto_trash_spam'}
+                                >
+                                    {loadingSetting === 'auto_trash_spam' ? (
+                                        <LoadingSpinner size="sm" className="mr-1" />
+                                    ) : (
+                                        <Power className="w-4 h-4 mr-1" />
+                                    )}
+                                    {state.rules.find(r => r.name === 'Auto-Trash Spam')?.is_enabled ? 'On' : 'Off'}
+                                </Button>
+                            </div>
                         </div>
 
                         <div className="flex justify-between items-center py-3 border-b border-border">
@@ -1132,26 +1181,48 @@ export function Configuration() {
                                     Generate draft replies for important emails
                                 </p>
                             </div>
-                            <Button
-                                variant={state.rules.find(r => r.name === 'Smart Drafts')?.is_enabled ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={handleToggleDrafts}
-                                disabled={loadingSetting === 'smart_drafts'}
-                            >
-                                {loadingSetting === 'smart_drafts' ? (
-                                    <LoadingSpinner size="sm" className="mr-1" />
-                                ) : (
-                                    <Power className="w-4 h-4 mr-1" />
-                                )}
-                                {state.rules.find(r => r.name === 'Smart Drafts')?.is_enabled ? 'On' : 'Off'}
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    onClick={() => {
+                                        const rule = state.rules.find(r => r.name === 'Smart Drafts');
+                                        if (rule) handleEditClick(rule);
+                                    }}
+                                    title="Edit Logic"
+                                >
+                                    <Edit2 className="w-4 h-4 text-muted-foreground" />
+                                </Button>
+                                <Button
+                                    variant={state.rules.find(r => r.name === 'Smart Drafts')?.is_enabled ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={handleToggleDrafts}
+                                    disabled={loadingSetting === 'smart_drafts'}
+                                >
+                                    {loadingSetting === 'smart_drafts' ? (
+                                        <LoadingSpinner size="sm" className="mr-1" />
+                                    ) : (
+                                        <Power className="w-4 h-4 mr-1" />
+                                    )}
+                                    {state.rules.find(r => r.name === 'Smart Drafts')?.is_enabled ? 'On' : 'Off'}
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Custom Rules */}
                         <div className="pt-2">
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="text-sm font-medium">Custom Rules</h4>
-                                <Button variant="ghost" size="sm" onClick={() => setShowRuleModal(true)}>
+                                <Button variant="ghost" size="sm" onClick={() => {
+                                    setEditingRule(null);
+                                    setNewRuleName('');
+                                    setNewRuleActions(['archive']);
+                                    setNewRuleOlderThan('');
+                                    setNewRuleInstructions('');
+                                    setNewRuleAttachments([]);
+                                    setShowRuleModal(true);
+                                }}>
                                     <Plus className="w-4 h-4 mr-1" /> Add Rule
                                 </Button>
                             </div>
@@ -1181,6 +1252,15 @@ export function Configuration() {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 w-7 p-0"
+                                                onClick={() => handleEditClick(rule)}
+                                                title="Edit Rule"
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                            </Button>
                                             <Button
                                                 variant={rule.is_enabled ? 'default' : 'outline'}
                                                 size="sm"

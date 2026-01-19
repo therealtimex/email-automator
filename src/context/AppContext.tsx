@@ -181,6 +181,7 @@ interface AppContextType {
         updateProfile: (updates: { first_name?: string; last_name?: string; avatar_url?: string }) => Promise<boolean>;
         updateAccount: (accountId: string, updates: Partial<EmailAccount>) => Promise<boolean>;
         createRule: (rule: Omit<Rule, 'id' | 'user_id' | 'created_at'>) => Promise<boolean>;
+        updateRule: (ruleId: string, updates: Partial<Rule>) => Promise<boolean>;
         deleteRule: (ruleId: string) => Promise<boolean>;
         toggleRule: (ruleId: string) => Promise<boolean>;
     };
@@ -427,6 +428,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 return true;
             }
             dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to create rule') });
+            return false;
+        },
+
+        updateRule: async (ruleId: string, updates: Partial<Rule>) => {
+            const response = await api.updateRule(ruleId, updates);
+            if (response.data) {
+                dispatch({ type: 'UPDATE_RULE', payload: response.data.rule });
+                return true;
+            }
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update rule') });
             return false;
         },
 
