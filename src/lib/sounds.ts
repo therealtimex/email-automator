@@ -8,13 +8,14 @@ class SoundManager {
     private enabled: boolean = false;
 
     constructor() {
-        // Initialize enabled state from localStorage
-        this.enabled = localStorage.getItem('ea_sounds_enabled') === 'true';
+        // Default to enabled if not explicitly set to 'false'
+        const stored = localStorage.getItem('ea_sounds_enabled');
+        this.enabled = stored !== 'false';
     }
 
     setEnabled(enabled: boolean) {
         this.enabled = enabled;
-        localStorage.setItem('ea_sounds_enabled', enabled ? 'true' : 'none');
+        localStorage.setItem('ea_sounds_enabled', enabled ? 'true' : 'false');
     }
 
     isEnabled(): boolean {
@@ -25,6 +26,8 @@ class SoundManager {
         if (!this.ctx) {
             this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         }
+        
+        // Browsers require a user gesture to resume AudioContext
         if (this.ctx.state === 'suspended') {
             this.ctx.resume();
         }

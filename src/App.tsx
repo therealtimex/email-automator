@@ -38,12 +38,32 @@ import {
 
 type TabType = 'dashboard' | 'config' | 'analytics' | 'account';
 
+import { sounds } from './lib/sounds';
+
 function AppContent() {
     const { state, isSubscribed, actions } = useApp();
     const [needsSetup, setNeedsSetup] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
     const [checkingConfig, setCheckingConfig] = useState(true);
     const [processingAuth, setProcessingAuth] = useState(false);
+
+    // Resume AudioContext on first interaction
+    useEffect(() => {
+        const resumeAudio = () => {
+            if (sounds.isEnabled()) {
+                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+            }
+            window.removeEventListener('click', resumeAudio);
+            window.removeEventListener('keydown', resumeAudio);
+        };
+        window.addEventListener('click', resumeAudio);
+        window.addEventListener('keydown', resumeAudio);
+        return () => {
+            window.removeEventListener('click', resumeAudio);
+            window.removeEventListener('keydown', resumeAudio);
+        };
+    }, []);
 
     // Handle OAuth Callback (e.g. Gmail)
     useEffect(() => {

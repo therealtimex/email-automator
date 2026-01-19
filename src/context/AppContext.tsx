@@ -56,7 +56,7 @@ const initialState: AppState = {
     selectedEmailId: null,
     emailsTotal: 0,
     emailsOffset: 0,
-    sortBy: 'date',
+    sortBy: 'created_at',
     sortOrder: 'desc',
 };
 
