@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.8.1] - 2026-01-19
+
+### Added
+- **Version Display**: Implemented clear versioning across the application UI.
+  - Added a global footer with the current version string.
+  - Added a version indicator in the Account Settings sidebar.
+  - Configured Vite to inject the application version from `package.json` at build time.
+
 ## [2.8.0] - 2026-01-19
 
 ### Added

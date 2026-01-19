@@ -38,25 +38,32 @@ export function AccountSettingsPage() {
 
             <div className="flex flex-col md:flex-row gap-8">
                 {/* Sidebar Tabs */}
-                <aside className="w-full md:w-64 space-y-1">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as SettingsTab)}
-                                className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                    isActive 
-                                        ? 'bg-primary text-primary-foreground' 
-                                        : 'hover:bg-secondary text-muted-foreground'
-                                }`}
-                            >
-                                <Icon className="w-4 h-4" />
-                                {tab.label}
-                            </button>
-                        );
-                    })}
+                <aside className="w-full md:w-64 flex flex-col justify-between">
+                    <nav className="space-y-1">
+                        {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            const isActive = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as SettingsTab)}
+                                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                        isActive 
+                                            ? 'bg-primary text-primary-foreground' 
+                                            : 'hover:bg-secondary text-muted-foreground'
+                                    }`}
+                                >
+                                    <Icon className="w-4 h-4" />
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </nav>
+
+                    <div className="mt-8 px-4 py-4 border-t border-border/40 text-center md:text-left">
+                        <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">Version</p>
+                        <p className="text-xs font-mono text-muted-foreground/70">v{import.meta.env.APP_VERSION}</p>
+                    </div>
                 </aside>
 
                 {/* Content Area */}

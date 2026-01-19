@@ -3,9 +3,13 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { spawn } from 'child_process';
 import path from 'path';
+import pkg from './package.json';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+    define: {
+        'import.meta.env.APP_VERSION': JSON.stringify(pkg.version),
+    },
     plugins: [
         react(),
         tailwindcss(),

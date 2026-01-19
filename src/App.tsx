@@ -290,12 +290,18 @@ function AppContent() {
                 </header>
 
                 {/* Main Content */}
-                <main className="max-w-7xl mx-auto p-4 sm:p-8 mt-4">
+                <main className="max-w-7xl mx-auto p-4 sm:p-8 mt-4 mb-12">
                     {activeTab === 'dashboard' && <Dashboard />}
                     {activeTab === 'config' && <Configuration />}
                     {activeTab === 'analytics' && <AnalyticsPage />}
                     {activeTab === 'account' && <AccountSettingsPage />}
                 </main>
+
+                <footer className="max-w-7xl mx-auto px-4 sm:px-8 pb-8 text-center sm:text-left">
+                    <p className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-[0.2em]">
+                        Email Automator <span className="mx-1">•</span> v{import.meta.env.APP_VERSION}
+                    </p>
+                </footer>
 
                 {/* Error Display */}
                 {state.error && (
