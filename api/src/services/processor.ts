@@ -4,7 +4,7 @@ import { createLogger } from '../utils/logger.js';
 import { config } from '../config/index.js';
 import { getGmailService, GmailMessage } from './gmail.js';
 import { getMicrosoftService, OutlookMessage } from './microsoft.js';
-import { getIntelligenceService, EmailAnalysis } from './intelligence.js';
+import { getIntelligenceService, EmailAnalysis, ContextAwareAnalysis, RuleContext } from './intelligence.js';
 import { getStorageService } from './storage.js';
 import { EmailAccount, Email, Rule, ProcessingLog } from './supabase.js';
 import { EventLogger } from './eventLogger.js';
@@ -551,7 +551,39 @@ export class EmailProcessorService {
                 mailer: parsed.headers.get('x-mailer')?.toString()
             };
 
-            // 3. Analyze with AI
+            // 3. Fetch account for action execution
+            const { data: account } = await this.supabase
+                .from('email_accounts')
+                .select('*')
+                .eq('id', email.account_id)
+                .single();
+
+            // 4. Fetch pre-compiled rule context (fast path - no loop/formatting)
+            // Falls back to building context if not cached
+            let compiledContext: string | null = settings?.compiled_rule_context || null;
+            
+            // Fetch rules for action execution (need attachments, instructions)
+            const { data: rules } = await this.supabase
+                .from('rules')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('is_enabled', true)
+                .order('priority', { ascending: false });
+
+            // Fallback: build context if not pre-compiled
+            if (!compiledContext && rules && rules.length > 0) {
+                compiledContext = rules.map((r, i) => 
+                    `Rule ${i + 1} [ID: ${r.id}]\n` +
+                    `  Name: ${r.name}\n` +
+                    (r.description ? `  Description: ${r.description}\n` : '') +
+                    (r.intent ? `  Intent: ${r.intent}\n` : '') +
+                    `  Actions: ${r.actions?.join(', ') || r.action || 'none'}\n` +
+                    (r.instructions ? `  Draft Instructions: ${r.instructions}\n` : '') +
+                    '\n'
+                ).join('');
+            }
+
+            // 5. Context-Aware Analysis: AI evaluates email against user's rules
             const intelligenceService = getIntelligenceService(
                 settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
                     ? {
@@ -562,53 +594,76 @@ export class EmailProcessorService {
                     : undefined
             );
 
-            const analysis = await intelligenceService.analyzeEmail(cleanContent, {
-                subject: email.subject || '',
-                sender: email.sender || '',
-                date: email.date || '',
-                metadata,
-                userPreferences: {
-                    autoTrashSpam: settings?.auto_trash_spam,
-                    smartDrafts: settings?.smart_drafts,
+            const analysis = await intelligenceService.analyzeEmailWithRules(
+                cleanContent,
+                {
+                    subject: email.subject || '',
+                    sender: email.sender || '',
+                    date: email.date || '',
+                    metadata,
+                    userPreferences: {
+                        autoTrashSpam: settings?.auto_trash_spam,
+                        smartDrafts: settings?.smart_drafts,
+                    },
                 },
-            }, eventLogger || undefined, email.id);
+                compiledContext || '',  // Pre-compiled context (fast path)
+                eventLogger || undefined,
+                email.id
+            );
 
             if (!analysis) {
                 throw new Error('AI analysis returned no result');
             }
 
-            // 4. Update the email record with results
+            // 6. Update the email record with context-aware results
             await this.supabase
                 .from('emails')
                 .update({
                     category: analysis.category,
-                    is_useless: analysis.is_useless,
                     ai_analysis: analysis as any,
-                    suggested_actions: analysis.suggested_actions || [],
-                    suggested_action: analysis.suggested_actions?.[0] || 'none',
+                    suggested_actions: analysis.actions_to_execute || [],
+                    suggested_action: analysis.actions_to_execute?.[0] || 'none',
+                    matched_rule_id: analysis.matched_rule.rule_id,
+                    matched_rule_confidence: analysis.matched_rule.confidence,
                     processing_status: 'completed'
                 })
                 .eq('id', email.id);
 
-            // 5. Execute automation rules
-            // Fetch account and rules needed for execution
-            const { data: account } = await this.supabase
-                .from('email_accounts')
-                .select('*')
-                .eq('id', email.account_id)
-                .single();
+            // 7. Execute actions if rule matched with sufficient confidence
+            if (account && analysis.matched_rule.rule_id && analysis.matched_rule.confidence >= 0.7) {
+                const matchedRule = rules?.find(r => r.id === analysis.matched_rule.rule_id);
+                
+                if (eventLogger) {
+                    await eventLogger.info('Rule Matched', 
+                        `"${analysis.matched_rule.rule_name}" matched with ${(analysis.matched_rule.confidence * 100).toFixed(0)}% confidence`,
+                        { reasoning: analysis.matched_rule.reasoning },
+                        email.id
+                    );
+                }
 
-            const { data: rules } = await this.supabase
-                .from('rules')
-                .select('*')
-                .eq('user_id', userId)
-                .eq('is_enabled', true);
-
-            if (account && rules) {
-                const tempResult = { processed: 0, deleted: 0, drafted: 0, errors: 0 };
-                // Ensure email object for rules has the analysis fields merged in
-                const emailForRules = { ...email, ...analysis };
-                await this.executeRules(account, emailForRules as any, analysis, rules, settings, tempResult, eventLogger);
+                // Execute each action from the AI's decision
+                for (const action of analysis.actions_to_execute) {
+                    if (action === 'none') continue;
+                    
+                    // Use AI-generated draft content if available
+                    const draftContent = action === 'draft' ? analysis.draft_content : undefined;
+                    
+                    await this.executeAction(
+                        account, 
+                        email, 
+                        action as any, 
+                        draftContent, 
+                        eventLogger, 
+                        `Rule: ${matchedRule?.name || analysis.matched_rule.rule_name}`,
+                        matchedRule?.attachments
+                    );
+                }
+            } else if (eventLogger && rules && rules.length > 0) {
+                await eventLogger.info('No Match', 
+                    analysis.matched_rule.reasoning,
+                    { confidence: analysis.matched_rule.confidence },
+                    email.id
+                );
             }
 
             // Mark log as success

@@ -115,10 +115,13 @@ export interface Rule {
     id: string;
     user_id: string;
     name: string;
-    condition: Record<string, unknown>;
+    description?: string;  // Semantic context for AI matching
+    intent?: string;       // The intent behind the rule (e.g., "Politely decline sales pitches")
+    priority?: number;     // Higher = evaluated first by AI
+    condition: Record<string, unknown>; // Legacy - kept for backwards compatibility
     action?: 'delete' | 'archive' | 'draft' | 'star' | 'read'; // Legacy single action
     actions?: ('delete' | 'archive' | 'draft' | 'star' | 'read')[]; // New multi-action array
-    instructions?: string;
+    instructions?: string; // Draft generation instructions
     attachments?: any[];
     is_enabled: boolean;
     created_at: string;

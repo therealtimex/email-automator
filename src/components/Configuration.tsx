@@ -65,6 +65,8 @@ export function Configuration() {
     const [newRuleActions, setNewRuleActions] = useState<string[]>(['archive']);
     const [newRuleOlderThan, setNewRuleOlderThan] = useState('');
     const [newRuleInstructions, setNewRuleInstructions] = useState('');
+    const [newRuleDescription, setNewRuleDescription] = useState('');
+    const [newRuleIntent, setNewRuleIntent] = useState('');
     const [newRuleAttachments, setNewRuleAttachments] = useState<RuleAttachment[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [savingRule, setSavingRule] = useState(false);
@@ -124,6 +126,8 @@ export function Configuration() {
         setNewRuleActions(ruleActions);
         
         setNewRuleInstructions(rule.instructions || '');
+        setNewRuleDescription(rule.description || '');
+        setNewRuleIntent(rule.intent || '');
         setNewRuleAttachments(rule.attachments || []);
         setShowRuleModal(true);
     };
@@ -393,6 +397,8 @@ export function Configuration() {
 
             const ruleData = {
                 name: newRuleName,
+                description: newRuleDescription || undefined,
+                intent: newRuleIntent || undefined,
                 condition,
                 actions: newRuleActions as any[],
                 instructions: hasDraftAction ? newRuleInstructions : undefined,
@@ -415,6 +421,8 @@ export function Configuration() {
                 setNewRuleActions(['archive']);
                 setNewRuleOlderThan('');
                 setNewRuleInstructions('');
+                setNewRuleDescription('');
+                setNewRuleIntent('');
                 setNewRuleAttachments([]);
                 actions.fetchRules();
             } else {
@@ -791,6 +799,31 @@ export function Configuration() {
                                 value={newRuleName}
                                 onChange={(e) => setNewRuleName(e.target.value)}
                             />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Description</label>
+                            <textarea
+                                className="w-full p-2 border rounded-md bg-background min-h-[60px] text-sm"
+                                placeholder="e.g. Handle all marketing newsletters and promotional content from subscription services"
+                                value={newRuleDescription}
+                                onChange={(e) => setNewRuleDescription(e.target.value)}
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                                Describe what this rule is for. The AI uses this to semantically match emails.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Intent</label>
+                            <Input
+                                placeholder="e.g. Politely decline all sales pitches"
+                                value={newRuleIntent}
+                                onChange={(e) => setNewRuleIntent(e.target.value)}
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                                The goal of this rule. Used to generate appropriate draft replies.
+                            </p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -1217,6 +1250,8 @@ export function Configuration() {
                                 <Button variant="ghost" size="sm" onClick={() => {
                                     setEditingRule(null);
                                     setNewRuleName('');
+                                    setNewRuleDescription('');
+                                    setNewRuleIntent('');
                                     setNewRuleActions(['archive']);
                                     setNewRuleOlderThan('');
                                     setNewRuleInstructions('');

@@ -55,10 +55,13 @@ export interface Rule {
     id: string;
     user_id: string;
     name: string;
-    condition: RuleCondition;
+    description?: string;  // Semantic context for AI matching
+    intent?: string;       // The intent behind the rule (e.g., "Politely decline sales pitches")
+    priority?: number;     // Higher = evaluated first by AI
+    condition: RuleCondition; // Legacy - kept for backwards compatibility
     action?: 'delete' | 'archive' | 'draft' | 'read' | 'star'; // Legacy single action
     actions?: ('delete' | 'archive' | 'draft' | 'read' | 'star')[]; // New multi-action array
-    instructions?: string;
+    instructions?: string; // Draft generation instructions
     attachments?: RuleAttachment[];
     is_enabled: boolean;
     is_system?: boolean; // New flag for pre-defined rules

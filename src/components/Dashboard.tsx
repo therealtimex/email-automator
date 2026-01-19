@@ -108,7 +108,31 @@ export function AITraceModal({
                                     {/* Event Details */}
                                     <div className="bg-card border rounded-lg p-4 shadow-sm">
                                         {event.event_type === 'info' && (
-                                            <p className="text-sm text-foreground/90">{event.details?.message}</p>
+                                            <div className="space-y-3">
+                                                <p className="text-sm text-foreground/90">{event.details?.message}</p>
+                                                
+                                                {event.details?.system_prompt && (
+                                                    <div className="space-y-1">
+                                                        <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                                            <Code className="w-3 h-3" /> System Prompt
+                                                        </div>
+                                                        <pre className="text-[10px] bg-secondary/50 p-2 rounded border overflow-x-auto whitespace-pre-wrap max-h-60 overflow-y-auto font-mono">
+                                                            {event.details.system_prompt}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                                
+                                                {event.details?.content_preview && (
+                                                    <div className="space-y-1">
+                                                        <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                                            <Code className="w-3 h-3" /> Email Content (sent to LLM)
+                                                        </div>
+                                                        <pre className="text-[10px] bg-blue-500/5 p-2 rounded border border-blue-500/10 overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
+                                                            {event.details.content_preview}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
 
                                         {event.event_type === 'analysis' && (

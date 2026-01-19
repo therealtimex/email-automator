@@ -87,8 +87,12 @@ export const schemas = {
     }),
 
     // Rule schemas - supports both single action (legacy) and actions array
+    // Now includes description and intent for context-aware AI matching
     createRule: z.object({
         name: z.string().min(1).max(100),
+        description: z.string().max(500).optional(),
+        intent: z.string().max(200).optional(),
+        priority: z.number().int().min(0).max(100).optional(),
         condition: z.record(z.unknown()),
         action: z.enum(['delete', 'archive', 'draft', 'star', 'read']).optional(),
         actions: z.array(z.enum(['delete', 'archive', 'draft', 'star', 'read'])).optional(),
@@ -100,6 +104,9 @@ export const schemas = {
 
     updateRule: z.object({
         name: z.string().min(1).max(100).optional(),
+        description: z.string().max(500).optional(),
+        intent: z.string().max(200).optional(),
+        priority: z.number().int().min(0).max(100).optional(),
         condition: z.record(z.unknown()).optional(),
         action: z.enum(['delete', 'archive', 'draft', 'star', 'read']).optional(),
         actions: z.array(z.enum(['delete', 'archive', 'draft', 'star', 'read'])).optional(),
