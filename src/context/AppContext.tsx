@@ -73,6 +73,7 @@ type Action =
     | { type: 'SET_EMAILS'; payload: { emails: Email[]; total: number; offset: number; category?: string | null; search?: string; sortBy?: 'date' | 'created_at'; sortOrder?: 'asc' | 'desc' } }
     | { type: 'ADD_EMAIL'; payload: Email }
     | { type: 'UPDATE_EMAIL'; payload: Email }
+    | { type: 'REMOVE_EMAIL'; payload: string }
     | { type: 'SET_PROFILE'; payload: Profile }
     | { type: 'UPDATE_PROFILE'; payload: Profile }
     | { type: 'SET_ACCOUNTS'; payload: EmailAccount[] }
@@ -135,12 +136,44 @@ function reducer(state: AppState, action: Action): AppState {
                 emailsTotal: state.emailsTotal + 1,
             };
         }
-        case 'UPDATE_EMAIL':
+        case 'UPDATE_EMAIL': {
+            const email = action.payload;
+            const existingIndex = state.emails.findIndex(e => e.id === email.id);
+
+            if (existingIndex !== -1) {
+                // Email exists in array - update it
+                return {
+                    ...state,
+                    emails: state.emails.map(e =>
+                        e.id === email.id ? email : e
+                    ),
+                };
+            }
+
+            // Email NOT in array - check if it should be added (upsert behavior)
+            // This handles the case where INSERT added email with null category,
+            // but UPDATE now has the real category after AI processing
+            const matchesCategory = !state.activeCategory || email.category === state.activeCategory;
+            const matchesSearch = !state.activeSearch ||
+                email.subject?.toLowerCase().includes(state.activeSearch.toLowerCase()) ||
+                email.sender?.toLowerCase().includes(state.activeSearch.toLowerCase());
+
+            if (matchesCategory && matchesSearch) {
+                // Add to array (sorted by created_at desc - prepend)
+                return {
+                    ...state,
+                    emails: [email, ...state.emails],
+                };
+            }
+
+            // Doesn't match current filters - no change needed
+            return state;
+        }
+        case 'REMOVE_EMAIL':
             return {
                 ...state,
-                emails: state.emails.map(e =>
-                    e.id === action.payload.id ? action.payload : e
-                ),
+                emails: state.emails.filter(e => e.id !== action.payload),
+                emailsTotal: Math.max(0, state.emailsTotal - 1),
             };
         case 'SET_PROFILE':
             return { ...state, profile: action.payload };
@@ -215,36 +248,69 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(reducer, initialState);
 
-    // Realtime subscription logic
-    const handleRealtimeInsert = useCallback(async (payload: Email) => {
-        // Hydrate: Fetch full email with joined account data
-        const response = await api.getEmail(payload.id);
-        if (response.data?.email) {
-            const email = response.data.email;
-            dispatch({ type: 'ADD_EMAIL', payload: email });
-            
-            // Play feedback
-            if (email.ai_analysis?.priority === 'High') {
-                sounds.playAlert();
-                toast.success('High Priority Email Processed!');
-            } else {
-                sounds.playNotify();
-                toast.info('New email processed');
+    // Helper to fetch email with retry (handles replication lag)
+    const fetchEmailWithRetry = useCallback(async (emailId: string, retries = 3, delay = 500): Promise<Email | null> => {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            const response = await api.getEmail(emailId);
+            if (response.data?.email) {
+                return response.data.email;
+            }
+            if (attempt < retries) {
+                console.debug(`[Realtime] Hydration attempt ${attempt} failed for ${emailId}, retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
-    }, [dispatch]);
+        console.warn(`[Realtime] Failed to hydrate email ${emailId} after ${retries} attempts`);
+        return null;
+    }, []);
+
+    // Realtime subscription logic
+    const handleRealtimeInsert = useCallback(async (payload: Email) => {
+        console.debug('[Realtime] INSERT event received:', payload.id, payload.subject);
+
+        // Hydrate: Fetch full email with joined account data (with retry for replication lag)
+        const email = await fetchEmailWithRetry(payload.id);
+        if (email) {
+            dispatch({ type: 'ADD_EMAIL', payload: email });
+
+            // Play feedback only for completed emails (not pending ones)
+            if (email.processing_status === 'completed') {
+                if (email.ai_analysis?.priority === 'High') {
+                    sounds.playAlert();
+                    toast.success('High Priority Email Processed!');
+                } else {
+                    sounds.playNotify();
+                    toast.info('New email processed');
+                }
+            }
+        }
+    }, [dispatch, fetchEmailWithRetry]);
 
     const handleRealtimeUpdate = useCallback(async (payload: Email) => {
-        // Hydrate: Fetch full email with joined account data
-        const response = await api.getEmail(payload.id);
-        if (response.data?.email) {
-            dispatch({ type: 'UPDATE_EMAIL', payload: response.data.email });
-        }
-    }, [dispatch]);
+        console.debug('[Realtime] UPDATE event received:', payload.id, 'status:', payload.processing_status);
 
-    const handleRealtimeDelete = useCallback((_emailId: string) => {
-        // We could manually remove from state, but refresh is safer for pagination
-        // fetchEmails is available below in actions
+        // Hydrate: Fetch full email with joined account data
+        const email = await fetchEmailWithRetry(payload.id);
+        if (email) {
+            dispatch({ type: 'UPDATE_EMAIL', payload: email });
+
+            // Play feedback when email completes processing (transition to completed)
+            if (email.processing_status === 'completed' && payload.processing_status === 'completed') {
+                // Check if this was a fresh completion (ai_analysis exists)
+                if (email.ai_analysis?.priority === 'High') {
+                    sounds.playAlert();
+                    toast.success('High Priority Email Processed!');
+                } else {
+                    sounds.playNotify();
+                    toast.info('Email analysis complete');
+                }
+            }
+        }
+    }, [dispatch, fetchEmailWithRetry]);
+
+    const handleRealtimeDelete = useCallback((emailId: string) => {
+        console.debug('[Realtime] DELETE event received:', emailId);
+        dispatch({ type: 'REMOVE_EMAIL', payload: emailId });
     }, [dispatch]);
 
     const { isSubscribed } = useRealtimeEmails({

@@ -20,10 +20,15 @@ export function useRealtimeEmails({
     const [isSubscribed, setIsSubscribed] = useState(false);
 
     useEffect(() => {
+        console.log('[useRealtimeEmails] Effect running, enabled:', enabled, 'userId:', userId);
+
         if (!enabled || !userId) {
+            console.log('[useRealtimeEmails] Skipping subscription - not enabled or no userId');
             setIsSubscribed(false);
             return;
         }
+
+        console.log('[useRealtimeEmails] Setting up subscription for user:', userId);
 
         // Subscribe to emails table changes
         const channel = supabase
@@ -36,16 +41,21 @@ export function useRealtimeEmails({
                     table: 'emails',
                 },
                 (payload) => {
+                    console.log('[useRealtimeEmails] Raw event received:', payload.eventType, payload);
                     if (payload.eventType === 'INSERT') {
+                        console.log('[useRealtimeEmails] Calling onInsert for:', payload.new?.id);
                         onInsert?.(payload.new as Email);
                     } else if (payload.eventType === 'UPDATE') {
+                        console.log('[useRealtimeEmails] Calling onUpdate for:', payload.new?.id);
                         onUpdate?.(payload.new as Email);
                     } else if (payload.eventType === 'DELETE') {
+                        console.log('[useRealtimeEmails] Calling onDelete for:', payload.old?.id);
                         onDelete?.(payload.old.id);
                     }
                 }
             )
-            .subscribe((status) => {
+            .subscribe((status, err) => {
+                console.log('[useRealtimeEmails] Subscription status:', status, err || '');
                 setIsSubscribed(status === 'SUBSCRIBED');
             });
 
