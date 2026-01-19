@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.8.3] - 2026-01-19
+
+### Fixed
+- **Hydrated Real-time Updates**: Implemented a "fetch-on-event" strategy for real-time dashboard updates. This ensures that new emails appear instantly with full relational data (icons, deep links), which raw table events lack.
+- **Filter-Aware Ingestion**: The dashboard now correctly respects your active category and search filters when adding emails in real-time. New items will only appear if they match your current view.
+- **Sync Event Synchronization**: Ensured the "Batch Sync Finished" event only appears after the background AI processing worker has fully completed its analysis.
+
 ## [2.8.2] - 2026-01-19
 
 ### Added
