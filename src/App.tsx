@@ -420,6 +420,14 @@ function RunTraceModal({
                                                         </span>
                                                     ))}
                                                 </div>
+                                                
+                                                {event.details?.usage && (
+                                                    <div className="flex gap-3 pt-1.5 mt-1 border-t border-border/50 text-[9px] text-muted-foreground">
+                                                        <span>In: <b>{event.details.usage.prompt_tokens}</b></span>
+                                                        <span>Out: <b>{event.details.usage.completion_tokens}</b></span>
+                                                        <span>Total: <span className="text-primary font-bold">{event.details.usage.total_tokens}</span></span>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 
