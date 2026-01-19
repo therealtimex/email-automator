@@ -19,7 +19,14 @@ router.get('/',
             account_id,
             action_taken,
             search,
+            sort_by = 'date',
+            sort_order = 'desc'
         } = req.query;
+
+        // Validate sort params
+        const validSortFields = ['date', 'created_at'];
+        const sortField = validSortFields.includes(sort_by as string) ? sort_by as string : 'date';
+        const isAscending = sort_order === 'asc';
 
         let query = req.supabase!
             .from('emails')
@@ -28,7 +35,7 @@ router.get('/',
                 email_accounts!inner(id, user_id, email_address, provider)
             `, { count: 'exact' })
             .eq('email_accounts.user_id', req.user!.id)
-            .order('date', { ascending: false })
+            .order(sortField, { ascending: isAscending })
             .range(
                 parseInt(offset as string, 10),
                 parseInt(offset as string, 10) + parseInt(limit as string, 10) - 1

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -166,11 +166,15 @@ export function AITraceModal({
                                         {event.event_type === 'error' && (
                                             <div className="space-y-2">
                                                 <p className="text-sm text-red-600 dark:text-red-400 font-bold">
-                                                    {event.details?.error}
+                                                    {typeof event.details?.error === 'object' 
+                                                        ? (event.details.error.message || JSON.stringify(event.details.error)) 
+                                                        : event.details?.error}
                                                 </p>
                                                 {event.details?.raw_response && (
                                                     <pre className="text-[10px] bg-red-500/5 p-2 rounded border border-red-500/10 overflow-x-auto whitespace-pre-wrap font-mono">
-                                                        {event.details.raw_response}
+                                                        {typeof event.details.raw_response === 'object' 
+                                                            ? JSON.stringify(event.details.raw_response, null, 2) 
+                                                            : event.details.raw_response}
                                                     </pre>
                                                 )}
                                             </div>
@@ -252,6 +256,7 @@ export function Dashboard() {
         // Only fetch emails if user is authenticated
         if (state.isAuthenticated) {
             loadEmails();
+            actions.fetchStats();
         } else {
             setIsLoading(false);
         }
@@ -263,8 +268,30 @@ export function Dashboard() {
             category: selectedCategory || undefined,
             search: searchQuery || undefined,
             offset,
+            sortBy: state.sortBy,
+            sortOrder: state.sortOrder,
         });
         setIsLoading(false);
+    };
+
+    const handleSortChange = (newSortBy: 'date' | 'created_at') => {
+        actions.fetchEmails({
+            category: selectedCategory || undefined,
+            search: searchQuery || undefined,
+            offset: 0, // Reset to first page
+            sortBy: newSortBy,
+            sortOrder: state.sortOrder,
+        });
+    };
+
+    const toggleSortOrder = () => {
+        actions.fetchEmails({
+            category: selectedCategory || undefined,
+            search: searchQuery || undefined,
+            offset: 0,
+            sortBy: state.sortBy,
+            sortOrder: state.sortOrder === 'asc' ? 'desc' : 'asc',
+        });
     };
 
     const handleSync = async () => {
@@ -363,6 +390,27 @@ export function Dashboard() {
                     </div>
                 </div>
 
+                {/* Sync Progress Banner */}
+                {isSyncing && (
+                    <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-primary/10 p-2 rounded-full">
+                                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                            </div>
+                            <div>
+                                <h4 className="font-semibold text-sm">Sync in progress...</h4>
+                                <p className="text-xs text-muted-foreground">
+                                    Fetching and analyzing emails. New emails will appear below automatically.
+                                </p>
+                            </div>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={openTerminal} className="h-8 text-xs">
+                            <Cpu className="w-3.5 h-3.5 mr-2" />
+                            View Logs
+                        </Button>
+                    </div>
+                )}
+
                 {/* Search and Filters */}
                 <div className="flex flex-col sm:flex-row gap-3">
                     <form onSubmit={handleSearch} className="flex-1 flex gap-2">
@@ -377,26 +425,49 @@ export function Dashboard() {
                         </div>
                         <Button type="submit" size="sm">Search</Button>
                     </form>
-                    <div className="flex gap-1 flex-wrap">
-                        <Button
-                            size="sm"
-                            variant={selectedCategory === null ? 'secondary' : 'ghost'}
-                            onClick={() => setSelectedCategory(null)}
+                    
+                    {/* Sort Controls */}
+                    <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-md border border-border/50">
+                        <select 
+                            className="bg-transparent text-xs font-medium border-none focus:ring-0 cursor-pointer pl-2 pr-8 h-7"
+                            value={state.sortBy}
+                            onChange={(e) => handleSortChange(e.target.value as 'date' | 'created_at')}
                         >
-                            All
+                            <option value="date">Received Time</option>
+                            <option value="created_at">Processed Time</option>
+                        </select>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={toggleSortOrder}
+                            title={state.sortOrder === 'asc' ? "Oldest First" : "Newest First"}
+                        >
+                            <ArrowUpDown className={cn("w-3.5 h-3.5", state.sortOrder === 'asc' && "rotate-180")} />
                         </Button>
-                        {['spam', 'client', 'newsletter', 'support'].map(cat => (
-                            <Button
-                                key={cat}
-                                size="sm"
-                                variant={selectedCategory === cat ? 'secondary' : 'ghost'}
-                                onClick={() => setSelectedCategory(cat)}
-                                className="capitalize"
-                            >
-                                {cat}
-                            </Button>
-                        ))}
                     </div>
+                </div>
+
+                {/* Categories */}
+                <div className="flex gap-1 flex-wrap">
+                    <Button
+                        size="sm"
+                        variant={selectedCategory === null ? 'secondary' : 'ghost'}
+                        onClick={() => setSelectedCategory(null)}
+                    >
+                        All
+                    </Button>
+                    {['spam', 'client', 'newsletter', 'support'].map(cat => (
+                        <Button
+                            key={cat}
+                            size="sm"
+                            variant={selectedCategory === cat ? 'secondary' : 'ghost'}
+                            onClick={() => setSelectedCategory(cat)}
+                            className="capitalize"
+                        >
+                            {cat}
+                        </Button>
+                    ))}
                 </div>
 
                 {/* Email List */}
@@ -511,6 +582,51 @@ export function Dashboard() {
                     onUpdateSettings={actions.updateSettings}
                     openTerminal={openTerminal}
                 />
+
+                {/* Recent Sync History */}
+                <Card className="p-6">
+                    <h3 className="font-semibold mb-4 flex items-center gap-2">
+                        <RotateCcw className="w-4 h-4 text-primary" />
+                        Sync History
+                    </h3>
+                    <div className="space-y-4">
+                        {!state.stats?.recentSyncs || state.stats.recentSyncs.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic">No sync history available.</p>
+                        ) : (
+                            state.stats.recentSyncs.slice(0, 5).map((log) => (
+                                <div key={log.id} className="flex justify-between items-start text-sm border-b last:border-0 pb-3 last:pb-0">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className={cn(
+                                                "w-1.5 h-1.5 rounded-full",
+                                                log.status === 'success' ? "bg-emerald-500" : 
+                                                log.status === 'running' ? "bg-blue-500 animate-pulse" : "bg-red-500"
+                                            )} />
+                                            <p className="font-medium text-xs">
+                                                {new Date(log.started_at).toLocaleDateString()} {new Date(log.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground pl-3.5">
+                                            Processed: <span className="font-medium text-foreground">{log.emails_processed}</span> • 
+                                            Actioned: <span className="font-medium text-foreground">{log.emails_deleted + log.emails_drafted}</span>
+                                        </p>
+                                        {log.error_message && (
+                                            <p className="text-[10px] text-destructive pl-3.5 line-clamp-1" title={log.error_message}>
+                                                {log.error_message}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                                        {log.status === 'running' ? 'Running' : 
+                                         log.completed_at ? 
+                                            `${Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)}s` 
+                                            : '...'}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </Card>
 
                 {/* Quick Stats */}
                 <Card className="p-6">
@@ -803,9 +919,25 @@ function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loading
                         <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", categoryClass)}>
                             {email.category || 'unknown'}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">
-                            {email.date ? new Date(email.date).toLocaleDateString() : ''}
-                        </span>
+                        <div className="flex items-center justify-end gap-1">
+                            {!email.ai_analysis ? (
+                                <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> Pending
+                                </span>
+                            ) : (
+                                <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <Brain className="w-2.5 h-2.5" /> Analyzed
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex flex-col items-end text-[10px] text-muted-foreground/80 leading-tight">
+                            <span title={email.date ? new Date(email.date).toLocaleString() : ''}>
+                                <span className="opacity-70">Rec:</span> {email.date ? new Date(email.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </span>
+                            <span title={new Date(email.created_at).toLocaleString()}>
+                                <span className="opacity-70">Proc:</span> {new Date(email.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        </div>
                     </div>
                 </div>
 

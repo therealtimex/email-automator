@@ -5,6 +5,44 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.5] - 2026-01-18
+
+### Fixed
+- **Sorting**: Fixed issue where sorting toggle in Dashboard was not updating the email list.
+  - Root Cause: `api-v1-emails` Edge Function had hardcoded sorting logic.
+  - Fix: Updated Edge Function to accept and process `sort_by` and `sort_order` query parameters.
+
+## [2.4.4] - 2026-01-18
+
+### Added
+- **Email Sorting**: Added ability to sort emails by "Received Time" or "Processing Time" in ascending or descending order.
+- **Detailed Timestamps**: Email cards now display both the original "Received" time and the system "Processed" time for better visibility.
+- **Sorting UI**: New sorting controls added to the Dashboard search bar area.
+
+### Changed
+- **API**: Updated `GET /api/v1/emails` to accept `sort_by` and `sort_order` parameters.
+- **State Management**: Updated `AppContext` to persist sorting preferences.
+
+## [2.4.3] - 2026-01-18
+
+### Added
+- **Sync History**: New "Sync History" card in the Dashboard sidebar showing recent sync runs, emails processed, and status (Success/Failed).
+- **Live Sync Banner**: Prominent banner appears at the top of the Dashboard during active syncs, providing clear feedback that background processing is happening.
+- **Email Status Indicators**: Email cards now show "Analyzed" (with AI brain icon) or "Pending" (with spinner) status badges to differentiate processed vs. unprocessed emails.
+
+### Changed
+- **Dashboard Data**: Dashboard now automatically fetches sync statistics on load, ensuring history is immediately visible.
+
+## [2.4.2] - 2026-01-18
+
+### Fixed
+- **LLM Compatibility**: Removed strict `response_format: { type: 'json_object' }` to fix 400 errors with newer models (e.g., o1, o3-mini) or providers that require `json_schema` or `text`. System now relies on robust prompt engineering and manual JSON extraction which is already implemented.
+
+## [2.4.1] - 2026-01-18
+
+### Fixed
+- **LLM Compatibility**: Removed strict `response_format: { type: 'json_object' }` to fix 400 errors with newer models (e.g., o1, o3-mini) or providers that require `json_schema` or `text`. System now relies on robust prompt engineering and manual JSON extraction which is already implemented.
+
 ## [2.4.0] - 2026-01-18
 
 ### Added

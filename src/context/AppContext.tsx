@@ -31,9 +31,11 @@ interface AppState {
     error: string | null;
     selectedEmailId: string | null;
 
-    // Pagination
+    // Pagination & Sorting
     emailsTotal: number;
     emailsOffset: number;
+    sortBy: 'date' | 'created_at';
+    sortOrder: 'asc' | 'desc';
 }
 
 const initialState: AppState = {
@@ -51,6 +53,8 @@ const initialState: AppState = {
     selectedEmailId: null,
     emailsTotal: 0,
     emailsOffset: 0,
+    sortBy: 'date',
+    sortOrder: 'desc',
 };
 
 // Actions
@@ -59,7 +63,7 @@ type Action =
     | { type: 'SET_LOADING'; payload: boolean }
     | { type: 'SET_INITIALIZED'; payload: boolean }
     | { type: 'SET_ERROR'; payload: string | null }
-    | { type: 'SET_EMAILS'; payload: { emails: Email[]; total: number; offset: number } }
+    | { type: 'SET_EMAILS'; payload: { emails: Email[]; total: number; offset: number; sortBy?: 'date' | 'created_at'; sortOrder?: 'asc' | 'desc' } }
     | { type: 'ADD_EMAIL'; payload: Email }
     | { type: 'UPDATE_EMAIL'; payload: Email }
     | { type: 'SET_PROFILE'; payload: Profile }
@@ -97,6 +101,8 @@ function reducer(state: AppState, action: Action): AppState {
                 emails: action.payload.emails,
                 emailsTotal: action.payload.total,
                 emailsOffset: action.payload.offset,
+                sortBy: action.payload.sortBy || state.sortBy,
+                sortOrder: action.payload.sortOrder || state.sortOrder,
             };
         case 'ADD_EMAIL':
             return {
@@ -158,7 +164,7 @@ interface AppContextType {
     state: AppState;
     dispatch: React.Dispatch<Action>;
     actions: {
-        fetchEmails: (params?: { category?: string; search?: string; offset?: number }) => Promise<void>;
+        fetchEmails: (params?: { category?: string; search?: string; offset?: number; sortBy?: 'date' | 'created_at'; sortOrder?: 'asc' | 'desc' }) => Promise<void>;
         fetchAccounts: () => Promise<void>;
         fetchRules: () => Promise<void>;
         fetchSettings: () => Promise<void>;
@@ -246,12 +252,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Actions
     const actions = {
-        fetchEmails: async (params: { category?: string; search?: string; offset?: number } = {}) => {
+        fetchEmails: async (params: { category?: string; search?: string; offset?: number; sortBy?: 'date' | 'created_at'; sortOrder?: 'asc' | 'desc' } = {}) => {
             const response = await api.getEmails({
                 limit: 20,
                 offset: params.offset || 0,
                 category: params.category,
                 search: params.search,
+                sort_by: params.sortBy || state.sortBy,
+                sort_order: params.sortOrder || state.sortOrder,
             });
             if (response.data) {
                 dispatch({
@@ -260,6 +268,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                         emails: response.data.emails,
                         total: response.data.total,
                         offset: params.offset || 0,
+                        sortBy: params.sortBy,
+                        sortOrder: params.sortOrder,
                     }
                 });
             }

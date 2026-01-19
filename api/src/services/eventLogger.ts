@@ -46,7 +46,15 @@ export class EventLogger {
         await this.log('action', state, { action, reason }, emailId);
     }
 
-    async error(state: string, error: any, emailId?: string) {
-        await this.log('error', state, { error: error.message || error }, emailId);
+    async error(state: string, errorOrDetails: any, emailId?: string) {
+        let details;
+        if (errorOrDetails instanceof Error) {
+            details = { error: errorOrDetails.message };
+        } else if (typeof errorOrDetails === 'object' && errorOrDetails !== null) {
+            details = errorOrDetails;
+        } else {
+            details = { error: String(errorOrDetails) };
+        }
+        await this.log('error', state, details, emailId);
     }
 }

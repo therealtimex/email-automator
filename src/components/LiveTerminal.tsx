@@ -238,7 +238,9 @@ export function LiveTerminal() {
                                 </div>
                             ) : event.event_type === 'error' && event.details ? (
                                 <div className="bg-red-500/5 border border-red-500/10 rounded-lg p-2.5 text-red-600 dark:text-red-400 font-medium">
-                                    {event.details.error}
+                                    {typeof event.details.error === 'object' 
+                                        ? (event.details.error.message || JSON.stringify(event.details.error)) 
+                                        : event.details.error}
                                 </div>
                             ) : (
                                 <p className="text-muted-foreground leading-relaxed">
@@ -292,7 +294,9 @@ export function LiveTerminal() {
                                             </div>
                                             <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
                                                 <pre className="text-[10px] text-muted-foreground select-all whitespace-pre-wrap">
-                                                    {event.details.raw_response}
+                                                    {typeof event.details.raw_response === 'object' 
+                                                        ? JSON.stringify(event.details.raw_response, null, 2) 
+                                                        : event.details.raw_response}
                                                 </pre>
                                             </div>
                                         </div>

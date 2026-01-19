@@ -57,6 +57,14 @@ Deno.serve(async (req) => {
       const account_id = url.searchParams.get('account_id');
       const action_taken = url.searchParams.get('action_taken');
       const search = url.searchParams.get('search');
+      
+      const sort_by = url.searchParams.get('sort_by') || 'date';
+      const sort_order = url.searchParams.get('sort_order') || 'desc';
+
+      // Validate sort params
+      const validSortFields = ['date', 'created_at'];
+      const sortField = validSortFields.includes(sort_by) ? sort_by : 'date';
+      const isAscending = sort_order === 'asc';
 
       let query = supabaseAdmin
         .from('emails')
@@ -65,7 +73,7 @@ Deno.serve(async (req) => {
           email_accounts!inner(id, user_id, email_address, provider)
         `, { count: 'exact' })
         .eq('email_accounts.user_id', user.id)
-        .order('date', { ascending: false })
+        .order(sortField, { ascending: isAscending })
         .range(offset, offset + limit - 1);
 
       // Apply filters

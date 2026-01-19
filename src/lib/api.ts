@@ -213,12 +213,16 @@ class HybridApiClient {
         offset?: number;
         category?: string;
         search?: string;
+        sort_by?: 'date' | 'created_at';
+        sort_order?: 'asc' | 'desc';
     } = {}) {
         const query = new URLSearchParams();
         if (params.limit) query.set('limit', params.limit.toString());
         if (params.offset) query.set('offset', params.offset.toString());
         if (params.category) query.set('category', params.category);
         if (params.search) query.set('search', params.search);
+        if (params.sort_by) query.set('sort_by', params.sort_by);
+        if (params.sort_order) query.set('sort_order', params.sort_order);
 
         return this.edgeRequest<{ emails: any[]; total: number }>(`/api-v1-emails?${query}`);
     }

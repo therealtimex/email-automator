@@ -167,7 +167,7 @@ REQUIRED JSON STRUCTURE:
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: cleanedContent || '[Empty email body]' },
                 ],
-                response_format: { type: 'json_object' },
+                // response_format: { type: 'json_object' }, // Removed for compatibility
                 temperature: 0.1,
             });
 
