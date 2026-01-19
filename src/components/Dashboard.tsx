@@ -735,12 +735,49 @@ interface SyncSettingsProps {
 }
 
 function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, openTerminal }: SyncSettingsProps) {
-    const [updating, setUpdating] = useState<string | null>(null);
-    const [updatingSettings, setUpdatingSettings] = useState(false);
+    if (accounts.length === 0) return null;
+
+    return (
+        <Card className="p-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-primary" />
+                Sync Scope
+            </h3>
+
+            <div className="space-y-6">
+                {accounts.map(account => (
+                    <AccountSyncRow 
+                        key={account.id} 
+                        account={account} 
+                        onUpdate={onUpdate} 
+                        onSync={onSync} 
+                        openTerminal={openTerminal} 
+                    />
+                ))}
+            </div>
+        </Card>
+    );
+}
+
+function AccountSyncRow({ 
+    account, 
+    onUpdate, 
+    onSync, 
+    openTerminal 
+}: { 
+    account: EmailAccount, 
+    onUpdate: (id: string, updates: Partial<EmailAccount>) => Promise<boolean>,
+    onSync: (id: string) => void,
+    openTerminal: () => void
+}) {
+    const [updating, setUpdating] = useState(false);
+    
+    // Local state for inputs to prevent aggressive updates while typing
+    const [localStartDate, setLocalStartDate] = useState('');
+    const [localMaxEmails, setLocalMaxEmails] = useState<string>('');
 
     const toLocalISOString = (dateInput: string | number | Date | null | undefined) => {
         if (!dateInput) return '';
-        // If it's a numeric string (Gmail checkpoint), parse as integer first
         const input = (typeof dateInput === 'string' && /^\d+$/.test(dateInput)) 
             ? parseInt(dateInput) 
             : dateInput;
@@ -756,118 +793,118 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, 
             ':' + pad(date.getMinutes());
     };
 
-    const handleUpdate = async (accountId: string, updates: Partial<EmailAccount>) => {
-        setUpdating(accountId);
-        await onUpdate(accountId, updates);
-        setUpdating(null);
+    // Initialize local state from account props
+    useEffect(() => {
+        const effectiveDate = account.sync_start_date 
+            || account.last_sync_checkpoint 
+            || account.last_sync_at;
+        
+        setLocalStartDate(toLocalISOString(effectiveDate));
+        setLocalMaxEmails((account.sync_max_emails_per_run || 50).toString());
+    }, [account.id, account.sync_start_date, account.last_sync_checkpoint, account.last_sync_at, account.sync_max_emails_per_run]);
+
+    const handleUpdate = async (updates: Partial<EmailAccount>) => {
+        setUpdating(true);
+        await onUpdate(account.id, updates);
+        setUpdating(false);
     };
 
-    if (accounts.length === 0) return null;
+    const handleBlurStartDate = () => {
+        const currentValue = account.sync_start_date ? new Date(account.sync_start_date).toISOString() : '';
+        const newValue = localStartDate ? new Date(localStartDate).toISOString() : '';
+        
+        if (newValue !== currentValue) {
+            handleUpdate({ sync_start_date: newValue || null });
+        }
+    };
+
+    const handleBlurMaxEmails = () => {
+        const val = parseInt(localMaxEmails, 10) || 50;
+        if (val !== account.sync_max_emails_per_run) {
+            handleUpdate({ sync_max_emails_per_run: val });
+        }
+    };
 
     return (
-        <Card className="p-6">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-primary" />
-                Sync Scope
-            </h3>
-
-            <div className="space-y-6">
-                {accounts.map(account => (
-                    <div key={account.id} className="space-y-3 pb-4 border-b last:border-0 last:pb-0">
-                        <div className="flex justify-between items-center">
-                            <span className="text-xs font-medium truncate max-w-[150px]" title={account.email_address}>
-                                {account.email_address}
-                            </span>
-                            <div className="flex items-center gap-1">
-                                {account.last_sync_status === 'syncing' ? (
-                                    <Loader2 className="w-3 h-3 text-primary animate-spin" />
-                                ) : account.last_sync_status === 'success' ? (
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                                ) : account.last_sync_status === 'error' ? (
-                                    <span title={account.last_sync_error || 'Error'}>
-                                        <AlertCircle className="w-3 h-3 text-destructive" />
-                                    </span>
-                                ) : null}
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => {
-                                        openTerminal();
-                                        onSync(account.id);
-                                    }}
-                                    disabled={account.last_sync_status === 'syncing'}
-                                >
-                                    <RefreshCw className={cn("w-3 h-3", account.last_sync_status === 'syncing' && "animate-spin")} />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-muted-foreground hover:text-orange-500"
-                                    title="Reset Checkpoint (Force Full Re-sync from Start Date)"
-                                    onClick={() => onUpdate(account.id, { last_sync_checkpoint: null })}
-                                    disabled={account.last_sync_status === 'syncing'}
-                                >
-                                    <RotateCcw className="w-3 h-3" />
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-[1.5fr_1fr] gap-2">
-                            <div className="space-y-1">
-                                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                    <Calendar className="w-2.5 h-2.5" /> Sync From
-                                </label>
-                                <Input
-                                    type="datetime-local"
-                                    className="h-7 text-[10px] px-2 py-0 w-full"
-                                    value={(() => {
-                                        // 1. Priority: User-defined start date
-                                        if (account.sync_start_date) return toLocalISOString(account.sync_start_date);
-                                        
-                                        // 2. Fallback: Last known checkpoint
-                                        if (account.last_sync_checkpoint) return toLocalISOString(account.last_sync_checkpoint);
-
-                                        // 3. Last fallback: Last sync execution time
-                                        if (account.last_sync_at) return toLocalISOString(account.last_sync_at);
-                                        
-                                        return '';
-                                    })()}
-                                    onChange={(e) => handleUpdate(account.id, {
-                                        sync_start_date: e.target.value ? new Date(e.target.value).toISOString() : null
-                                    })}
-                                    disabled={updating === account.id}
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                    <Hash className="w-2.5 h-2.5" /> Max Emails
-                                </label>
-                                <Input
-                                    type="number"
-                                    className="h-7 text-[10px] px-2 py-0"
-                                    value={account.sync_max_emails_per_run || 50}
-                                    onChange={(e) => handleUpdate(account.id, {
-                                        sync_max_emails_per_run: parseInt(e.target.value, 10) || 50
-                                    })}
-                                    disabled={updating === account.id}
-                                />
-                            </div>
-                        </div>
-                        {account.last_sync_at && (
-                            <p className="text-[9px] text-muted-foreground">
-                                Last sync: {new Date(account.last_sync_at).toLocaleString()}
-                            </p>
-                        )}
-                        {account.last_sync_error && (
-                            <p className="text-[9px] text-destructive italic line-clamp-1" title={account.last_sync_error}>
-                                Error: {account.last_sync_error}
-                            </p>
-                        )}
-                    </div>
-                ))}
+        <div className="space-y-3 pb-4 border-b last:border-0 last:pb-0">
+            <div className="flex justify-between items-center">
+                <span className="text-xs font-medium truncate max-w-[150px]" title={account.email_address}>
+                    {account.email_address}
+                </span>
+                <div className="flex items-center gap-1">
+                    {account.last_sync_status === 'syncing' ? (
+                        <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                    ) : account.last_sync_status === 'success' ? (
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                    ) : account.last_sync_status === 'error' ? (
+                        <span title={account.last_sync_error || 'Error'}>
+                            <AlertCircle className="w-3 h-3 text-destructive" />
+                        </span>
+                    ) : null}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => {
+                            openTerminal();
+                            onSync(account.id);
+                        }}
+                        disabled={account.last_sync_status === 'syncing'}
+                    >
+                        <RefreshCw className={cn("w-3 h-3", account.last_sync_status === 'syncing' && "animate-spin")} />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-orange-500"
+                        title="Reset Checkpoint (Force Full Re-sync from Start Date)"
+                        onClick={() => onUpdate(account.id, { last_sync_checkpoint: null })}
+                        disabled={account.last_sync_status === 'syncing'}
+                    >
+                        <RotateCcw className="w-3 h-3" />
+                    </Button>
+                </div>
             </div>
-        </Card>
+
+            <div className="grid grid-cols-[1.5fr_1fr] gap-2">
+                <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Calendar className="w-2.5 h-2.5" /> Sync From
+                    </label>
+                    <Input
+                        type="datetime-local"
+                        className="h-7 text-[10px] px-2 py-0 w-full"
+                        value={localStartDate}
+                        onChange={(e) => setLocalStartDate(e.target.value)}
+                        onBlur={handleBlurStartDate}
+                        disabled={updating || account.last_sync_status === 'syncing'}
+                    />
+                </div>
+                <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Hash className="w-2.5 h-2.5" /> Max Emails
+                    </label>
+                    <Input
+                        type="number"
+                        className="h-7 text-[10px] px-2 py-0"
+                        value={localMaxEmails}
+                        onChange={(e) => setLocalMaxEmails(e.target.value)}
+                        onBlur={handleBlurMaxEmails}
+                        disabled={updating || account.last_sync_status === 'syncing'}
+                    />
+                </div>
+            </div>
+            {account.last_sync_at && (
+                <p className="text-[9px] text-muted-foreground">
+                    Last sync: {new Date(account.last_sync_at).toLocaleString()}
+                </p>
+            )}
+            {account.last_sync_error && (
+                <p className="text-[9px] text-destructive italic line-clamp-1" title={account.last_sync_error}>
+                    Error: {account.last_sync_error}
+                </p>
+            )}
+        </div>
     );
 }
 
