@@ -16,17 +16,7 @@ const GRAPH_SCOPES = [
 export interface OutlookMessage {
     id: string;
     conversationId: string;
-    subject: string;
-    sender: string;
-    recipient: string;
-    date: string;
-    body: string;
-    snippet: string;
-    headers: {
-        importance?: string;
-        listUnsubscribe?: string;
-        autoSubmitted?: string;
-    };
+    raw: string; // MIME content
 }
 
 export interface DeviceCodeResponse {
@@ -160,9 +150,7 @@ export class MicrosoftService {
         const accessToken = account.access_token || '';
         const { top = 20, skip = 0, filter } = options;
 
-        // IMPORTANT: Use ascending order to fetch OLDEST emails first
-        // This ensures checkpoint-based pagination works correctly and doesn't skip emails
-        let url = `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime asc&$select=id,conversationId,subject,from,toRecipients,receivedDateTime,body,bodyPreview,importance`;
+        let url = `https://graph.microsoft.com/v1.0/me/messages?$top=${top}&$skip=${skip}&$orderby=receivedDateTime asc&$select=id,conversationId`;
         if (filter) {
             url += `&$filter=${encodeURIComponent(filter)}`;
         }
@@ -184,19 +172,33 @@ export class MicrosoftService {
         }
 
         const data = await response.json();
-        const messages: OutlookMessage[] = (data.value || []).map((msg: any) => ({
-            id: msg.id,
-            conversationId: msg.conversationId,
-            subject: msg.subject || 'No Subject',
-            sender: msg.from?.emailAddress?.address || 'Unknown',
-            recipient: msg.toRecipients?.[0]?.emailAddress?.address || '',
-            date: msg.receivedDateTime,
-            body: msg.body?.content || '',
-            snippet: msg.bodyPreview || '',
-            headers: {
-                importance: msg.importance,
+        const messageRefs = data.value || [];
+        const messages: OutlookMessage[] = [];
+
+        // For each message, fetch the raw MIME content
+        for (const ref of messageRefs) {
+            try {
+                const rawResponse = await fetch(
+                    `https://graph.microsoft.com/v1.0/me/messages/${ref.id}/$value`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                        },
+                    }
+                );
+
+                if (rawResponse.ok) {
+                    const rawMime = await rawResponse.text();
+                    messages.push({
+                        id: ref.id,
+                        conversationId: ref.conversationId,
+                        raw: rawMime
+                    });
+                }
+            } catch (error) {
+                logger.warn('Failed to fetch raw content for Outlook message', { messageId: ref.id, error });
             }
-        }));
+        }
 
         return {
             messages,
@@ -287,16 +289,19 @@ export class MicrosoftService {
     ): Promise<string> {
         const accessToken = account.access_token || '';
 
-        // Get original message
+        // Get original message (minimal metadata)
         const originalResponse = await fetch(
-            `https://graph.microsoft.com/v1.0/me/messages/${originalMessageId}`,
+            `https://graph.microsoft.com/v1.0/me/messages/${originalMessageId}?$select=id,conversationId`,
             {
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                 },
             }
         );
-        const original = await originalResponse.json();
+        
+        if (!originalResponse.ok) {
+            throw new Error('Failed to fetch original message metadata');
+        }
 
         // Create reply draft
         const response = await fetch(

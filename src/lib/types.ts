@@ -44,6 +44,11 @@ export interface Email {
     actions_taken?: EmailAction[];
     created_at: string;
     email_accounts?: EmailAccount;
+    // ETL fields
+    file_path?: string | null;
+    processing_status: 'pending' | 'processing' | 'completed' | 'failed';
+    processing_error?: string | null;
+    retry_count: number;
 }
 
 export interface Rule {
@@ -87,6 +92,9 @@ export interface UserSettings {
     llm_model: string | null;
     llm_base_url: string | null;
     llm_api_key: string | null;
+    auto_trash_spam?: boolean;
+    smart_drafts?: boolean;
+    storage_path?: string | null;
     sync_interval_minutes: number;
     preferences?: Record<string, any>;
 }

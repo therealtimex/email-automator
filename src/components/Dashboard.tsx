@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -713,6 +713,24 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, 
     const [updating, setUpdating] = useState<string | null>(null);
     const [updatingSettings, setUpdatingSettings] = useState(false);
 
+    const toLocalISOString = (dateInput: string | number | Date | null | undefined) => {
+        if (!dateInput) return '';
+        // If it's a numeric string (Gmail checkpoint), parse as integer first
+        const input = (typeof dateInput === 'string' && /^\d+$/.test(dateInput)) 
+            ? parseInt(dateInput) 
+            : dateInput;
+            
+        const date = new Date(input);
+        if (isNaN(date.getTime())) return '';
+        
+        const pad = (n: number) => n < 10 ? '0' + n : n;
+        return date.getFullYear() +
+            '-' + pad(date.getMonth() + 1) +
+            '-' + pad(date.getDate()) +
+            'T' + pad(date.getHours()) +
+            ':' + pad(date.getMinutes());
+    };
+
     const handleUpdate = async (accountId: string, updates: Partial<EmailAccount>) => {
         setUpdating(accountId);
         await onUpdate(accountId, updates);
@@ -804,23 +822,13 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, 
                                     className="h-7 text-[10px] px-2 py-0 w-full"
                                     value={(() => {
                                         // 1. Priority: User-defined start date
-                                        if (account.sync_start_date) return account.sync_start_date.substring(0, 16);
+                                        if (account.sync_start_date) return toLocalISOString(account.sync_start_date);
                                         
-                                        // 2. Fallback: Last known checkpoint (data time)
-                                        if (account.last_sync_checkpoint) {
-                                            if (account.provider === 'gmail') {
-                                                try {
-                                                    const ms = parseInt(account.last_sync_checkpoint);
-                                                    if (!isNaN(ms)) return new Date(ms).toISOString().substring(0, 16);
-                                                } catch (e) { /* ignore */ }
-                                            } else {
-                                                // Outlook checkpoint is already ISO
-                                                return account.last_sync_checkpoint.substring(0, 16);
-                                            }
-                                        }
+                                        // 2. Fallback: Last known checkpoint
+                                        if (account.last_sync_checkpoint) return toLocalISOString(account.last_sync_checkpoint);
 
                                         // 3. Last fallback: Last sync execution time
-                                        if (account.last_sync_at) return account.last_sync_at.substring(0, 16);
+                                        if (account.last_sync_at) return toLocalISOString(account.last_sync_at);
                                         
                                         return '';
                                     })()}
@@ -920,11 +928,32 @@ function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loading
                             {email.category || 'unknown'}
                         </span>
                         <div className="flex items-center justify-end gap-1">
-                            {!email.ai_analysis ? (
+                            {email.processing_status === 'pending' && (
+                                <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <Clock className="w-2.5 h-2.5" /> Queued
+                                </span>
+                            )}
+                            {email.processing_status === 'processing' && (
+                                <span className="text-[9px] text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> Analyzing
+                                </span>
+                            )}
+                            {email.processing_status === 'completed' && (
+                                <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <Brain className="w-2.5 h-2.5" /> Analyzed
+                                </span>
+                            )}
+                            {email.processing_status === 'failed' && (
+                                <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1" title={email.processing_error || 'Unknown error'}>
+                                    <AlertCircle className="w-2.5 h-2.5" /> Failed
+                                </span>
+                            )}
+                            {!email.processing_status && !email.ai_analysis && (
                                 <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded flex items-center gap-1">
                                     <Loader2 className="w-2.5 h-2.5 animate-spin" /> Pending
                                 </span>
-                            ) : (
+                            )}
+                            {!email.processing_status && email.ai_analysis && (
                                 <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
                                     <Brain className="w-2.5 h-2.5" /> Analyzed
                                 </span>

@@ -58,14 +58,35 @@ Deno.serve(async (req) => {
       const allowedUpdates: Record<string, any> = {};
       if (updates.sync_start_date !== undefined) {
         allowedUpdates.sync_start_date = updates.sync_start_date;
-        
-        // If moving start date backwards, reset checkpoint to force backfill
+
+        // Reset checkpoint if sync_start_date is BEFORE the current checkpoint
+        // This allows users to "go back in time" and re-sync older emails
         if (currentAccount && updates.sync_start_date) {
-          const newDate = new Date(updates.sync_start_date).getTime();
-          const oldDate = currentAccount.sync_start_date ? new Date(currentAccount.sync_start_date).getTime() : Infinity;
-          
-          if (newDate < oldDate) {
-            console.log('Sync start date moved backwards, resetting checkpoint for account:', accountId);
+          const newStartDateMs = new Date(updates.sync_start_date).getTime();
+
+          // Check against old sync_start_date
+          const oldStartDateMs = currentAccount.sync_start_date
+            ? new Date(currentAccount.sync_start_date).getTime()
+            : Infinity;
+
+          // Check against checkpoint (could be ms timestamp or ISO string)
+          let checkpointMs = 0;
+          if (currentAccount.last_sync_checkpoint) {
+            // Try parsing as number first (Gmail format), then as ISO date (Outlook format)
+            const parsed = parseInt(currentAccount.last_sync_checkpoint);
+            checkpointMs = isNaN(parsed)
+              ? new Date(currentAccount.last_sync_checkpoint).getTime()
+              : parsed;
+          }
+
+          // Reset checkpoint if new start date is before EITHER old start date OR checkpoint
+          if (newStartDateMs < oldStartDateMs || newStartDateMs < checkpointMs) {
+            console.log('Sync start date requires backfill, resetting checkpoint', {
+              accountId,
+              newStartDateMs,
+              oldStartDateMs,
+              checkpointMs,
+            });
             allowedUpdates.last_sync_checkpoint = null;
           }
         }

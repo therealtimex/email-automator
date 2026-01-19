@@ -5,6 +5,48 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-01-18
+
+### Added
+- **Asynchronous ETL Pipeline**: Migrated from a synchronous "Fetch & Process" model to an asynchronous ETL (Extract, Transform, Load) model. Emails are now ingested rapidly and processed by a background worker, eliminating timeouts and improving reliability.
+- **Local Disk Storage**: Raw email content is now saved as `.eml` files on the local file system instead of the database. This improves database performance and data fidelity.
+- **Customizable Storage Path**: Added a "Local Storage Path" setting in the Configuration page, allowing users to define where raw emails are stored.
+- **Processing Status UI**: Dashboard now displays granular processing states: Queued (Ingested), Analyzing (AI processing), Analyzed (Complete), and Failed.
+- **Raw Email Access**: Added API endpoint `GET /api/v1/emails/:id/raw` to download/view the original email source.
+
+### Changed
+- **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
+- **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
+
+## [2.5.1] - 2026-01-18
+
+### Fixed
+- **Storage Fidelity**: Fixed issue where saved `.eml` files only contained the body text and lacked original email headers.
+  - Ingestion now fetches the **Raw RFC822 MIME** source from Gmail and Outlook.
+  - Integrated `mailparser` to extract metadata (Subject, From, Date) from the raw source for the database while preserving the full original source on disk.
+  - AI analysis now uses clean text parsed locally from the raw source, ensuring better accuracy.
+
+## [2.5.0] - 2026-01-18
+
+### Fixed
+- **Sync Logic**: Prioritized `sync_start_date` over `last_sync_checkpoint` in the backend query construction. This ensures that when a user manually sets a "Sync From" date (e.g., to rewind and backfill older emails), the system respects it even if a newer checkpoint exists. Previously, the checkpoint would override the manual start date, preventing rewinds.
+
+## [2.4.8] - 2026-01-18
+
+### Changed
+- **Sync Optimization**: Refactored `last_sync_checkpoint` updates to occur once per batch instead of per-email, improving performance and reducing database load.
+- **Error Handling**: Added robust error checking and logging for checkpoint persistence to help diagnose sync issues.
+
+## [2.4.7] - 2026-01-18
+
+### Fixed
+- **Sync UX**: "Sync From" input now automatically defaults to the `last_sync_checkpoint` (in Local Time) after a successful sync run. This clears any temporary manual overrides, ensuring the user always sees the actual "Next Sync Point" by default.
+
+## [2.4.6] - 2026-01-18
+
+### Fixed
+- **Timezone Display**: Fixed "Sync From" input in Dashboard showing UTC times instead of Local Time. It now correctly converts UTC checkpoints to the user's local timezone for display, preventing accidental time shifts when saving settings.
+
 ## [2.4.5] - 2026-01-18
 
 ### Fixed

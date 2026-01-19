@@ -3,6 +3,7 @@ import { asyncHandler, NotFoundError } from '../middleware/errorHandler.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { apiRateLimit } from '../middleware/rateLimit.js';
 import { createLogger } from '../utils/logger.js';
+import { getStorageService } from '../services/storage.js';
 
 const router = Router();
 const logger = createLogger('EmailsRoutes');
@@ -95,6 +96,34 @@ router.get('/:emailId',
     })
 );
 
+// Get raw email content (.eml)
+router.get('/:emailId/raw',
+    authMiddleware,
+    asyncHandler(async (req, res) => {
+        const { emailId } = req.params;
+
+        const { data: email, error } = await req.supabase!
+            .from('emails')
+            .select('file_path, subject, email_accounts!inner(user_id)')
+            .eq('id', emailId)
+            .eq('email_accounts.user_id', req.user!.id)
+            .single();
+
+        if (error || !email || !email.file_path) {
+            throw new NotFoundError('Raw Email');
+        }
+
+        const storageService = getStorageService();
+        const content = await storageService.readEmail(email.file_path);
+
+        const filename = `${email.subject || 'email'}.eml`.replace(/[^a-z0-9._-]/gi, '_');
+        
+        res.setHeader('Content-Type', 'message/rfc822');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(content);
+    })
+);
+
 // Delete email record (not the actual email from provider)
 router.delete('/:emailId',
     apiRateLimit,
@@ -105,7 +134,7 @@ router.delete('/:emailId',
         // Verify ownership first
         const { data: email } = await req.supabase!
             .from('emails')
-            .select('id, email_accounts!inner(user_id)')
+            .select('id, file_path, email_accounts!inner(user_id)')
             .eq('id', emailId)
             .eq('email_accounts.user_id', req.user!.id)
             .single();
@@ -114,6 +143,13 @@ router.delete('/:emailId',
             throw new NotFoundError('Email');
         }
 
+        // 1. Delete from disk
+        if (email.file_path) {
+            const storageService = getStorageService();
+            await storageService.deleteEmail(email.file_path);
+        }
+
+        // 2. Delete from DB
         const { error } = await req.supabase!
             .from('emails')
             .delete()

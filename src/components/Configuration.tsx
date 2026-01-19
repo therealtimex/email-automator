@@ -1263,6 +1263,22 @@ export function Configuration() {
                             />
                         </div>
                     </div>
+                    
+                    <div className="space-y-2 pt-2 border-t border-border/50">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                            <Database className="w-4 h-4" />
+                            Local Storage Path (.eml)
+                        </label>
+                        <Input
+                            placeholder="./data/emails"
+                            value={localSettings.storage_path || ''}
+                            onChange={(e) => setLocalSettings(s => ({ ...s, storage_path: e.target.value }))}
+                        />
+                        <p className="text-[10px] text-muted-foreground italic">
+                            Absolute or relative path where raw emails will be saved before analysis. Default: ./data/emails
+                        </p>
+                    </div>
+
                     <div className="flex justify-end mt-4 gap-2">
                         <Button
                             variant="outline"

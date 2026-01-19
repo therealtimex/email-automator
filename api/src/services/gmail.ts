@@ -17,19 +17,8 @@ export interface RuleAttachment {
 export interface GmailMessage {
     id: string;
     threadId: string;
-    subject: string;
-    sender: string;
-    recipient: string;
-    date: string;
-    internalDate: string; // Gmail's internal timestamp (ms since epoch) - use this for checkpointing
-    body: string;
-    snippet: string;
-    headers: {
-        importance?: string;
-        listUnsubscribe?: string;
-        autoSubmitted?: string;
-        mailer?: string;
-    };
+    internalDate: string;
+    raw: string; // Base64url encoded raw RFC822 message
 }
 
 export interface OAuthCredentials {
@@ -207,12 +196,16 @@ export class GmailService {
                 const detail = await gmail.users.messages.get({
                     userId: 'me',
                     id: msg.id,
-                    format: 'full',
+                    format: 'raw',
                 });
 
-                const parsed = this.parseMessage(detail.data);
-                if (parsed) {
-                    messages.push(parsed);
+                if (detail.data.raw) {
+                    messages.push({
+                        id: detail.data.id!,
+                        threadId: detail.data.threadId!,
+                        internalDate: detail.data.internalDate!,
+                        raw: detail.data.raw
+                    });
                 }
             } catch (error) {
                 logger.warn('Failed to fetch message details', { messageId: msg.id, error });
@@ -271,6 +264,7 @@ export class GmailService {
     /**
      * Fetch all message IDs matching a query (lightweight, paginated).
      * Uses minimal fields for speed: only id and internalDate.
+     * Parallelizes API calls for better performance.
      */
     private async fetchAllMessageIds(
         account: EmailAccount,
@@ -278,45 +272,65 @@ export class GmailService {
         maxIds: number
     ): Promise<{ id: string; internalDate: string }[]> {
         const gmail = await this.getAuthenticatedClient(account);
-        const results: { id: string; internalDate: string }[] = [];
+        const allMessageRefs: { id: string }[] = [];
         let pageToken: string | undefined;
 
+        // Step 1: Collect all message IDs (this is fast - just IDs)
         do {
             const response = await gmail.users.messages.list({
                 userId: 'me',
                 q: query,
                 pageToken,
                 maxResults: 500, // Max allowed per page
-                // Note: messages.list only returns id and threadId, not internalDate
-                // We need to fetch internalDate separately with minimal format
             });
 
             const messageRefs = response.data.messages || [];
-
-            // Fetch internalDate for each message (using metadata format for speed)
             for (const ref of messageRefs) {
-                if (!ref.id || results.length >= maxIds) break;
-
-                try {
-                    const msg = await gmail.users.messages.get({
-                        userId: 'me',
-                        id: ref.id,
-                        format: 'minimal', // Only returns id, threadId, labelIds, snippet, internalDate
-                    });
-
-                    if (msg.data.id && msg.data.internalDate) {
-                        results.push({
-                            id: msg.data.id,
-                            internalDate: msg.data.internalDate,
-                        });
-                    }
-                } catch (error) {
-                    logger.warn('Failed to fetch message metadata', { messageId: ref.id });
+                if (ref.id && allMessageRefs.length < maxIds) {
+                    allMessageRefs.push({ id: ref.id });
                 }
             }
 
             pageToken = response.data.nextPageToken ?? undefined;
-        } while (pageToken && results.length < maxIds);
+        } while (pageToken && allMessageRefs.length < maxIds);
+
+        logger.info('Collected message IDs', { count: allMessageRefs.length });
+
+        // Step 2: Fetch internalDate in parallel batches
+        const BATCH_SIZE = 50; // Parallel requests per batch
+        const results: { id: string; internalDate: string }[] = [];
+
+        for (let i = 0; i < allMessageRefs.length; i += BATCH_SIZE) {
+            const batch = allMessageRefs.slice(i, i + BATCH_SIZE);
+
+            const batchResults = await Promise.all(
+                batch.map(async (ref) => {
+                    try {
+                        const msg = await gmail.users.messages.get({
+                            userId: 'me',
+                            id: ref.id,
+                            format: 'minimal', // Only returns id, threadId, labelIds, snippet, internalDate
+                        });
+
+                        if (msg.data.id && msg.data.internalDate) {
+                            return {
+                                id: msg.data.id,
+                                internalDate: msg.data.internalDate,
+                            };
+                        }
+                        return null;
+                    } catch (error) {
+                        logger.warn('Failed to fetch message metadata', { messageId: ref.id });
+                        return null;
+                    }
+                })
+            );
+
+            // Filter out nulls and add to results
+            results.push(...batchResults.filter((r): r is { id: string; internalDate: string } => r !== null));
+
+            logger.debug('Fetched batch', { batch: i / BATCH_SIZE + 1, total: Math.ceil(allMessageRefs.length / BATCH_SIZE) });
+        }
 
         return results;
     }
@@ -336,12 +350,16 @@ export class GmailService {
                 const detail = await gmail.users.messages.get({
                     userId: 'me',
                     id,
-                    format: 'full',
+                    format: 'raw',
                 });
 
-                const parsed = this.parseMessage(detail.data);
-                if (parsed) {
-                    messages.push(parsed);
+                if (detail.data.raw) {
+                    messages.push({
+                        id: detail.data.id!,
+                        threadId: detail.data.threadId!,
+                        internalDate: detail.data.internalDate!,
+                        raw: detail.data.raw
+                    });
                 }
             } catch (error) {
                 logger.warn('Failed to hydrate message', { messageId: id, error });
@@ -349,53 +367,6 @@ export class GmailService {
         }
 
         return messages;
-    }
-
-    private parseMessage(message: gmail_v1.Schema$Message): GmailMessage | null {
-        if (!message.id || !message.threadId) return null;
-
-        const headers = message.payload?.headers || [];
-        const getHeader = (name: string) => headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
-
-        let body = '';
-        const payload = message.payload;
-
-        if (payload?.parts) {
-            // Multipart message
-            const textPart = payload.parts.find(p => p.mimeType === 'text/plain');
-            const htmlPart = payload.parts.find(p => p.mimeType === 'text/html');
-            const part = textPart || htmlPart || payload.parts[0];
-            body = this.decodeBody(part?.body?.data);
-        } else if (payload?.body?.data) {
-            body = this.decodeBody(payload.body.data);
-        }
-
-        return {
-            id: message.id,
-            threadId: message.threadId,
-            subject: getHeader('Subject') || 'No Subject',
-            sender: getHeader('From'),
-            recipient: getHeader('To'),
-            date: getHeader('Date'),
-            internalDate: message.internalDate || '', // Gmail's internal timestamp (ms since epoch)
-            body,
-            snippet: message.snippet || '',
-            headers: {
-                importance: getHeader('Importance') || getHeader('X-Priority'),
-                listUnsubscribe: getHeader('List-Unsubscribe'),
-                autoSubmitted: getHeader('Auto-Submitted'),
-                mailer: getHeader('X-Mailer'),
-            }
-        };
-    }
-
-    private decodeBody(data?: string | null): string {
-        if (!data) return '';
-        try {
-            return Buffer.from(data, 'base64').toString('utf-8');
-        } catch {
-            return '';
-        }
     }
 
     async trashMessage(account: EmailAccount, messageId: string): Promise<void> {

@@ -103,6 +103,12 @@ export interface Email {
     action_taken: string | null; // Deprecated
     actions_taken?: string[];
     created_at: string;
+    email_accounts?: EmailAccount;
+    // ETL fields
+    file_path?: string | null;
+    processing_status: 'pending' | 'processing' | 'completed' | 'failed';
+    processing_error?: string | null;
+    retry_count: number;
 }
 
 export interface Rule {
