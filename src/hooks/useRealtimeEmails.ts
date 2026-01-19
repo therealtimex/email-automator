@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Email } from '../lib/types';
 
@@ -17,60 +17,45 @@ export function useRealtimeEmails({
     onDelete,
     enabled = true,
 }: UseRealtimeEmailsOptions) {
-    const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+    const [isSubscribed, setIsSubscribed] = useState(false);
 
     useEffect(() => {
-        if (!enabled || !userId) return;
+        if (!enabled || !userId) {
+            setIsSubscribed(false);
+            return;
+        }
 
         // Subscribe to emails table changes
         const channel = supabase
-            .channel('emails-realtime')
+            .channel(`emails-realtime-${userId}`)
             .on(
                 'postgres_changes',
                 {
-                    event: 'INSERT',
+                    event: '*',
                     schema: 'public',
                     table: 'emails',
                 },
                 (payload) => {
-                    onInsert?.(payload.new as Email);
+                    if (payload.eventType === 'INSERT') {
+                        onInsert?.(payload.new as Email);
+                    } else if (payload.eventType === 'UPDATE') {
+                        onUpdate?.(payload.new as Email);
+                    } else if (payload.eventType === 'DELETE') {
+                        onDelete?.(payload.old.id);
+                    }
                 }
             )
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'emails',
-                },
-                (payload) => {
-                    onUpdate?.(payload.new as Email);
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: 'DELETE',
-                    schema: 'public',
-                    table: 'emails',
-                },
-                (payload) => {
-                    onDelete?.(payload.old.id);
-                }
-            )
-            .subscribe();
-
-        channelRef.current = channel;
+            .subscribe((status) => {
+                setIsSubscribed(status === 'SUBSCRIBED');
+            });
 
         return () => {
-            if (channelRef.current) {
-                supabase.removeChannel(channelRef.current);
-            }
+            supabase.removeChannel(channel);
         };
     }, [userId, enabled, onInsert, onUpdate, onDelete]);
 
     return {
-        isSubscribed: !!channelRef.current,
+        isSubscribed,
     };
 }
 

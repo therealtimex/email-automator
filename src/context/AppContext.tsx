@@ -39,6 +39,8 @@ interface AppState {
     emailsOffset: number;
     sortBy: 'date' | 'created_at';
     sortOrder: 'asc' | 'desc';
+    activeCategory: string | null;
+    activeSearch: string;
 }
 
 const initialState: AppState = {
@@ -58,6 +60,8 @@ const initialState: AppState = {
     emailsOffset: 0,
     sortBy: 'created_at',
     sortOrder: 'desc',
+    activeCategory: null,
+    activeSearch: '',
 };
 
 // Actions
@@ -66,7 +70,7 @@ type Action =
     | { type: 'SET_LOADING'; payload: boolean }
     | { type: 'SET_INITIALIZED'; payload: boolean }
     | { type: 'SET_ERROR'; payload: string | null }
-    | { type: 'SET_EMAILS'; payload: { emails: Email[]; total: number; offset: number; sortBy?: 'date' | 'created_at'; sortOrder?: 'asc' | 'desc' } }
+    | { type: 'SET_EMAILS'; payload: { emails: Email[]; total: number; offset: number; category?: string | null; search?: string; sortBy?: 'date' | 'created_at'; sortOrder?: 'asc' | 'desc' } }
     | { type: 'ADD_EMAIL'; payload: Email }
     | { type: 'UPDATE_EMAIL'; payload: Email }
     | { type: 'SET_PROFILE'; payload: Profile }
@@ -104,15 +108,33 @@ function reducer(state: AppState, action: Action): AppState {
                 emails: action.payload.emails,
                 emailsTotal: action.payload.total,
                 emailsOffset: action.payload.offset,
+                activeCategory: action.payload.category !== undefined ? action.payload.category : state.activeCategory,
+                activeSearch: action.payload.search !== undefined ? action.payload.search : state.activeSearch,
                 sortBy: action.payload.sortBy || state.sortBy,
                 sortOrder: action.payload.sortOrder || state.sortOrder,
             };
-        case 'ADD_EMAIL':
+        case 'ADD_EMAIL': {
+            const email = action.payload;
+            
+            // Check if email matches current filters
+            const matchesCategory = !state.activeCategory || email.category === state.activeCategory;
+            const matchesSearch = !state.activeSearch || 
+                email.subject?.toLowerCase().includes(state.activeSearch.toLowerCase()) || 
+                email.sender?.toLowerCase().includes(state.activeSearch.toLowerCase());
+
+            if (!matchesCategory || !matchesSearch) {
+                return {
+                    ...state,
+                    emailsTotal: state.emailsTotal + 1,
+                };
+            }
+
             return {
                 ...state,
-                emails: [action.payload, ...state.emails],
+                emails: [email, ...state.emails],
                 emailsTotal: state.emailsTotal + 1,
             };
+        }
         case 'UPDATE_EMAIL':
             return {
                 ...state,
@@ -194,21 +216,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(reducer, initialState);
 
     // Realtime subscription logic
-    const handleRealtimeInsert = useCallback((email: Email) => {
-        dispatch({ type: 'ADD_EMAIL', payload: email });
-        
-        // Play feedback
-        if (email.ai_analysis?.priority === 'High') {
-            sounds.playAlert();
-            toast.success('High Priority Email Processed!');
-        } else {
-            sounds.playNotify();
-            toast.info('New email processed');
+    const handleRealtimeInsert = useCallback(async (payload: Email) => {
+        // Hydrate: Fetch full email with joined account data
+        const response = await api.getEmail(payload.id);
+        if (response.data?.email) {
+            const email = response.data.email;
+            dispatch({ type: 'ADD_EMAIL', payload: email });
+            
+            // Play feedback
+            if (email.ai_analysis?.priority === 'High') {
+                sounds.playAlert();
+                toast.success('High Priority Email Processed!');
+            } else {
+                sounds.playNotify();
+                toast.info('New email processed');
+            }
         }
     }, [dispatch]);
 
-    const handleRealtimeUpdate = useCallback((email: Email) => {
-        dispatch({ type: 'UPDATE_EMAIL', payload: email });
+    const handleRealtimeUpdate = useCallback(async (payload: Email) => {
+        // Hydrate: Fetch full email with joined account data
+        const response = await api.getEmail(payload.id);
+        if (response.data?.email) {
+            dispatch({ type: 'UPDATE_EMAIL', payload: response.data.email });
+        }
     }, [dispatch]);
 
     const handleRealtimeDelete = useCallback((_emailId: string) => {
@@ -305,6 +336,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                         emails: response.data.emails,
                         total: response.data.total,
                         offset: params.offset || 0,
+                        category: params.category || null,
+                        search: params.search || '',
                         sortBy: params.sortBy,
                         sortOrder: params.sortOrder,
                     }

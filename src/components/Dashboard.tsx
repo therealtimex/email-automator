@@ -491,7 +491,7 @@ export function Dashboard() {
                 <div className="flex gap-1 flex-wrap">
                     <Button
                         size="sm"
-                        variant={selectedCategory === null ? 'secondary' : 'ghost'}
+                        variant={state.activeCategory === null ? 'secondary' : 'ghost'}
                         onClick={() => setSelectedCategory(null)}
                     >
                         All
@@ -500,7 +500,7 @@ export function Dashboard() {
                         <Button
                             key={cat}
                             size="sm"
-                            variant={selectedCategory === cat ? 'secondary' : 'ghost'}
+                            variant={state.activeCategory === cat ? 'secondary' : 'ghost'}
                             onClick={() => setSelectedCategory(cat)}
                             className="capitalize"
                         >
