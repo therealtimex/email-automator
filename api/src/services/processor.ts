@@ -55,6 +55,12 @@ export class EmailProcessorService {
                 throw new Error('Account not found or access denied');
             }
 
+            logger.info('Retrieved account settings', { 
+                accountId: account.id, 
+                sync_start_date: account.sync_start_date,
+                last_sync_checkpoint: account.last_sync_checkpoint
+            });
+
             // Refresh token if needed
             let refreshedAccount = account;
             if (account.provider === 'gmail') {
@@ -97,6 +103,11 @@ export class EmailProcessorService {
             // After processing new emails, run retention rules for this account
             await this.runRetentionRules(refreshedAccount, rules || [], settings, result, eventLogger);
 
+            // Trigger background worker (async) to process the queue
+            this.processQueue(userId, settings).catch(err => 
+                logger.error('Background worker failed', err)
+            );
+
             // Update log and account on success
             if (log) {
                 await this.supabase
@@ -115,11 +126,12 @@ export class EmailProcessorService {
                 .from('email_accounts')
                 .update({
                     last_sync_status: 'success',
-                    last_sync_error: null
+                    last_sync_error: null,
+                    sync_start_date: null // Clear manual override once used successfully
                 })
                 .eq('id', accountId);
 
-            logger.info('Sync completed', { accountId, ...result });
+            logger.info('Sync completed and override cleared', { accountId, ...result });
         } catch (error) {
             logger.error('Sync failed', error, { accountId });
 
@@ -233,9 +245,14 @@ export class EmailProcessorService {
             }
         }
 
-        // Update checkpoint once at the end of the batch
-        if (maxInternalDate > (account.last_sync_checkpoint ? parseInt(account.last_sync_checkpoint) : 0)) {
-            logger.debug('Updating Gmail checkpoint at end of batch', { accountId: account.id, checkpoint: maxInternalDate.toString() });
+        // Update checkpoint once at the end of the batch if we made progress
+        if (maxInternalDate > effectiveStartMs) {
+            logger.info('Updating Gmail checkpoint', { 
+                accountId: account.id, 
+                oldCheckpoint: account.last_sync_checkpoint,
+                newCheckpoint: maxInternalDate.toString() 
+            });
+            
             const { error: updateError } = await this.supabase
                 .from('email_accounts')
                 .update({ last_sync_checkpoint: maxInternalDate.toString() })
@@ -244,6 +261,11 @@ export class EmailProcessorService {
             if (updateError) {
                 logger.error('Failed to update Gmail checkpoint', updateError);
             }
+        } else {
+            logger.info('Gmail checkpoint not updated (no newer emails found in this batch)', {
+                maxInternalDate,
+                effectiveStartMs
+            });
         }
     }
 
@@ -312,9 +334,14 @@ export class EmailProcessorService {
             }
         }
 
-        // Update checkpoint once at the end of the batch
-        if (latestCheckpoint && latestCheckpoint !== account.last_sync_checkpoint) {
-            logger.debug('Updating Outlook checkpoint at end of batch', { accountId: account.id, checkpoint: latestCheckpoint });
+        // Update checkpoint once at the end of the batch if we made progress
+        if (latestCheckpoint && latestCheckpoint !== effectiveStartIso) {
+            logger.info('Updating Outlook checkpoint', { 
+                accountId: account.id, 
+                oldCheckpoint: account.last_sync_checkpoint,
+                newCheckpoint: latestCheckpoint 
+            });
+            
             const { error: updateError } = await this.supabase
                 .from('email_accounts')
                 .update({ last_sync_checkpoint: latestCheckpoint })
@@ -323,6 +350,11 @@ export class EmailProcessorService {
             if (updateError) {
                 logger.error('Failed to update Outlook checkpoint', updateError);
             }
+        } else {
+            logger.info('Outlook checkpoint not updated (no newer emails found in this batch)', {
+                latestCheckpoint,
+                effectiveStartIso
+            });
         }
     }
 
@@ -416,20 +448,20 @@ export class EmailProcessorService {
             return { date };
         }
 
+        // Log successful ingestion linked to email ID
+        if (eventLogger) await eventLogger.info('Ingested', `Successfully ingested email: ${subject}`, { filePath }, savedEmail.id);
+
         result.processed++;
         
-        // Trigger background processing (async)
-        this.processQueue(account.user_id, settings).catch(err => 
-            logger.error('Background processing trigger failed', err)
-        );
-
         return { date };
     }
 
     /**
-     * Background Worker: Processes pending emails for a user.
+     * Background Worker: Processes pending emails for a user recursively until empty.
      */
     async processQueue(userId: string, settings: any): Promise<void> {
+        logger.info('Worker: Checking queue', { userId });
+
         // Fetch up to 5 pending emails for this user
         const { data: pendingEmails, error } = await this.supabase
             .from('emails')
@@ -438,28 +470,76 @@ export class EmailProcessorService {
             .eq('processing_status', 'pending')
             .limit(5);
 
-        if (error || !pendingEmails || pendingEmails.length === 0) return;
+        if (error) {
+            logger.error('Worker: Failed to fetch queue', error);
+            return;
+        }
+
+        if (!pendingEmails || pendingEmails.length === 0) {
+            logger.info('Worker: Queue empty', { userId });
+            return;
+        }
+
+        logger.info('Worker: Processing batch', { userId, count: pendingEmails.length });
 
         for (const email of pendingEmails) {
-            await this.processPendingEmail(email, settings);
+            await this.processPendingEmail(email, userId, settings);
         }
+
+        // Slight delay to prevent hitting rate limits too fast, then check again
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return this.processQueue(userId, settings);
     }
 
-    private async processPendingEmail(email: Email, settings: any): Promise<void> {
-        const eventLogger = null; // We might want to link this to the original run_id if possible
+    private async processPendingEmail(email: Email, userId: string, settings: any): Promise<void> {
+        // Create a real processing log entry for this background task to ensure RLS compliance
+        const { data: log } = await this.supabase
+            .from('processing_logs')
+            .insert({
+                user_id: userId,
+                account_id: email.account_id,
+                status: 'running',
+            })
+            .select()
+            .single();
+
+        const eventLogger = log ? new EventLogger(this.supabase, log.id) : null;
 
         try {
-            // 1. Mark as processing
+            // 1. Double-check status and mark as processing (Atomic-ish)
+            const { data: current } = await this.supabase
+                .from('emails')
+                .select('processing_status')
+                .eq('id', email.id)
+                .single();
+            
+            if (current?.processing_status !== 'pending') {
+                if (log) await this.supabase.from('processing_logs').delete().eq('id', log.id);
+                return;
+            }
+
             await this.supabase
                 .from('emails')
                 .update({ processing_status: 'processing' })
                 .eq('id', email.id);
 
+            if (eventLogger) await eventLogger.info('Processing', `Background processing: ${email.subject}`, undefined, email.id);
+
             // 2. Read content from disk and parse with mailparser
             if (!email.file_path) throw new Error('No file path found for email');
             const rawMime = await this.storageService.readEmail(email.file_path);
             const parsed = await simpleParser(rawMime);
+            
+            // Extract clean content (prioritize text)
             const cleanContent = parsed.text || parsed.textAsHtml || '';
+
+            // Extract metadata signals from headers
+            const metadata = {
+                importance: parsed.headers.get('importance')?.toString() || parsed.headers.get('x-priority')?.toString(),
+                listUnsubscribe: parsed.headers.get('list-unsubscribe')?.toString(),
+                autoSubmitted: parsed.headers.get('auto-submitted')?.toString(),
+                mailer: parsed.headers.get('x-mailer')?.toString()
+            };
 
             // 3. Analyze with AI
             const intelligenceService = getIntelligenceService(
@@ -476,11 +556,12 @@ export class EmailProcessorService {
                 subject: email.subject || '',
                 sender: email.sender || '',
                 date: email.date || '',
+                metadata,
                 userPreferences: {
                     autoTrashSpam: settings?.auto_trash_spam,
                     smartDrafts: settings?.smart_drafts,
                 },
-            }, undefined, email.id);
+            }, eventLogger || undefined, email.id);
 
             if (!analysis) {
                 throw new Error('AI analysis returned no result');
@@ -510,17 +591,44 @@ export class EmailProcessorService {
             const { data: rules } = await this.supabase
                 .from('rules')
                 .select('*')
-                .eq('user_id', email.email_accounts!.user_id)
+                .eq('user_id', userId)
                 .eq('is_enabled', true);
 
             if (account && rules) {
                 const tempResult = { processed: 0, deleted: 0, drafted: 0, errors: 0 };
-                await this.executeRules(account, { ...email, ...analysis } as any, analysis, rules, settings, tempResult, null);
+                // Ensure email object for rules has the analysis fields merged in
+                const emailForRules = { ...email, ...analysis };
+                await this.executeRules(account, emailForRules as any, analysis, rules, settings, tempResult, eventLogger);
+            }
+
+            // Mark log as success
+            if (log) {
+                await this.supabase
+                    .from('processing_logs')
+                    .update({ 
+                        status: 'success', 
+                        completed_at: new Date().toISOString(),
+                        emails_processed: 1 
+                    })
+                    .eq('id', log.id);
             }
 
         } catch (error) {
             logger.error('Failed to process pending email', error, { emailId: email.id });
+            if (eventLogger) await eventLogger.error('Processing Failed', error, email.id);
             
+            // Mark log as failed
+            if (log) {
+                await this.supabase
+                    .from('processing_logs')
+                    .update({ 
+                        status: 'failed', 
+                        completed_at: new Date().toISOString(),
+                        error_message: error instanceof Error ? error.message : String(error)
+                    })
+                    .eq('id', log.id);
+            }
+
             await this.supabase
                 .from('emails')
                 .update({ 
@@ -636,8 +744,9 @@ export class EmailProcessorService {
                 case 'suggested_actions':
                     // Handle array membership check (e.g. if condition expects "reply" to be in actions)
                     const requiredActions = Array.isArray(value) ? value : [value];
+                    const actualActions = analysis.suggested_actions || [];
                     const hasAllActions = requiredActions.every(req => 
-                        analysis.suggested_actions?.includes(req as any)
+                        actualActions.includes(req as any)
                     );
                     if (!hasAllActions) return false;
                     break;

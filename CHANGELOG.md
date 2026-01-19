@@ -18,6 +18,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.5.5] - 2026-01-18
+
+### Fixed
+- **Sync Overrides**: Fixed issue where `sync_start_date` (Sync From) was ignored if a newer checkpoint existed. The system now correctly prioritizes the manual start date, enabling rewinds.
+- **Checkpoint Persistence**: Improved checkpoint logic to update relative to the *current run's* starting point. This ensures that when you rewind a sync, the checkpoint correctly follows the new forward progress, even if it is behind a previous (stale) checkpoint.
+- **Auto-Cleanup**: Backend now automatically clears the `sync_start_date` override after a successful run to resume normal incremental processing.
+
+## [2.5.4] - 2026-01-18
+
+### Fixed
+- **AI Trace**: Fixed issue where granular trace events were missing for background-processed emails.
+  - Background worker now creates real `processing_logs` entries to satisfy RLS requirements.
+  - Linked the "Ingested" event to the email ID in the database, ensuring the full pipeline (Ingestion -> Analysis -> Action) is visible in the AI Trace modal.
+
+## [2.5.3] - 2026-01-18
+
+### Fixed
+- **Rule Engine**: Fixed TypeScript error in `suggested_actions` matching logic.
+- **Worker Stability**: Added status checks to prevent multiple background workers from processing the same email simultaneously.
+
+## [2.5.2] - 2026-01-18
+
+### Added
+- **Background Processing Visibility**: Background worker now utilizes the `EventLogger`, meaning AI "Thinking" and "Decided" events are once again visible in the Live Terminal in real-time.
+- **Enhanced AI Intelligence**: Extracted technical headers (Importance, List-Unsubscribe, Auto-Submitted) from raw MIME content and passed them as explicit signals to the LLM for better categorization.
+
+### Fixed
+- **ETL Reliability**: Ensured AI analysis prioritized clean text over HTML when parsing raw emails.
+
 ## [2.5.1] - 2026-01-18
 
 ### Fixed
