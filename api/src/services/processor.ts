@@ -185,7 +185,7 @@ export class EmailProcessorService {
             sync_max_emails_per_run: account.sync_max_emails_per_run,
         });
 
-        // Construct query: Use sync_start_date if present (Override), otherwise checkpoint
+        // Construct query: Use a sliding window for efficiency and determinism
         let effectiveStartMs = 0;
         if (account.sync_start_date) {
             effectiveStartMs = new Date(account.sync_start_date).getTime();
@@ -195,38 +195,54 @@ export class EmailProcessorService {
             logger.info('Using last_sync_checkpoint', { effectiveStartMs, date: new Date(effectiveStartMs).toISOString() });
         }
 
-        let query = '';
-        if (effectiveStartMs > 0) {
-            // Subtract 1 second to make query inclusive (Gmail's after: is exclusive)
-            // This ensures we don't miss emails at the exact checkpoint timestamp
-            const startSeconds = Math.floor(effectiveStartMs / 1000) - 1;
-            query = `after:${startSeconds}`;
+        // Use a 7-day sliding window. If empty, skip forward (up to 10 weeks per run)
+        const windowSizeMs = 7 * 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const tomorrowMs = nowMs + (24 * 60 * 60 * 1000);
+        
+        let currentStartMs = effectiveStartMs;
+        let messages: GmailMessage[] = [];
+        let hasMore = false;
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        while (attempts < maxAttempts && currentStartMs < nowMs) {
+            let effectiveEndMs = currentStartMs + windowSizeMs;
+            if (effectiveEndMs > tomorrowMs) effectiveEndMs = tomorrowMs;
+
+            const startSec = Math.floor(currentStartMs / 1000) - 1;
+            const endSec = Math.floor(effectiveEndMs / 1000);
+            const query = `after:${startSec} before:${endSec}`;
+
+            logger.info('Gmail window attempt', { attempt: attempts + 1, query });
+
+            const result = await this.gmailService.fetchMessagesOldestFirst(account, {
+                limit: batchSize,
+                query,
+            });
+
+            if (result.messages.length > 0) {
+                messages = result.messages;
+                hasMore = result.hasMore;
+                break; // Found emails, stop skipping
+            }
+
+            // No emails found in this week, move to next week
+            logger.info('No emails in 7-day window, skipping forward', { start: new Date(currentStartMs).toISOString() });
+            currentStartMs = effectiveEndMs;
+            attempts++;
+            
+            if (eventLogger && attempts % 3 === 0) {
+                await eventLogger.info('Sync', `Scanning history... reached ${new Date(currentStartMs).toLocaleDateString()}`);
+            }
         }
 
-        logger.info('Final Gmail query', { query, effectiveDate: new Date(effectiveStartMs).toISOString() });
-
-        if (eventLogger) await eventLogger.info('Fetching', 'Fetching emails from Gmail (oldest first)', {
-            query,
-            batchSize,
-            sync_start_date: account.sync_start_date,
-            last_sync_checkpoint: account.last_sync_checkpoint,
-            effectiveDate: new Date(effectiveStartMs).toISOString()
-        });
-
-        // Use "Fetch IDs → Reverse → Hydrate" strategy to get OLDEST emails first
-        // Gmail API always returns newest first, so we fetch all IDs and reverse
-        // This prevents skipping emails when using max_emails pagination
-        const { messages, hasMore } = await this.gmailService.fetchMessagesOldestFirst(account, {
-            limit: batchSize,
-            query: query || undefined,
-        });
-
-        if (eventLogger) {
-            await eventLogger.info('Fetching', `Fetched ${messages.length} emails (oldest first)${hasMore ? ', more available' : ''}`);
+        if (eventLogger && messages.length > 0) {
+            await eventLogger.info('Fetching', `Fetched ${messages.length} emails in window${hasMore ? ', more available' : ''}`);
         }
 
-        // Initialize max tracking with effective start time to allow checkpoint to update relative to current run
-        let maxInternalDate = effectiveStartMs;
+        // Initialize max tracking with the point we reached
+        let maxInternalDate = currentStartMs;
 
         for (const message of messages) {
             try {
@@ -260,11 +276,6 @@ export class EmailProcessorService {
             if (updateError) {
                 logger.error('Failed to update Gmail checkpoint', updateError);
             }
-        } else {
-            logger.info('Gmail checkpoint not updated (no newer emails found in this batch)', {
-                maxInternalDate,
-                effectiveStartMs
-            });
         }
     }
 

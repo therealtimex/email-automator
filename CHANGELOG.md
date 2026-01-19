@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.6.1] - 2026-01-18
+
+### Changed
+- **Sync Strategy**: Optimized the sliding window from 30 days to **7 days** for better search performance.
+- **Auto-Skip Loop**: Added logic to automatically skip forward through empty 7-day windows (up to 10 weeks per run). This allows the system to fast-forward through years of inactivity while maintaining high performance and precision.
+
+## [2.6.0] - 2026-01-18
+
+### Added
+- **Sliding Window Sync**: Implemented a **30-day Bounded Sliding Window** for Gmail synchronization. This makes historical syncs (e.g., from 2024) significantly faster and more predictable.
+- **Auto Fast-Forward**: The system now automatically "jumps" the checkpoint forward if a 30-day window contains no emails. This allows the system to skip years of inactive data in just a few seconds without hitting API rate limits.
+
+### Changed
+- **Sync Logic**: Combined `after:` and `before:` operators in Gmail queries to create tight, high-precision search ranges.
+
 ## [2.5.7] - 2026-01-18
 
 ### Fixed
@@ -62,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **ETL Reliability**: Ensured AI analysis prioritized clean text over HTML when parsing raw emails.
+
+## [2.5.9] - 2026-01-18
+
+### Changed
+- **Sync Optimization**: Refined Gmail ID collection cap to 5,000 messages. This ensures snappy performance during historical syncs while still being exhaustive enough to find the "bottom" of search results efficiently.
+- **Sync Reliability**: Added a `before:now` guard to Gmail queries to ignore future-dated emails that could otherwise break chronological sorting and checkpoint tracking.
 
 ## [2.5.1] - 2026-01-18
 

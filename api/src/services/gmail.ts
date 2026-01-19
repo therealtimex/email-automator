@@ -221,7 +221,7 @@ export class GmailService {
         const gmail = await this.getAuthenticatedClient(account);
         const allIds: string[] = [];
         let pageToken: string | undefined;
-        const MAX_IDS = 50000; // Safety cap
+        const MAX_IDS = 5000; // Efficient chunk size for finding the "bottom" of recent emails
 
         do {
             const response = await gmail.users.messages.list({
@@ -237,10 +237,6 @@ export class GmailService {
             }
 
             pageToken = response.data.nextPageToken ?? undefined;
-            
-            if (allIds.length % 5000 === 0) {
-                logger.debug('Collecting IDs...', { count: allIds.length });
-            }
         } while (pageToken && allIds.length < MAX_IDS);
 
         logger.info('Collected matching message IDs', { total: allIds.length, query });
