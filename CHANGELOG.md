@@ -18,6 +18,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.8.0] - 2026-01-19
+
+### Added
+- **Manual Job Retry**: Added ability for users to retry failed email processing jobs.
+  - New "Retry" button on email cards and within the AI Trace modal.
+  - Optimized retry logic that triggers the background worker immediately for instant feedback.
+- **Sound & Haptics Fixes**: 
+  - Audio context is now automatically resumed on first user interaction, ensuring sounds play reliably across all browsers.
+  - Default state for sound effects is now "Enabled" for all users.
+  - Fixed persistence bug where disabled state was not correctly remembered.
+
+### Changed
+- **Default Sorting**: Updated default dashboard sorting to **Processed Time** (`created_at`) descending. This ensures users always see the most recent AI activity at the top.
+- **Improved Card Layout**: 
+  - Enhanced robustness of email cards to handle very long sender names/email addresses without breaking the layout.
+  - Added full truncation with tooltips for sender information.
+
 ## [2.7.0] - 2026-01-19
 
 ### Changed

@@ -245,6 +245,12 @@ class HybridApiClient {
         return this.edgeRequest<{ categories: Record<string, number> }>('/api-v1-emails/summary/categories');
     }
 
+    async retryEmail(emailId: string) {
+        return this.expressRequest<{ success: boolean }>(`/api/emails/${emailId}/retry`, {
+            method: 'POST',
+        });
+    }
+
     // ============================================================================
     // RULES ENDPOINTS (Express API - Local App)
     // ============================================================================

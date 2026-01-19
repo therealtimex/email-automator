@@ -180,6 +180,7 @@ interface AppContextType {
         updateSettings: (settings: Partial<UserSettings>) => Promise<boolean>;
         updateProfile: (updates: { first_name?: string; last_name?: string; avatar_url?: string }) => Promise<boolean>;
         updateAccount: (accountId: string, updates: Partial<EmailAccount>) => Promise<boolean>;
+        retryProcessing: (emailId: string) => Promise<boolean>;
         createRule: (rule: Omit<Rule, 'id' | 'user_id' | 'created_at'>) => Promise<boolean>;
         updateRule: (ruleId: string, updates: Partial<Rule>) => Promise<boolean>;
         deleteRule: (ruleId: string) => Promise<boolean>;
@@ -418,6 +419,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 return true;
             }
             dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update account') });
+            return false;
+        },
+
+        retryProcessing: async (emailId: string) => {
+            const response = await api.retryEmail(emailId);
+            if (response.data?.success) {
+                // Update local state to show as pending
+                const email = state.emails.find(e => e.id === emailId);
+                if (email) {
+                    dispatch({
+                        type: 'UPDATE_EMAIL',
+                        payload: { 
+                            ...email, 
+                            processing_status: 'pending',
+                            processing_error: null 
+                        }
+                    });
+                }
+                return true;
+            }
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Retry failed') });
             return false;
         },
 

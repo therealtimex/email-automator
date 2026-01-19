@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { apiRateLimit } from '../middleware/rateLimit.js';
 import { createLogger } from '../utils/logger.js';
 import { getStorageService } from '../services/storage.js';
+import { EmailProcessorService } from '../services/processor.js';
 
 const router = Router();
 const logger = createLogger('EmailsRoutes');
@@ -158,6 +159,60 @@ router.delete('/:emailId',
         if (error) throw error;
 
         logger.info('Email record deleted', { emailId, userId: req.user!.id });
+
+        res.json({ success: true });
+    })
+);
+
+// Retry failed email processing
+router.post('/:emailId/retry',
+    apiRateLimit,
+    authMiddleware,
+    asyncHandler(async (req, res) => {
+        const { emailId } = req.params;
+
+        // Verify ownership and status
+        const { data: email, error } = await req.supabase!
+            .from('emails')
+            .select('id, processing_status, email_accounts!inner(user_id)')
+            .eq('id', emailId)
+            .eq('email_accounts.user_id', req.user!.id)
+            .single();
+
+        if (error || !email) {
+            throw new NotFoundError('Email');
+        }
+
+        if (email.processing_status !== 'failed' && email.processing_status !== 'pending') {
+            return res.status(400).json({ error: 'Only failed or pending emails can be retried' });
+        }
+
+        // Reset status to pending
+        const { error: updateError } = await req.supabase!
+            .from('emails')
+            .update({ 
+                processing_status: 'pending',
+                processing_error: null 
+            })
+            .eq('id', emailId);
+
+        if (updateError) throw updateError;
+
+        logger.info('Email processing retried', { emailId, userId: req.user!.id });
+
+        // Trigger background worker (async) to process the queue immediately
+        const processor = new EmailProcessorService(req.supabase!);
+        
+        // Fetch user settings for worker config
+        const { data: settings } = await req.supabase!
+            .from('user_settings')
+            .select('*')
+            .eq('user_id', req.user!.id)
+            .single();
+
+        processor.processQueue(req.user!.id, settings).catch(err => 
+            logger.error('Manual retry worker failed', err)
+        );
 
         res.json({ success: true });
     })

@@ -22,11 +22,13 @@ import {
 export function AITraceModal({ 
     email, 
     isOpen, 
-    onOpenChange 
+    onOpenChange,
+    onRetry
 }: { 
     email: Email | null, 
     isOpen: boolean, 
-    onOpenChange: (open: boolean) => void 
+    onOpenChange: (open: boolean) => void,
+    onRetry?: (email: Email) => void
 }) {
     const [events, setEvents] = useState<ProcessingEvent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -64,14 +66,30 @@ export function AITraceModal({
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 border-b">
-                    <div className="flex items-center gap-2">
-                        <Cpu className="w-5 h-5 text-primary" />
-                        <DialogTitle>AI Processing Trace</DialogTitle>
+                <DialogHeader className="p-6 border-b flex flex-row items-center justify-between">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <Cpu className="w-5 h-5 text-primary" />
+                            <DialogTitle>AI Processing Trace</DialogTitle>
+                        </div>
+                        <DialogDescription>
+                            Step-by-step log of how the AI analyzed and acted on this email.
+                        </DialogDescription>
                     </div>
-                    <DialogDescription>
-                        Step-by-step log of how the AI analyzed and acted on this email.
-                    </DialogDescription>
+                    {email?.processing_status === 'failed' && onRetry && (
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => {
+                                onRetry(email);
+                                onOpenChange(false);
+                            }}
+                            className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10"
+                        >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Retry Job
+                        </Button>
+                    )}
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-secondary/5">
@@ -372,6 +390,13 @@ export function Dashboard() {
         setIsTraceOpen(true);
     };
 
+    const handleRetry = async (email: Email) => {
+        const success = await actions.retryProcessing(email.id);
+        if (success) {
+            toast.success('Retrying email processing...');
+        }
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
             {/* Main Content */}
@@ -514,6 +539,7 @@ export function Dashboard() {
                                 key={email.id}
                                 email={email}
                                 onAction={handleAction}
+                                onRetry={handleRetry}
                                 onViewTrace={handleViewTrace}
                                 onSelect={() => setSelectedEmail(email)}
                                 isSelected={selectedEmail?.id === email.id}
@@ -527,6 +553,7 @@ export function Dashboard() {
                             isOpen={isTraceOpen} 
                             onOpenChange={setIsTraceOpen} 
                             email={traceEmail} 
+                            onRetry={handleRetry}
                         />
 
                         {/* Pagination */}
@@ -847,6 +874,7 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, 
 interface EmailCardProps {
     email: Email;
     onAction: (email: Email, action: string) => void;
+    onRetry: (email: Email) => void;
     onViewTrace: (email: Email) => void;
     onSelect: () => void;
     isSelected: boolean;
@@ -855,7 +883,7 @@ interface EmailCardProps {
     onCancelDelete?: () => void;
 }
 
-function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
+function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
     if (!email) return null;
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
     const isLoading = !!loadingAction;
@@ -882,19 +910,21 @@ function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loading
             onClick={onSelect}
         >
             <div className="p-5">
-                <div className="flex justify-between items-start mb-3">
-                    <div className="flex gap-3">
+                <div className="flex justify-between items-start mb-3 gap-4">
+                    <div className="flex gap-3 flex-1 min-w-0">
                         <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs",
+                            "w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white text-xs",
                             email.category === 'spam' ? 'bg-destructive' : 'bg-primary'
                         )}>
                             {email.sender?.[0]?.toUpperCase() || '?'}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                             <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
                                 {email.subject || 'No Subject'}
                             </h3>
-                            <p className="text-xs text-muted-foreground truncate">{email.sender}</p>
+                            <p className="text-xs text-muted-foreground truncate" title={email.sender || ''}>
+                                {email.sender}
+                            </p>
                         </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -918,9 +948,20 @@ function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loading
                                 </span>
                             )}
                             {email.processing_status === 'failed' && (
-                                <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1" title={email.processing_error || 'Unknown error'}>
-                                    <AlertCircle className="w-2.5 h-2.5" /> Failed
-                                </span>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1" title={email.processing_error || 'Unknown error'}>
+                                        <AlertCircle className="w-2.5 h-2.5" /> Failed
+                                    </span>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-5 w-5 text-red-600 hover:bg-red-500/10" 
+                                        onClick={(e) => { e.stopPropagation(); onRetry(email); }}
+                                        title="Retry Processing"
+                                    >
+                                        <RefreshCw className="w-2.5 h-2.5" />
+                                    </Button>
+                                </div>
                             )}
                             {!email.processing_status && !email.ai_analysis && (
                                 <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded flex items-center gap-1">
