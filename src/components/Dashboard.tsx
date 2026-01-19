@@ -386,14 +386,14 @@ export function Dashboard() {
                         <Button
                             onClick={handleSync}
                             size="sm"
-                            variant="outline"
-                            className="shadow-sm"
+                            variant="default"
+                            className="h-9 shadow-md px-4"
                             disabled={isSyncing}
                         >
                             <RefreshCw className={cn("w-3.5 h-3.5 mr-2", isSyncing && "animate-spin")} />
                             {isSyncing ? 'Syncing...' : 'Sync Now'}
                         </Button>
-                        <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-1 rounded-md border border-border flex items-center">
+                        <span className="h-9 text-xs font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-md border border-border flex items-center">
                             {state.emailsTotal} emails
                         </span>
                     </div>
@@ -933,12 +933,13 @@ function EmailCard({ email, onAction, onViewTrace, onSelect, isSelected, loading
                                 </span>
                             )}
                         </div>
-                        <div className="flex flex-col items-end text-[10px] text-muted-foreground/80 leading-tight">
-                            <span title={email.date ? new Date(email.date).toLocaleString() : ''}>
-                                <span className="opacity-70">Rec:</span> {email.date ? new Date(email.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                        <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground/80 leading-tight">
+                            <span title={email.date ? new Date(email.date).toLocaleString() : ''} className="whitespace-nowrap">
+                                <span className="opacity-70 text-[9px]">REC:</span> {email.date ? new Date(email.date).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
                             </span>
-                            <span title={new Date(email.created_at).toLocaleString()}>
-                                <span className="opacity-70">Proc:</span> {new Date(email.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            <span className="opacity-30">•</span>
+                            <span title={new Date(email.created_at).toLocaleString()} className="whitespace-nowrap">
+                                <span className="opacity-70 text-[9px]">PROC:</span> {new Date(email.created_at).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
                     </div>

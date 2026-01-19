@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.7.0] - 2026-01-19
+
+### Changed
+- **Header Consistency**: Normalized the height of all top bar elements (Logo, Navigation, ModeToggle, Account, and Logout buttons) to **32px** (`h-8`) for a perfectly aligned horizontal axis.
+- **Enhanced LIVE Indicator**: Upgraded the system status badge with a dynamic **radar ripple effect** (using `animate-ping`). Refined its height to **24px** (`h-6`) and increased the dot size for better visual balance and "badge-like" appearance.
+- **Dashboard UI Standardization**: Standardized the heights of the Search Input, Search Button, and Sort Controls to **36px** (`h-9`), ensuring they align perfectly in the "Recent Analysis" header.
+- **Explicit Sort Order**: Replaced the generic rotating sort icon with state-aware **ArrowUp** and **ArrowDown** icons, providing immediate visual feedback on the current sort direction.
+- **Compact Metadata Row**: Optimized the email cards to display "REC" (Received) and "PROC" (Processed) timestamps on a **single line** with a bullet separator, including full year formatting for better clarity.
+- **Primary CTA Polish**: Promoted "Sync Now" to a **Primary Button** (default variant) with increased visual weight and shadow to better guide the user toward the core application action.
+
 ## [2.6.6] - 2026-01-18
 
 ### Added
