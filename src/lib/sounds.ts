@@ -95,6 +95,31 @@ class SoundManager {
     }
 
     /**
+     * Soft rising tone for starting a process
+     */
+    playStart() {
+        if (!this.enabled) return;
+        const ctx = this.initCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2); // A5
+
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+        this.haptic(10);
+    }
+
+    /**
      * Soft success sound for completed actions
      */
     playSuccess() {

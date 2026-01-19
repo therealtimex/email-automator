@@ -103,13 +103,22 @@ export class EmailProcessorService {
             // After processing new emails, run retention rules for this account
             await this.runRetentionRules(refreshedAccount, rules || [], settings, result, eventLogger);
 
-            // Trigger background worker (async) to process the queue
-            this.processQueue(userId, settings).catch(err =>
+            // Wait for background worker to process the queue (ensure sync is fully complete before event)
+            await this.processQueue(userId, settings).catch(err =>
                 logger.error('Background worker failed', err)
             );
 
             // Update log and account on success
             if (log) {
+                if (eventLogger) {
+                    await eventLogger.success('Finished', 'Sync run completed', {
+                        total_processed: result.processed,
+                        deleted: result.deleted,
+                        drafted: result.drafted,
+                        errors: result.errors
+                    });
+                }
+
                 await this.supabase
                     .from('processing_logs')
                     .update({

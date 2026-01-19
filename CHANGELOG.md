@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.8.2] - 2026-01-19
+
+### Added
+- **Batch Completion Events**: Added a "Batch Sync Finished" summary event to the Agent Live Terminal and Sync Trace. This provides a clear overview of processed items, actions taken, and errors.
+- **Sync Start Sound**: Added a soft rising tone sound effect when manually starting a sync, providing immediate confirmation of the action.
+
+### Fixed
+- **Sync Scope UX**: Refactored "Sync From" and "Max Emails" inputs to use local state and save on `Blur`. This prevents aggressive database updates and input blocking while typing.
+- **Accurate Feedback**: Fixed a logic flaw where completion events were emitted before AI processing was actually finished. The system now correctly waits for analysis to complete before signaling success.
+
 ## [2.8.1] - 2026-01-19
 
 ### Added

@@ -11,7 +11,8 @@ import {
     Minimize2,
     ChevronDown,
     ChevronUp,
-    Code
+    Code,
+    CheckCircle
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
@@ -76,8 +77,10 @@ export function LiveTerminal() {
         setExpandedEvents(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const getIcon = (type: string) => {
-        switch (type) {
+    const getIcon = (event: ProcessingEvent) => {
+        if (event.details?.is_completion) return <CheckCircle className="w-3 h-3 text-emerald-500" />;
+        
+        switch (event.event_type) {
             case 'analysis': return <Brain className="w-3 h-3 text-purple-500" />;
             case 'action': return <Zap className="w-3 h-3 text-emerald-500" />;
             case 'error': return <AlertTriangle className="w-3 h-3 text-red-500" />;
@@ -158,9 +161,10 @@ export function LiveTerminal() {
                             "absolute left-0 top-0 w-7 h-7 rounded-full border border-border bg-card flex items-center justify-center z-10 shadow-sm",
                             event.event_type === 'error' && "border-red-500/50 bg-red-500/5",
                             event.event_type === 'analysis' && "border-purple-500/50 bg-purple-500/5",
-                            event.event_type === 'action' && "border-emerald-500/50 bg-emerald-500/5"
+                            event.event_type === 'action' && "border-emerald-500/50 bg-emerald-500/5",
+                            event.details?.is_completion && "border-emerald-500/50 bg-emerald-500/5"
                         )}>
-                            {getIcon(event.event_type)}
+                            {getIcon(event)}
                         </div>
 
                         <div className="flex flex-col gap-1.5">
@@ -246,6 +250,28 @@ export function LiveTerminal() {
                                     {typeof event.details.error === 'object' 
                                         ? (event.details.error.message || JSON.stringify(event.details.error)) 
                                         : event.details.error}
+                                </div>
+                            ) : event.details?.is_completion ? (
+                                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold uppercase text-[9px] tracking-[0.2em]">
+                                        <CheckCircle className="w-3.5 h-3.5" />
+                                        Batch Sync Finished
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 pt-1">
+                                        <div className="space-y-0.5">
+                                            <p className="text-[10px] text-muted-foreground uppercase">Processed</p>
+                                            <p className="text-sm font-bold">{event.details.total_processed || 0}</p>
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <p className="text-[10px] text-muted-foreground uppercase">Actions</p>
+                                            <p className="text-sm font-bold text-emerald-500">{(event.details.deleted || 0) + (event.details.drafted || 0)}</p>
+                                        </div>
+                                    </div>
+                                    {event.details.errors > 0 && (
+                                        <p className="text-[10px] text-red-500 font-bold pt-1 border-t border-emerald-500/10">
+                                            ⚠️ {event.details.errors} items failed to process.
+                                        </p>
+                                    )}
                                 </div>
                             ) : (
                                 <p className="text-muted-foreground leading-relaxed">

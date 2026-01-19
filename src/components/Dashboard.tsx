@@ -326,6 +326,7 @@ export function Dashboard() {
             toast.warning('Please connect an email account first');
             return;
         }
+        sounds.playStart();
         openTerminal();
         setIsSyncing(true);
         const success = await actions.triggerSync();
