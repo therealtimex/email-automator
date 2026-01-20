@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.1] - 2026-01-20
+
+### Fixed
+- **Workflow Trigger**: Force-pushed version bump to re-trigger GitHub Actions release workflow.
+
 ## [2.10.0] - 2026-01-20
 
 ### Added
