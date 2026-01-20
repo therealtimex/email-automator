@@ -689,8 +689,8 @@ export class EmailProcessorService {
                 for (const action of analysis.actions_to_execute) {
                     if (action === 'none') continue;
 
-                    // Use AI-generated draft content if available
-                    const draftContent = action === 'draft' ? analysis.draft_content : undefined;
+                    // Use AI-generated draft content if available (handle null from AI)
+                    const draftContent = action === 'draft' ? (analysis.draft_content || undefined) : undefined;
 
                     await this.executeAction(
                         account,
