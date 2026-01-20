@@ -11,6 +11,9 @@ const GRAPH_SCOPES = [
     'https://graph.microsoft.com/Mail.Read',
     'https://graph.microsoft.com/Mail.ReadWrite',
     'https://graph.microsoft.com/User.Read',
+    'offline_access',
+    'openid',
+    'profile',
 ];
 
 export interface OutlookMessage {
@@ -97,6 +100,9 @@ export class MicrosoftService {
         emailAddress: string,
         authResult: msal.AuthenticationResult
     ): Promise<EmailAccount> {
+        // MSAL Node doesn't expose refresh_token directly in AuthenticationResult
+        // but it is available if you use a cache plugin or direct refresh token request.
+        // For now, we'll store what we have.
         const { data, error } = await supabase
             .from('email_accounts')
             .upsert({
@@ -104,7 +110,7 @@ export class MicrosoftService {
                 email_address: emailAddress,
                 provider: 'outlook',
                 access_token: authResult.accessToken,
-                refresh_token: null, // MSAL handles token cache internally
+                refresh_token: (authResult as any).refreshToken || null,
                 token_expires_at: authResult.expiresOn?.toISOString() || null,
                 scopes: authResult.scopes,
                 is_active: true,
@@ -115,6 +121,23 @@ export class MicrosoftService {
 
         if (error) throw error;
         return data;
+    }
+
+    async getProviderCredentials(supabase: SupabaseClient, userId: string): Promise<{ clientId: string; clientSecret?: string; tenantId: string }> {
+        const { data: integration } = await supabase
+            .from('integrations')
+            .select('credentials')
+            .eq('user_id', userId)
+            .eq('provider', 'microsoft')
+            .single();
+
+        const creds = integration?.credentials as any;
+
+        return {
+            clientId: creds?.client_id || config.microsoft.clientId,
+            clientSecret: creds?.client_secret || config.microsoft.clientSecret,
+            tenantId: creds?.tenant_id || config.microsoft.tenantId || 'common'
+        };
     }
 
     async refreshTokenIfNeeded(
@@ -133,14 +156,51 @@ export class MicrosoftService {
 
         logger.info('Refreshing Microsoft token', { accountId: account.id });
 
-        // For Microsoft, we need the CCA with client secret for refresh
-        if (!this.cca) {
-            throw new Error('Microsoft client secret not configured for token refresh');
+        const refreshToken = account.refresh_token;
+        
+        // If we have a refresh token stored, we can try to use the CCA
+        if (refreshToken) {
+            try {
+                const creds = await this.getProviderCredentials(supabase, account.user_id);
+                if (creds.clientSecret) {
+                    const confidentialConfig: msal.Configuration = {
+                        auth: {
+                            clientId: creds.clientId,
+                            authority: `https://login.microsoftonline.com/${creds.tenantId}`,
+                            clientSecret: creds.clientSecret,
+                        },
+                    };
+                    const cca = new msal.ConfidentialClientApplication(confidentialConfig);
+                    const result = await cca.acquireTokenByRefreshToken({
+                        refreshToken,
+                        scopes: GRAPH_SCOPES,
+                    });
+
+                    if (result) {
+                        const { data, error } = await supabase
+                            .from('email_accounts')
+                            .update({
+                                access_token: result.accessToken,
+                                refresh_token: (result as any).refreshToken || refreshToken, // Keep old if new not provided
+                                token_expires_at: result.expiresOn?.toISOString() || null,
+                                updated_at: new Date().toISOString(),
+                            })
+                            .eq('id', account.id)
+                            .select()
+                            .single();
+
+                        if (error) throw error;
+                        return data;
+                    }
+                }
+            } catch (err) {
+                logger.warn('Confidential refresh failed, attempting public refresh...', { error: err });
+            }
         }
 
-        // In production, you'd use refresh tokens stored in a token cache
-        // This is a simplified implementation
-        throw new Error('Microsoft token refresh requires re-authentication');
+        // Fallback or if no refresh token: we can't refresh automatically without a persistent cache
+        // Modern MSAL usually requires a TokenCache implementation for this
+        throw new Error('Outlook session expired. Please reconnect your account in Settings.');
     }
 
     async fetchMessages(

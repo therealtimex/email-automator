@@ -57,12 +57,17 @@ class HybridApiClient {
             ...(options.headers || {}),
         };
 
-        // Fallback: try to get token from supabaseClient if missing
-        if (auth && !this.token && this.supabaseClient) {
-            const { data: { session } } = await this.supabaseClient.auth.getSession();
-            if (session?.access_token) {
-                this.token = session.access_token;
-                console.debug('[HybridApiClient] Recovered token from session');
+        // Always get the latest token from Supabase session if auth is required
+        if (auth && this.supabaseClient) {
+            try {
+                const { data: { session }, error } = await this.supabaseClient.auth.getSession();
+                if (error) {
+                    console.error('[HybridApiClient] Failed to get Supabase session:', error);
+                } else if (session?.access_token) {
+                    this.token = session.access_token;
+                }
+            } catch (err) {
+                console.error('[HybridApiClient] Session recovery error:', err);
             }
         }
 

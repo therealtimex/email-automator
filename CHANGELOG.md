@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.7] - 2026-01-20
+
+### Fixed
+- **Token Management**: Resolved "Invalid or expired token" errors by ensuring the Supabase session is automatically refreshed before making backend API calls.
+- **Outlook Sync Reliability**: Implemented background token refreshing for Microsoft accounts. Previously, Outlook sync would fail after the initial access token expired.
+- **Improved Scopes**: Added `offline_access` to Microsoft authentication to ensure long-lived synchronization is possible.
+- **Better Error Reporting**: Account sync now provides clearer, provider-specific error messages (e.g., "Gmail Sync Error" vs "Outlook Sync Error") to aid in troubleshooting.
+
 ## [2.10.6] - 2026-01-20
 
 ### Fixed

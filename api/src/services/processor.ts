@@ -66,6 +66,8 @@ export class EmailProcessorService {
             let refreshedAccount = account;
             if (account.provider === 'gmail') {
                 refreshedAccount = await this.gmailService.refreshTokenIfNeeded(this.supabase, account);
+            } else if (account.provider === 'outlook') {
+                refreshedAccount = await this.microsoftService.refreshTokenIfNeeded(this.supabase, account);
             }
 
             // Update status to syncing
@@ -95,10 +97,15 @@ export class EmailProcessorService {
             if (eventLogger) await eventLogger.info('Running', 'Starting sync process');
 
             // Process based on provider
-            if (refreshedAccount.provider === 'gmail') {
-                await this.processGmailAccount(refreshedAccount, rules || [], settings, result, eventLogger);
-            } else if (refreshedAccount.provider === 'outlook') {
-                await this.processOutlookAccount(refreshedAccount, rules || [], settings, result, eventLogger);
+            try {
+                if (refreshedAccount.provider === 'gmail') {
+                    await this.processGmailAccount(refreshedAccount, rules || [], settings, result, eventLogger);
+                } else if (refreshedAccount.provider === 'outlook') {
+                    await this.processOutlookAccount(refreshedAccount, rules || [], settings, result, eventLogger);
+                }
+            } catch (providerError) {
+                const providerName = refreshedAccount.provider === 'gmail' ? 'Gmail' : 'Outlook';
+                throw new Error(`${providerName} Sync Error: ${providerError instanceof Error ? providerError.message : String(providerError)}`);
             }
 
             // After processing new emails, run retention rules for this account
