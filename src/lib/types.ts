@@ -98,6 +98,7 @@ export interface UserSettings {
     auto_trash_spam?: boolean;
     smart_drafts?: boolean;
     storage_path?: string | null;
+    intelligent_rename?: boolean;
     sync_interval_minutes: number;
     preferences?: Record<string, any>;
 }

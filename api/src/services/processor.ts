@@ -6,6 +6,7 @@ import { getGmailService, GmailMessage } from './gmail.js';
 import { getMicrosoftService, OutlookMessage } from './microsoft.js';
 import { getIntelligenceService, EmailAnalysis, ContextAwareAnalysis, RuleContext } from './intelligence.js';
 import { getStorageService } from './storage.js';
+import { generateEmailFilename } from '../utils/filename.js';
 import { EmailAccount, Email, Rule, ProcessingLog } from './supabase.js';
 import { EventLogger } from './eventLogger.js';
 
@@ -434,7 +435,12 @@ export class EmailProcessorService {
         // 2. Save raw content to local storage (.eml format)
         let filePath = '';
         try {
-            const filename = `${account.id}_${message.id}.eml`.replace(/[^a-z0-9._-]/gi, '_');
+            const filename = generateEmailFilename({
+                subject,
+                date: parsed.date || new Date(),
+                externalId: message.id,
+                intelligentRename: settings?.intelligent_rename || config.intelligentRename
+            });
             filePath = await this.storageService.saveEmail(rawMime, filename, settings?.storage_path);
         } catch (storageError) {
             logger.error('Failed to save raw email content', storageError);

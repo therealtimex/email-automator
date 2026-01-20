@@ -1394,6 +1394,23 @@ export function Configuration() {
                         </p>
                     </div>
 
+                    <div className="flex justify-between items-center py-3 border-t border-border/50">
+                        <div>
+                            <h4 className="font-medium text-sm">Intelligent Rename</h4>
+                            <p className="text-xs text-muted-foreground">
+                                Use slugified-hyphenated filenames (e.g. 20240119-1430-subject-id.eml)
+                            </p>
+                        </div>
+                        <Button
+                            variant={localSettings.intelligent_rename ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLocalSettings(s => ({ ...s, intelligent_rename: !s.intelligent_rename }))}
+                        >
+                            <Power className="w-4 h-4 mr-1" />
+                            {localSettings.intelligent_rename ? 'On' : 'Off'}
+                        </Button>
+                    </div>
+
                     <div className="space-y-2 pt-2 border-t border-border/50">
                         <label className="text-sm font-medium flex items-center gap-2">
                             <Clock className="w-4 h-4" />

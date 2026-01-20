@@ -39,7 +39,7 @@ function loadEnvironment() {
 
 loadEnvironment();
 
-function parseArgs(args: string[]): { port: number | null, noUi: boolean } {
+function parseArgs(args: string[]): { port: number | null, noUi: boolean, rename: boolean } {
     const portIndex = args.indexOf('--port');
     let port = null;
     if (portIndex !== -1 && args[portIndex + 1]) {
@@ -50,8 +50,9 @@ function parseArgs(args: string[]): { port: number | null, noUi: boolean } {
     }
     
     const noUi = args.includes('--no-ui');
+    const rename = args.includes('--rename');
     
-    return { port, noUi };
+    return { port, noUi, rename };
 }
 
 const cliArgs = parseArgs(process.argv.slice(2));
@@ -62,6 +63,7 @@ export const config = {
     // Default port 3004 (RealTimeX Desktop uses 3001/3002)
     port: cliArgs.port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3004),
     noUi: cliArgs.noUi,
+    intelligentRename: cliArgs.rename || process.env.INTELLIGENT_RENAME === 'true',
     nodeEnv: process.env.NODE_ENV || 'development',
     isProduction: process.env.NODE_ENV === 'production',
 

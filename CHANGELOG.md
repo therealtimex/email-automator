@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.0] - 2026-01-19
+
+### Added
+- **Standardized Email Naming**: Implemented a new, human-readable naming convention for archived `.eml` files.
+  - Default: `YYYYMMDD_HHMM_[Sanitized_Subject]_[ID].eml`
+  - Ensures files are chronologically sortable and easily identifiable in file explorers.
+- **Intelligent Rename**: Added a new toggle in Configuration (and `--rename` CLI flag) to use a web-friendly slugified naming format (`YYYYMMDD-HHMM-slugified-subject-id.eml`).
+- **Resilient Archiving**: Updated the ingestion pipeline to automatically sanitize subjects, stripping illegal filesystem characters and non-printable control characters.
+
 ## [2.8.5] - 2026-01-19
 
 ### Fixed
