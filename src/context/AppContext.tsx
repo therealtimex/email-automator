@@ -256,18 +256,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 return response.data.email;
             }
             if (attempt < retries) {
-                console.debug(`[Realtime] Hydration attempt ${attempt} failed for ${emailId}, retrying in ${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
-        console.warn(`[Realtime] Failed to hydrate email ${emailId} after ${retries} attempts`);
         return null;
     }, []);
 
     // Realtime subscription logic
     const handleRealtimeInsert = useCallback(async (payload: Email) => {
-        console.debug('[Realtime] INSERT event received:', payload.id, payload.subject);
-
         // Hydrate: Fetch full email with joined account data (with retry for replication lag)
         const email = await fetchEmailWithRetry(payload.id);
         if (email) {
@@ -287,8 +283,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, [dispatch, fetchEmailWithRetry]);
 
     const handleRealtimeUpdate = useCallback(async (payload: Email) => {
-        console.debug('[Realtime] UPDATE event received:', payload.id, 'status:', payload.processing_status);
-
         // Hydrate: Fetch full email with joined account data
         const email = await fetchEmailWithRetry(payload.id);
         if (email) {
@@ -296,7 +290,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             // Play feedback when email completes processing (transition to completed)
             if (email.processing_status === 'completed' && payload.processing_status === 'completed') {
-                // Check if this was a fresh completion (ai_analysis exists)
                 if (email.ai_analysis?.priority === 'High') {
                     sounds.playAlert();
                     toast.success('High Priority Email Processed!');
@@ -309,7 +302,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, [dispatch, fetchEmailWithRetry]);
 
     const handleRealtimeDelete = useCallback((emailId: string) => {
-        console.debug('[Realtime] DELETE event received:', emailId);
         dispatch({ type: 'REMOVE_EMAIL', payload: emailId });
     }, [dispatch]);
 
