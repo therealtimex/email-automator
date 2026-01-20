@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.8.4] - 2026-01-19
+
+### Changed
+- **Production Logging**: Removed verbose debug and warning console logs from the real-time processing and hydration logic to ensure a cleaner browser console in production.
+- **Improved Hydration**: Stabilized the real-time email hydration mechanism with more resilient retry logic for handling database replication lag.
+
 ## [2.8.3] - 2026-01-19
 
 ### Fixed
