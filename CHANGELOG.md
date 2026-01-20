@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.5] - 2026-01-20
+
+### Added
+- **Database Version Display**: Added the current database schema version (timestamp) to the Supabase tab in Account Settings, providing better visibility into the backend state.
+
 ## [2.10.4] - 2026-01-20
 
 ### Fixed

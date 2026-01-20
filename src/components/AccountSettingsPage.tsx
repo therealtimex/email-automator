@@ -12,6 +12,7 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { getSupabaseConfig, clearSupabaseConfig, getConfigSource } from '../lib/supabase-config';
 import { SetupWizard } from './SetupWizard';
 import { sounds } from '../lib/sounds';
+import { checkMigrationStatus, type MigrationStatus } from '../lib/migration-check';
 
 type SettingsTab = 'profile' | 'security' | 'database';
 
@@ -314,8 +315,15 @@ function SecuritySection() {
 
 function DatabaseSection() {
     const [showWizard, setShowWizard] = useState(false);
+    const [migrationInfo, setMigrationInfo] = useState<MigrationStatus | null>(null);
     const config = getSupabaseConfig();
     const source = getConfigSource();
+
+    useEffect(() => {
+        if (config) {
+            checkMigrationStatus(supabase).then(setMigrationInfo);
+        }
+    }, []);
 
     const handleClearConfig = () => {
         if (confirm('Are you sure you want to disconnect from this Supabase project? This will log you out and clear local configuration.')) {
@@ -341,7 +349,14 @@ function DatabaseSection() {
                             <div className="flex items-start gap-4 p-4 border rounded-xl bg-emerald-500/5 border-emerald-500/20">
                                 <CheckCircle className="w-6 h-6 text-emerald-500 mt-0.5" />
                                 <div className="flex-1 space-y-1">
-                                    <p className="font-semibold text-emerald-700 dark:text-emerald-400">Connected</p>
+                                    <div className="flex items-center justify-between">
+                                        <p className="font-semibold text-emerald-700 dark:text-emerald-400">Connected</p>
+                                        {migrationInfo?.dbVersion && (
+                                            <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                                DB v{migrationInfo.dbVersion}
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-sm font-mono break-all opacity-80">{config.url}</p>
                                 </div>
                             </div>
