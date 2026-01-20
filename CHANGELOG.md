@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.7] - 2026-01-19
+
+### Fixed
+- **Background Sync Stability**: Implemented a keep-alive ping mechanism between the frontend and backend. This prevents the server from being suspended or throttled during idle periods, ensuring background sync continues reliably.
+- **Supabase Resilience**: Enhanced the server-side Supabase client with better re-initialization logic to handle configuration changes or stale connections.
+
 ## [2.9.6] - 2026-01-19
 
 ### Added

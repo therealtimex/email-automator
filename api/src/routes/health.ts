@@ -1,8 +1,20 @@
 import { Router } from 'express';
 import { getServerSupabase } from '../services/supabase.js';
 import { config } from '../config/index.js';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 const router = Router();
+
+// Read version from package.json
+let version = '1.0.0';
+try {
+    const pkgPath = join(config.packageRoot, 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    version = pkg.version;
+} catch (e) {
+    console.error('Failed to read version from package.json', e);
+}
 
 router.get('/', async (_req, res) => {
     const supabase = getServerSupabase();
@@ -22,7 +34,7 @@ router.get('/', async (_req, res) => {
     res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        version: '1.0.0',
+        version,
         environment: config.nodeEnv,
         services: {
             database: dbStatus,

@@ -5,6 +5,7 @@ import { createLogger } from '../utils/logger.js';
 const logger = createLogger('SupabaseService');
 
 let serverClient: SupabaseClient | null = null;
+let lastConfigHash = '';
 
 export function isValidUrl(url: string): boolean {
     try {
@@ -14,16 +15,22 @@ export function isValidUrl(url: string): boolean {
     }
 }
 
-export function getServerSupabase(): SupabaseClient | null {
-    if (serverClient) return serverClient;
+function getConfigHash() {
+    return `${config.supabase.url}_${config.supabase.anonKey}`;
+}
+
+export function getServerSupabase(forceRefresh = false): SupabaseClient | null {
+    const currentHash = getConfigHash();
+    
+    if (serverClient && !forceRefresh && currentHash === lastConfigHash) {
+        return serverClient;
+    }
 
     const url = config.supabase.url;
     const key = config.supabase.anonKey;
 
     if (!url || !key || !isValidUrl(url)) {
-        logger.warn('Supabase not configured or invalid URL - skipping client initialization', {
-            url: url || 'missing'
-        });
+        logger.warn('Supabase not configured or invalid URL - skipping client initialization');
         return null;
     }
 
@@ -35,7 +42,8 @@ export function getServerSupabase(): SupabaseClient | null {
             },
         });
 
-        logger.info('Server Supabase client initialized');
+        lastConfigHash = currentHash;
+        logger.info('Server Supabase client initialized/refreshed');
         return serverClient;
     } catch (error) {
         logger.error('Failed to initialize Supabase client', error);

@@ -195,6 +195,24 @@ function AppContent() {
         toast.success('Logged out successfully');
     };
 
+    // Keep-alive ping to backend
+    useEffect(() => {
+        const ping = async () => {
+            try {
+                await api.healthCheck();
+            } catch (e) {
+                console.warn('[App] Keep-alive ping failed');
+            }
+        };
+        
+        // Initial ping
+        ping();
+        
+        // Repeat every 30 seconds
+        const interval = setInterval(ping, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <MigrationProvider value={migrationContextValue}>
             <div className="min-h-screen bg-background font-sans text-foreground transition-colors duration-300">
