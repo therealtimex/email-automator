@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.8] - 2026-01-20
+
+### Fixed
+- **Sync Metrics Accuracy**: Fixed a bug where automated actions (deletes, drafts) taken by the background AI processor were not being included in the final sync summary. The "Batch Sync Finished" report now accurately reflects all work completed by the agent.
+
 ## [2.10.7] - 2026-01-20
 
 ### Fixed

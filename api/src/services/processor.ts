@@ -112,7 +112,7 @@ export class EmailProcessorService {
             await this.runRetentionRules(refreshedAccount, rules || [], settings, result, eventLogger);
 
             // Wait for background worker to process the queue (ensure sync is fully complete before event)
-            await this.processQueue(userId, settings).catch(err =>
+            await this.processQueue(userId, settings, result).catch(err =>
                 logger.error('Background worker failed', err)
             );
 
@@ -491,7 +491,7 @@ export class EmailProcessorService {
     /**
      * Background Worker: Processes pending emails for a user recursively until empty.
      */
-    async processQueue(userId: string, settings: any): Promise<void> {
+    async processQueue(userId: string, settings: any, result?: ProcessingResult): Promise<void> {
         logger.info('Worker: Checking queue', { userId });
 
         // Fetch up to 5 pending emails for this user
@@ -515,15 +515,15 @@ export class EmailProcessorService {
         logger.info('Worker: Processing batch', { userId, count: pendingEmails.length });
 
         for (const email of pendingEmails) {
-            await this.processPendingEmail(email, userId, settings);
+            await this.processPendingEmail(email, userId, settings, result);
         }
 
         // Slight delay to prevent hitting rate limits too fast, then check again
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return this.processQueue(userId, settings);
+        return this.processQueue(userId, settings, result);
     }
 
-    private async processPendingEmail(email: Email, userId: string, settings: any): Promise<void> {
+    private async processPendingEmail(email: Email, userId: string, settings: any, result?: ProcessingResult): Promise<void> {
         // Create a real processing log entry for this background task to ensure RLS compliance
         const { data: log } = await this.supabase
             .from('processing_logs')
@@ -708,6 +708,12 @@ export class EmailProcessorService {
                         `Rule: ${matchedRule?.name || analysis.matched_rule.rule_name}`,
                         matchedRule?.attachments
                     );
+
+                    // Update metrics if result object provided
+                    if (result) {
+                        if (action === 'delete') result.deleted++;
+                        else if (action === 'draft') result.drafted++;
+                    }
                 }
             } else if (eventLogger && rules && rules.length > 0) {
                 await eventLogger.info('No Match',
