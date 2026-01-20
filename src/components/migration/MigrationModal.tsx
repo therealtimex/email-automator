@@ -134,9 +134,14 @@ export function MigrationModal({
         }
     }, [migrationLogs]);
 
+
     const handleAutoMigrate = async () => {
         if (!projectId) {
             toast.error("Missing Project ID");
+            return;
+        }
+        if (!accessToken && !dbPassword) {
+            toast.error("Provide an access token or database password.");
             return;
         }
 
@@ -144,7 +149,45 @@ export function MigrationModal({
         setMigrationLogs(["Initializing migration..."]);
 
         try {
-            const response = await fetch("/api/migrate", {
+            const readStreamWithResult = async (
+                reader: ReadableStreamDefaultReader<Uint8Array>,
+            ): Promise<"success" | "failure" | null> => {
+                const decoder = new TextDecoder();
+                let buffer = "";
+                let result: "success" | "failure" | null = null;
+
+                const handleLine = (line: string) => {
+                    const cleaned = line.replace(/\r$/, "");
+                    if (!cleaned.trim()) return;
+                    if (cleaned.startsWith("RESULT:")) {
+                        const status = cleaned.replace("RESULT:", "").trim();
+                        if (status === "success" || status === "failure") {
+                            result = status;
+                        }
+                        return;
+                    }
+                    setMigrationLogs((prev) => [...prev, cleaned]);
+                };
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() || "";
+                    lines.forEach(handleLine);
+                }
+
+                buffer += decoder.decode();
+                if (buffer) handleLine(buffer);
+
+                return result;
+            };
+
+            // Step 1: Run migration
+            setMigrationLogs((prev) => [...prev, "", "📦 Step 1/2: Database Migration"]);
+            const migrateResponse = await fetch("/api/migrate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -154,36 +197,80 @@ export function MigrationModal({
                 }),
             });
 
-            if (!response.ok) {
+            if (!migrateResponse.ok) {
                 throw new Error(
-                    `Server returned ${response.status}: ${response.statusText}`,
+                    `Migration failed: ${migrateResponse.status} ${migrateResponse.statusText}`,
                 );
             }
 
-            const reader = response.body?.getReader();
-            if (!reader) throw new Error("No response stream received.");
+            const migrateReader = migrateResponse.body?.getReader();
+            if (!migrateReader) throw new Error("No migration response stream received.");
 
-            const decoder = new TextDecoder();
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const text = decoder.decode(value);
-                const lines = text.split("\n").filter(Boolean);
-                setMigrationLogs((prev) => [...prev, ...lines]);
+            const migrationResult = await readStreamWithResult(migrateReader);
+            if (migrationResult !== "success") {
+                throw new Error("Migration did not complete successfully");
             }
+
+            // Step 2: Deploy Edge Functions
+            setMigrationLogs((prev) => [...prev, "", "⚡ Step 2/2: Deploying Edge Functions"]);
+
+            const deployResponse = await fetch("/api/deploy", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    projectRef: projectId,
+                    dbPassword,
+                    accessToken,
+                }),
+            });
+
+            if (!deployResponse.ok) {
+                throw new Error(
+                    `Deployment failed: ${deployResponse.status} ${deployResponse.statusText}`,
+                );
+            }
+
+            const deployReader = deployResponse.body?.getReader();
+            if (!deployReader) throw new Error("No deployment response stream received.");
+
+            const deployResult = await readStreamWithResult(deployReader);
+            if (deployResult !== "success") {
+                throw new Error("Edge Functions deployment did not complete successfully");
+            }
+
+            // Final success message
+            setMigrationLogs((prev) => [
+                ...prev,
+                "",
+                "═".repeat(60),
+                "✅ Setup Complete!",
+                "",
+                "✓ Database schema updated",
+                "✓ Edge Functions deployed",
+                "",
+                "🎉 Your Email Automator is ready to use!",
+                "📝 The application will reload automatically...",
+                "═".repeat(60),
+            ]);
+
+            // Auto-reload after 3 seconds
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+
         } catch (err) {
             console.error(err);
             setMigrationLogs((prev) => [
                 ...prev,
-                `Error: ${err instanceof Error ? err.message : String(err)}`,
+                "",
+                `❌ Error: ${err instanceof Error ? err.message : String(err)}`,
             ]);
-            toast.error("Migration failed. Check logs for details.");
+            toast.error("Setup failed. Check logs for details.");
         } finally {
             setIsMigrating(false);
         }
     };
+
 
     return (
         <Dialog
@@ -194,10 +281,10 @@ export function MigrationModal({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl">
                         <AlertTriangle className="h-6 w-6 text-red-700 dark:text-red-600" />
-                        Database Migration Required
+                        Database Setup Required
                     </DialogTitle>
                     <DialogDescription>
-                        Your application version ({status.appVersion}) requires a database schema update to function correctly.
+                        Your application version ({status.appVersion}) requires database migration and Edge Functions deployment to function correctly.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -210,6 +297,9 @@ export function MigrationModal({
                             <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
                                 <li>
                                     Updates your database schema to match version {status.appVersion}
+                                </li>
+                                <li>
+                                    Deploys Edge Functions (API endpoints) to your Supabase project
                                 </li>
                                 <li>
                                     Enables new features and performance improvements
@@ -241,10 +331,10 @@ export function MigrationModal({
                         <div className="space-y-4 py-2">
                             <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
                                 <h3 className="text-lg font-semibold mb-2">
-                                    Automated Migration
+                                    Automated Setup
                                 </h3>
                                 <p className="text-sm text-muted-foreground mb-4">
-                                    Run the migration directly from your browser. Requires your database password.
+                                    Run database migration and deploy Edge Functions directly from your browser. No CLI installation required - everything is bundled.
                                 </p>
 
                                 <div className="grid gap-4">
@@ -313,12 +403,12 @@ export function MigrationModal({
                                         {isMigrating ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Migrating...
+                                                Running Setup...
                                             </>
                                         ) : (
                                             <>
                                                 <Terminal className="mr-2 h-4 w-4" />
-                                                Start Migration
+                                                Start Setup
                                             </>
                                         )}
                                     </Button>

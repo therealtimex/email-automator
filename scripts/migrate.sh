@@ -7,26 +7,23 @@
 # DESCRIPTION:
 #   This script automates the backend update process for RealtimeX Email Automator.
 #   It performs the following actions without requiring the user to clone git:
-#   1. Creates a temporary, invisible workspace on your system.
-#   2. Downloads the latest code/migrations from the official GitHub repository.
-#   3. Links your local environment to your remote Supabase project.
-#   4. Applies the latest Database Schema changes (Tables, Columns, etc).
-#   5. Pushes the latest Project Configuration (Auth, Storage, etc).
-#   6. Deploys the latest Edge Functions (API Logic).
-#   7. Cleans up all temporary files automatically.
+#   1. Uses the bundled Supabase config/migrations included with this package.
+#   2. Links your local environment to your remote Supabase project.
+#   3. Applies the latest Database Schema changes (Tables, Columns, etc).
+#   4. Pushes the latest Project Configuration (Auth, Storage, etc).
+#   5. Deploys the latest Edge Functions (API Logic) unless skipped.
 #
 # PREREQUISITES:
-#   1. Supabase CLI installed (global or local via npm).
-#   2. You must be logged in (run: 'supabase login').
+#   1. Supabase CLI available (bundled or global).
+#   2. You must be logged in (run: 'supabase login') or provide credentials.
 #   3. You need your Supabase Project Reference ID (e.g., 'abcdefghijklm').
-#   4. You need your Database Password (to type when prompted if needed).
+#   4. You need your Database Password or Access Token (if prompted).
 #
 # HOW TO USE:
-#   1. Download this file to your computer.
-#   2. Open your terminal and navigate to the folder where you saved it.
-#   3. Make the script executable:
+#   1. Run the script from the installed package folder.
+#   2. Make the script executable (if needed):
 #      chmod +x migrate.sh
-#   4. Run the script:
+#   3. Run the script:
 #      ./migrate.sh
 #
 # ==============================================================================
@@ -34,30 +31,52 @@
 # Exit immediately if any command fails
 set -e
 
-# --- CONFIGURATION ---
-GITHUB_ORG="therealtimex"
-REPO_NAME="email-automator"
-BRANCH="main"
-
 echo "🚀 Starting RealtimeX Email Automator Migration Tool..."
 
 # ------------------------------------------------------------------------------
 # 1. PRE-FLIGHT CHECKS
 # ------------------------------------------------------------------------------
 
-SUPABASE_CMD="supabase"
+# Prefer bundled Supabase CLI from node_modules to keep version locked
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+ROOT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 
-# Check if global Supabase CLI is installed
-if command -v supabase &> /dev/null; then
+find_supabase_bin() {
+    local dir="$ROOT_DIR"
+    while [ "$dir" != "/" ]; do
+        local candidate="$dir/node_modules/.bin/supabase"
+        if [ -x "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+        dir=$(dirname "$dir")
+    done
+    return 1
+}
+
+SUPABASE_BIN=$(find_supabase_bin || true)
+
+if [ -n "$SUPABASE_BIN" ]; then
+    SUPABASE_CMD="$SUPABASE_BIN"
+    echo "✅ Using bundled Supabase CLI: $SUPABASE_BIN"
+elif command -v supabase &> /dev/null; then
+    # Fallback to global if bundled CLI is not available
     echo "✅ Found global Supabase CLI."
+    SUPABASE_CMD="supabase"
 elif command -v npx &> /dev/null; then
-    # Fallback to npx if available
-    echo "ℹ️  Global 'supabase' not found. Trying local via npx..."
-    SUPABASE_CMD="npx supabase"
+    # Last resort: npx (will not download)
+    echo "ℹ️  Bundled CLI not found. Falling back to npx."
+    SUPABASE_CMD="npx --no-install supabase"
 else
-    echo "❌ Error: 'supabase' CLI is not installed and 'npx' is not available."
-    echo "   Please install it via: brew install supabase/tap/supabase"
-    echo "   Or visit: https://supabase.com/docs/guides/cli"
+    echo "❌ Error: Neither 'npx' nor 'supabase' CLI is available."
+    echo "   Please ensure Node.js is installed (for npx)."
+    echo "   Or install Supabase CLI globally: brew install supabase/tap/supabase"
+    exit 1
+fi
+
+if [ ! -d "$ROOT_DIR/supabase" ]; then
+    echo "❌ Error: supabase folder not found at $ROOT_DIR/supabase"
+    echo "   Please reinstall the package or run from a valid install."
     exit 1
 fi
 
@@ -79,40 +98,11 @@ if [ -z "$SUPABASE_PROJECT_ID" ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 3. PREPARE TEMPORARY WORKSPACE
+# 3. EXECUTE MIGRATION
 # ------------------------------------------------------------------------------
 
-# Create a safe, random directory in the system temp folder (e.g., /tmp/tmp.XyZ123)
-# This ensures we don't mess with existing files on the user's desktop.
-WORK_DIR=$(mktemp -d)
-echo "🧹 Working in temporary system directory..."
-
-# Define a cleanup function that runs automatically when the script exits
-# (Whether it finishes successfully or crashes)
-cleanup() {
-    rm -rf "$WORK_DIR"
-    echo "🧹 Temporary files cleaned up."
-}
-trap cleanup EXIT
-
-# ------------------------------------------------------------------------------
-# 4. DOWNLOAD & EXTRACT LATEST CODE
-# ------------------------------------------------------------------------------
-
-echo "📥 Downloading latest source from GitHub ($BRANCH)..."
-# Download the repository archive as a compressed file
-curl -L -s "https://github.com/$GITHUB_ORG/$REPO_NAME/archive/refs/heads/$BRANCH.tar.gz" -o "$WORK_DIR/repo.tar.gz"
-
-echo "📦 Extracting configuration files..."
-# Extract the files, stripping the root folder so they sit directly in WORK_DIR
-tar -xzf "$WORK_DIR/repo.tar.gz" -C "$WORK_DIR" --strip-components=1
-
-# ------------------------------------------------------------------------------
-# 5. EXECUTE MIGRATION
-# ------------------------------------------------------------------------------
-
-# Move into the temp directory to run Supabase commands
-cd "$WORK_DIR"
+# Move into the package root to run Supabase commands
+cd "$ROOT_DIR"
 
 echo "---------------------------------------------------------"
 echo "🔗 Linking to Supabase Project: $SUPABASE_PROJECT_ID"
@@ -145,30 +135,34 @@ else
 fi
 
 echo "---------------------------------------------------------"
-echo "⚡ Deploying Edge Functions..."
-# Deploys API logic explicitly for each function to ensure they are all deployed
-# We skip _shared and hidden folders
-if [ -d "supabase/functions" ]; then
-    for func in supabase/functions/*; do
-        if [ -d "$func" ]; then
-            func_name=$(basename "$func")
-            # Skip _shared and hidden folders
-            if [[ "$func_name" != "_shared" && "$func_name" != .* ]]; then
-                echo "   Deploying $func_name..."
-                if ! $SUPABASE_CMD functions deploy "$func_name" --no-verify-jwt; then
-                    echo "❌ Error: Failed to deploy function '$func_name'."
-                    exit 1
+if [ "$SKIP_FUNCTIONS" = "1" ]; then
+    echo "⏭️  Skipping Edge Functions deployment (SKIP_FUNCTIONS=1)."
+else
+    echo "⚡ Deploying Edge Functions..."
+    # Deploys API logic explicitly for each function to ensure they are all deployed
+    # We skip _shared and hidden folders
+    if [ -d "supabase/functions" ]; then
+        for func in supabase/functions/*; do
+            if [ -d "$func" ]; then
+                func_name=$(basename "$func")
+                # Skip _shared and hidden folders
+                if [[ "$func_name" != "_shared" && "$func_name" != .* ]]; then
+                    echo "   Deploying $func_name..."
+                    if ! $SUPABASE_CMD functions deploy "$func_name" --no-verify-jwt; then
+                        echo "❌ Error: Failed to deploy function '$func_name'."
+                        exit 1
+                    fi
                 fi
             fi
-        fi
-    done
-else
-    echo "⚠️ Warning: supabase/functions directory not found. Skipping function deployment."
+        done
+    else
+        echo "⚠️ Warning: supabase/functions directory not found. Skipping function deployment."
+    fi
 fi
 
 
 # ------------------------------------------------------------------------------
-# 6. COMPLETION
+# 4. COMPLETION
 # ------------------------------------------------------------------------------
 
 echo "---------------------------------------------------------"

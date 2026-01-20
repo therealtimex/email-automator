@@ -34,6 +34,7 @@ router.post('/',
                 SUPABASE_PROJECT_ID: projectRef,
                 SUPABASE_DB_PASSWORD: dbPassword || '',
                 SUPABASE_ACCESS_TOKEN: accessToken || '',
+                SKIP_FUNCTIONS: '1',
             };
 
             const child = spawn('bash', [scriptPath], { 
@@ -52,9 +53,11 @@ router.post('/',
             child.on('close', (code) => {
                 if (code === 0) {
                     sendLog('✅ Migration successful!');
+                    sendLog('RESULT: success');
                     logger.info('Migration completed successfully', { projectRef });
                 } else {
                     sendLog(`❌ Migration failed with code ${code}`);
+                    sendLog('RESULT: failure');
                     logger.error('Migration failed', new Error(`Exit code: ${code}`), { projectRef });
                 }
                 res.end();
@@ -62,11 +65,13 @@ router.post('/',
 
             child.on('error', (error) => {
                 sendLog(`❌ Failed to run migration: ${error.message}`);
+                sendLog('RESULT: failure');
                 logger.error('Migration spawn error', error);
                 res.end();
             });
         } catch (error: any) {
             sendLog(`❌ Server error: ${error.message}`);
+            sendLog('RESULT: failure');
             logger.error('Migration error', error);
             res.end();
         }
