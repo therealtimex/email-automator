@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.10] - 2026-01-20
+
+### Added
+- **Updated Developer Architecture Docs**: Fully documented the new backend orchestration engine. Added details on bundled migration assets, portable CLI strategies, and the consolidated `migrate.sh` workflow.
+
 ## [2.10.9] - 2026-01-20
 
 ### Added

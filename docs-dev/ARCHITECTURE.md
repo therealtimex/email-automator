@@ -10,7 +10,20 @@ Users only need to provide:
 - **Supabase Project URL**
 - **Supabase Publishable/Anon Key**
 
-Edge Functions are deployed once to their project via RealTimeX Desktop or Supabase CLI.
+The application automatically detects if the database is uninitialized and prompts the user to run an **Automated Setup**. This process, triggered directly from the browser, performs database migrations and deploys Edge Functions using the bundled backend configuration.
+
+## Backend Orchestration: The Migration Engine
+
+The `scripts/migrate.sh` script is the primary engine for backend deployment. It has been optimized for the RealTimeX ecosystem:
+
+- **Bundled Assets**: Unlike traditional scripts that download source code from GitHub, this script uses the migrations and configuration files bundled directly within the NPM package.
+- **Portable CLI**: It prioritizes the *bundled Supabase CLI* (located in `node_modules/.bin`) to ensure version consistency and compatibility in restricted environments (like realtimex.ai sandboxes) where global CLI installation might be impossible.
+- **Consolidated Workflow**: A single execution handles:
+    1.  Linking to the remote Supabase project.
+    2.  Applying database schema migrations.
+    3.  Pushing project configuration (Auth, Storage, etc.).
+    4.  Deploying all Edge Functions (API endpoints).
+- **Automation Ready**: Supports non-interactive mode via environment variables, allowing the Express API to trigger deployments securely on behalf of the user.
 
 ## Architecture Components
 
@@ -52,13 +65,13 @@ The Local App is designed to be highly portable:
 ## Deployment
 
 ```bash
-# Deploy Edge Functions
-./scripts/deploy-functions.sh
+# Apply migrations AND deploy Edge Functions
+./scripts/migrate.sh
 
-# Run Local App
+# Run Local App (Express API + Background Worker)
 npm run dev:api
 
-# Run Frontend
+# Run Frontend (Vite)
 npm run dev
 ```
 
