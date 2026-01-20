@@ -19,17 +19,35 @@ Frontend (React) → Edge Functions (Auth/DB) → Supabase Database
                  ↘ Express API (Sync/AI)    ↗
 ```
 
+## Data Flow: Async ETL Pipeline
+
+Email Automator uses an Asynchronous **Extract, Transform, Load (ETL)** pattern to handle large inboxes without timeouts:
+
+1.  **Extract (Ingestion)**: Local App fetches raw RFC822 MIME source from the provider (Gmail/Outlook).
+2.  **Transform (Storage)**: Raw content is saved as `.eml` files on local disk (default: `./data/emails`). Only metadata (subject, sender, etc.) is saved to the database.
+3.  **Load (AI Analysis)**: A background worker picks up "Pending" emails, parses the local files, extracts technical headers, and sends cleaned text to the LLM for categorization and decision-making.
+
 ## Component Responsibilities
 
 ### Edge Functions (Serverless)
 - OAuth Management (Gmail, Microsoft)
 - Secure Credential Storage
 - Database Proxy (CRUD with RLS)
+- Authentication & Profile Management
 
-### Express API (Local App)
-- Email Sync from Gmail/Outlook
-- AI Processing (categorization, drafts)
-- Automation Execution
+### Express API (Local App / Background Worker)
+- Asynchronous Ingestion & Checkpointing
+- Local Disk Management (.eml storage)
+- AI Intelligence (Categorization, Intent Matching)
+- Automation Execution (Drafting, Trashing, Moving)
+- Real-time Event Logging (Live Terminal)
+
+## Local App Portability
+
+The Local App is designed to be highly portable:
+- **Sandbox Friendly**: Automatically falls back to user home directory (`~/.email-automator/emails`) if project-relative storage is restricted.
+- **Self-Healing**: Automatically refreshes provider tokens and Supabase sessions in the background.
+- **Interactive**: Emits real-time state changes via Supabase Realtime for the "Live Activity" dashboard.
 
 ## Deployment
 

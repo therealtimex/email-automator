@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.9] - 2026-01-20
+
+### Added
+- **Developer Documentation**: Major update to the `docs-dev/` directory to reflect the new Async ETL architecture, local archiving strategy, and current development roadmap.
+
 ## [2.10.8] - 2026-01-20
 
 ### Fixed
