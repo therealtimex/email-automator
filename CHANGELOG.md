@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.4] - 2026-01-19
+
+### Added
+- **Toast Grouping**: Implemented automatic grouping for identical notification messages. If multiple "New email processed" alerts occur rapidly, they now collapse into a single toast with a counter badge to reduce visual clutter.
+- **Improved Notification Placement**: Moved all toasts to the **bottom-left corner** to prevent overlapping with the "Live Activity" button and terminal. Updated slide-in animations to match the new position.
+
 ## [2.9.3] - 2026-01-19
 
 ### Fixed

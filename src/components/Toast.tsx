@@ -9,6 +9,8 @@ interface Toast {
     type: ToastType;
     message: string;
     duration?: number;
+    count?: number;
+    lastUpdated?: number;
 }
 
 interface ToastContextType {
@@ -33,8 +35,24 @@ export const toast = {
 };
 
 function addToast(type: ToastType, message: string, duration = 5000) {
+    // Check if a toast with same message already exists to group them
+    const existingIndex = toasts.findIndex(t => t.message === message && t.type === type);
+    
+    if (existingIndex !== -1) {
+        // Update existing toast
+        const existing = toasts[existingIndex];
+        toasts = [...toasts];
+        toasts[existingIndex] = {
+            ...existing,
+            count: (existing.count || 1) + 1,
+            lastUpdated: Date.now()
+        };
+        notify();
+        return;
+    }
+
     const id = Math.random().toString(36).substr(2, 9);
-    toasts = [...toasts, { id, type, message, duration }];
+    toasts = [...toasts, { id, type, message, duration, count: 1, lastUpdated: Date.now() }];
     notify();
     
     if (duration > 0) {
@@ -79,10 +97,17 @@ function ToastItem({ toast: t }: { toast: Toast }) {
     return (
         <div className={cn(
             'flex items-start gap-3 p-4 rounded-lg border shadow-lg backdrop-blur-sm',
-            'animate-in slide-in-from-right-full duration-300',
+            'animate-in slide-in-from-left-full duration-300',
             styles[t.type]
         )}>
-            <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="relative">
+                <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                {t.count && t.count > 1 && (
+                    <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 rounded-full border border-background scale-90 animate-in zoom-in duration-200">
+                        {t.count}
+                    </span>
+                )}
+            </div>
             <p className="text-sm flex-1">{t.message}</p>
             <button 
                 onClick={() => removeToast(t.id)}
@@ -100,7 +125,7 @@ export function ToastContainer() {
     if (toastList.length === 0) return null;
     
     return (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+        <div className="fixed bottom-4 left-4 z-50 flex flex-col-reverse gap-2 max-w-sm w-full">
             {toastList.map(t => (
                 <ToastItem key={t.id} toast={t} />
             ))}
