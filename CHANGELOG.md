@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.8.5] - 2026-01-19
+
+### Fixed
+- **Sandbox Compatibility**: Improved storage path resilience for restricted environments (like realtimex.ai). The system now automatically detects if the default project-relative storage path is restricted and seamlessly falls back to the user's home directory (`~/.email-automator/emails`).
+- **Storage Validation**: Enhanced error messaging when storage paths are not accessible, providing clearer guidance for configuration.
+
 ## [2.8.4] - 2026-01-19
 
 ### Changed

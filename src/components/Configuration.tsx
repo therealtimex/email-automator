@@ -1385,12 +1385,12 @@ export function Configuration() {
                             Local Storage Path (.eml)
                         </label>
                         <Input
-                            placeholder="./data/emails"
+                            placeholder="e.g. ./data/emails or ~/.email-automator/emails"
                             value={localSettings.storage_path || ''}
                             onChange={(e) => setLocalSettings(s => ({ ...s, storage_path: e.target.value }))}
                         />
                         <p className="text-[10px] text-muted-foreground italic">
-                            Absolute or relative path where raw emails will be saved before analysis. Default: ./data/emails
+                            Directory where raw emails (.eml) are saved. Default: ./data/emails (falls back to ~/.email-automator/emails if restricted).
                         </p>
                     </div>
 

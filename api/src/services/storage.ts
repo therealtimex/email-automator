@@ -9,16 +9,26 @@ export class StorageService {
     private defaultPath: string;
 
     constructor() {
-        // Default to a folder in the user's home directory or current project
-        // Using project-relative path for now as discussed
-        this.defaultPath = path.resolve(process.cwd(), 'data', 'emails');
+        // Determine a safe default path
+        const homeDir = os.homedir();
+        const fallbackPath = path.join(homeDir, '.email-automator', 'emails');
+        const projectDataPath = path.resolve(process.cwd(), 'data', 'emails');
+
+        // If we are at system root or in a restricted environment, use home dir
+        if (process.cwd() === '/' || process.cwd() === '/root' || process.cwd().startsWith('/bin')) {
+            this.defaultPath = fallbackPath;
+        } else {
+            // Default to project-relative for now, but ensureDirectory will handle the check
+            this.defaultPath = projectDataPath;
+        }
     }
 
     /**
      * Ensures the storage directory exists and is writable.
      */
     async ensureDirectory(customPath?: string | null): Promise<string> {
-        const targetPath = customPath || this.defaultPath;
+        let targetPath = customPath || this.defaultPath;
+        
         try {
             await fs.mkdir(targetPath, { recursive: true });
             // Test writability
@@ -27,8 +37,15 @@ export class StorageService {
             await fs.unlink(testFile);
             return targetPath;
         } catch (error) {
+            // If the default project-relative path failed and we haven't tried the fallback yet
+            if (!customPath && targetPath !== path.join(os.homedir(), '.email-automator', 'emails')) {
+                const fallback = path.join(os.homedir(), '.email-automator', 'emails');
+                logger.warn('Default storage path not writable, falling back to home directory', { targetPath, fallback });
+                return this.ensureDirectory(fallback);
+            }
+
             logger.error('Storage directory validation failed', error, { targetPath });
-            throw new Error(`Storage path "${targetPath}" is not accessible or writable.`);
+            throw new Error(`Storage path "${targetPath}" is not accessible or writable. Please configure a valid path in Settings.`);
         }
     }
 
