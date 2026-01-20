@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.1] - 2026-01-19
+
+### Fixed
+- **Migration Collision**: Resolved a duplicate migration version ID error that prevented `supabase db push`. Standardized timestamps for the Intelligent Rename and Realtime migrations.
+
 ## [2.9.0] - 2026-01-19
 
 ### Added
