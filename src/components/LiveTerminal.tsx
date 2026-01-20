@@ -49,6 +49,14 @@ export function LiveTerminal() {
                     setEvents((prev) => {
                         // Insert at the beginning (descending order)
                         const updated = [newEvent, ...prev];
+                        
+                        // Auto-collapse logic: If it's a completion event and terminal is expanded
+                        if (newEvent.details?.is_completion && isExpanded) {
+                            setTimeout(() => {
+                                setIsExpanded(false);
+                            }, 3000);
+                        }
+
                         if (updated.length > 100) return updated.slice(0, 100);
                         return updated;
                     });
@@ -59,7 +67,7 @@ export function LiveTerminal() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [isExpanded, setIsExpanded]);
 
     const fetchRecentEvents = async () => {
         const { data } = await supabase

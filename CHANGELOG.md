@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.5] - 2026-01-19
+
+### Added
+- **Terminal Auto-Collapse**: The Agent Live Terminal now automatically minimizes 3 seconds after a sync batch completes, providing a cleaner transition back to the dashboard.
+- **Hydrated Real-time Updates**: Implemented a resilient "fetch-on-event" strategy. New emails now appear instantly with full relational data (icons, deep links), and AI analysis results fill in dynamically as they happen.
+
+### Fixed
+- **Filter-Aware Ingestion**: The dashboard list now correctly respects active category and search filters when processing new emails in real-time.
+
 ## [2.9.4] - 2026-01-19
 
 ### Added
