@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.10] - 2026-01-19
+
+### Fixed
+- **Onboarding UX**: Fixed a bug where the login screen would incorrectly show "Welcome Back" when the Supabase connection was broken or unconfigured. 
+- **Strict Initialization Check**: Improved database state detection to prevent bypassing the setup wizard in fresh deployments.
+
 ## [2.9.9] - 2026-01-19
 
 ### Fixed

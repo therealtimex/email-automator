@@ -1,6 +1,6 @@
 {
   "name": "@realtimex/email-automator",
-  "version": "2.9.9",
+  "version": "2.9.10",
   "type": "module",
   "main": "dist/api/server.js",
   "bin": {

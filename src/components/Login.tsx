@@ -48,9 +48,10 @@ export function Login({ onSuccess, onConfigure }: LoginProps) {
                     return;
                 }
 
-                // For other errors (API key issues, etc.), default to initialized to allow login attempt
-                console.warn('[Login] Init check error, defaulting to initialized:', error);
-                setIsInitialized(true);
+                // For other errors (API key issues, etc.), don't assume initialized
+                console.warn('[Login] Init check error:', error);
+                setIsInitialized(false);
+                setError(error.message);
                 return;
             }
 
@@ -58,19 +59,9 @@ export function Login({ onSuccess, onConfigure }: LoginProps) {
             const initialized = data && data.length > 0 && data[0].is_initialized > 0;
             setIsInitialized(initialized);
         } catch (err: any) {
-            console.warn('[Login] Init check exception, defaulting to initialized:', err);
-
-            // On any exception (network, auth, etc), we default to showing the Login screen.
-            // This prevents getting stuck in Signup mode if the DB is actually initialized but unreachable.
-            // The "Update Connection" button is still available if they need to change config.
-
-            // Clear blocking error to allow UI to render Login form
-            if (err.message?.includes('Invalid API key') || err.status === 401) {
-                console.warn('[Login] API Key invalid for REST check (likely Publishable Key). defaulting to Setup Mode (isInitialized=false).');
-                setIsInitialized(false);
-                return;
-            }
-            setIsInitialized(true);
+            console.warn('[Login] Init check exception:', err);
+            setIsInitialized(false);
+            setError(err.message || 'Connection failed');
         } finally {
             setIsCheckingInit(false);
         }
