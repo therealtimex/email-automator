@@ -351,9 +351,9 @@ function DatabaseSection() {
                                 <div className="flex-1 space-y-1">
                                     <div className="flex items-center justify-between">
                                         <p className="font-semibold text-emerald-700 dark:text-emerald-400">Connected</p>
-                                        {migrationInfo?.dbVersion && (
-                                            <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                                DB v{migrationInfo.dbVersion}
+                                        {migrationInfo?.latestMigrationTimestamp && (
+                                            <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-500/20" title="Database Schema Version">
+                                                Schema {migrationInfo.latestMigrationTimestamp}
                                             </span>
                                         )}
                                     </div>

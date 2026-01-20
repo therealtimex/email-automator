@@ -95,6 +95,8 @@ export interface MigrationStatus {
     appVersion: string;
     /** Database schema version (null if unknown) */
     dbVersion: string | null;
+    /** Latest applied migration timestamp in DB */
+    latestMigrationTimestamp: string | null;
     /** Human-readable status message */
     message: string;
 }
@@ -131,6 +133,7 @@ export async function checkMigrationStatus(
             needsMigration: true,
             appVersion,
             dbVersion: dbInfo.version,
+            latestMigrationTimestamp: dbInfo.latestMigrationTimestamp,
             message: `App migration info missing. Migration to v${appVersion} likely needed.`,
         };
     }
@@ -149,6 +152,7 @@ export async function checkMigrationStatus(
                 needsMigration: true,
                 appVersion,
                 dbVersion: dbInfo.version,
+                latestMigrationTimestamp: dbTimestamp,
                 message: `New migrations available. Database is at ${dbTimestamp}, app has ${appTimestamp}.`,
             };
         } else if (appTimestamp < dbTimestamp) {
@@ -157,6 +161,7 @@ export async function checkMigrationStatus(
                 needsMigration: false,
                 appVersion,
                 dbVersion: dbInfo.version,
+                latestMigrationTimestamp: dbTimestamp,
                 message: `Database (${dbTimestamp}) is ahead of app (${appTimestamp}).`,
             };
         } else {
@@ -165,6 +170,7 @@ export async function checkMigrationStatus(
                 needsMigration: false,
                 appVersion,
                 dbVersion: dbInfo.version,
+                latestMigrationTimestamp: dbTimestamp,
                 message: `Database schema is up-to-date.`,
             };
         }
@@ -184,6 +190,7 @@ export async function checkMigrationStatus(
                 needsMigration: true,
                 appVersion,
                 dbVersion: dbInfo.version,
+                latestMigrationTimestamp: null,
                 message: `Database schema (v${dbInfo.version}) is outdated. Migration to v${appVersion} required.`,
             };
         } else if (comparison === 0) {
@@ -196,6 +203,7 @@ export async function checkMigrationStatus(
                 needsMigration: true,
                 appVersion,
                 dbVersion: dbInfo.version,
+                latestMigrationTimestamp: null,
                 message: `Database lacks timestamp tracking. Please run migration to upgrade to modern schema (v${appVersion}).`,
             };
         } else {
@@ -204,6 +212,7 @@ export async function checkMigrationStatus(
                 needsMigration: false,
                 appVersion,
                 dbVersion: dbInfo.version,
+                latestMigrationTimestamp: null,
                 message: `Database version (v${dbInfo.version}) is ahead of app (v${appVersion}).`,
             };
         }
@@ -215,6 +224,7 @@ export async function checkMigrationStatus(
         needsMigration: true,
         appVersion,
         dbVersion: null,
+        latestMigrationTimestamp: null,
         message: `Database schema unknown. Migration required to v${appVersion}.`,
     };
 }
