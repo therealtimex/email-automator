@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.2] - 2026-01-20
+
+### Changed
+- **Rate Limiting**: Increased the synchronization rate limit from 5 to 20 requests per minute to allow for more frequent manual syncing during active use and testing.
+
 ## [2.10.1] - 2026-01-20
 
 ### Fixed

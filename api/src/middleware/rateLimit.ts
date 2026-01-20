@@ -83,5 +83,5 @@ export const apiRateLimit = rateLimit({
 // Sync rate limit (expensive operation)
 export const syncRateLimit = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 5, // 5 sync requests per minute
+    max: 20, // 20 sync requests per minute
 });
