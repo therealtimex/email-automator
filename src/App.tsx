@@ -162,6 +162,25 @@ function AppContent() {
         checkConfig();
     }, [state.isInitialized, state.isAuthenticated]);
 
+    // Keep-alive ping to backend
+    useEffect(() => {
+        const ping = async () => {
+            try {
+                // Only ping if the server is likely running
+                await api.healthCheck();
+            } catch (e) {
+                console.warn('[App] Keep-alive ping failed');
+            }
+        };
+
+        // Initial ping
+        ping();
+
+        // Repeat every 30 seconds
+        const interval = setInterval(ping, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     const handleOpenMigrationModal = () => {
         setShowMigrationModal(true);
         setShowMigrationBanner(false);
@@ -253,24 +272,6 @@ function AppContent() {
         await supabase.auth.signOut();
         toast.success('Logged out successfully');
     };
-
-    // Keep-alive ping to backend
-    useEffect(() => {
-        const ping = async () => {
-            try {
-                await api.healthCheck();
-            } catch (e) {
-                console.warn('[App] Keep-alive ping failed');
-            }
-        };
-
-        // Initial ping
-        ping();
-
-        // Repeat every 30 seconds
-        const interval = setInterval(ping, 30000);
-        return () => clearInterval(interval);
-    }, []);
 
     return (
         <MigrationProvider value={migrationContextValue}>

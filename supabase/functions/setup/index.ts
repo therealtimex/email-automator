@@ -5,6 +5,13 @@ import { corsHeaders, createErrorResponse } from "../_shared/cors.ts";
 async function createFirstUser(req: Request) {
     try {
         const { email, password, first_name, last_name } = await req.json();
+        console.log(`[Setup] Starting setup for ${email}`);
+
+        // Check if SUPABASE_SERVICE_ROLE_KEY is set
+        if (!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+            console.error("[Setup] SUPABASE_SERVICE_ROLE_KEY is missing!");
+            return createErrorResponse(500, "SUPABASE_SERVICE_ROLE_KEY is missing in Edge Function environment");
+        }
 
         // Check if any users exist
         const { count, error: countError } = await supabaseAdmin
@@ -12,15 +19,17 @@ async function createFirstUser(req: Request) {
             .select("*", { count: "exact", head: true });
 
         if (countError) {
-            console.error("Error checking profiles:", countError);
-            return createErrorResponse(500, "Database error checking profiles");
+            console.error("[Setup] Error checking profiles table:", countError);
+            return createErrorResponse(500, `Database error checking profiles: ${countError.message} (code: ${countError.code})`);
         }
 
+        console.log(`[Setup] Existing profiles count: ${count}`);
         if (count && count > 0) {
             return createErrorResponse(403, "First user already exists");
         }
 
         // Create user with admin API (bypasses signup restrictions)
+        console.log("[Setup] Creating admin user...");
         const { data, error: userError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
@@ -29,9 +38,11 @@ async function createFirstUser(req: Request) {
         });
 
         if (userError || !data?.user) {
-            console.error("Error creating first user:", userError);
-            return createErrorResponse(500, `Failed to create first user: ${userError?.message}`);
+            console.error("[Setup] Error creating auth user:", userError);
+            return createErrorResponse(500, `Failed to create auth user: ${userError?.message || 'Unknown error'}`);
         }
+
+        console.log(`[Setup] User created successfully: ${data.user.id}. Creating profile...`);
 
         // Explicitly create profile as admin (trigger may not fire with admin.createUser in some configs)
         // Use upsert to handle case where trigger did fire
@@ -46,18 +57,24 @@ async function createFirstUser(req: Request) {
             }, { onConflict: 'id' });
 
         if (profileError) {
-            console.error("Error creating profile:", profileError);
+            console.error("[Setup] Error creating profile row:", profileError);
             // Profile creation failed - this is critical for is_initialized
-            return createErrorResponse(500, `User created but profile failed: ${profileError.message}`);
+            return createErrorResponse(500, `User created but profile record failed: ${profileError.message} (code: ${profileError.code})`);
         }
 
+        console.log("[Setup] Profile created successfully. Verification...");
+
         // Verify the profile was created
-        const { count: profileCount } = await supabaseAdmin
+        const { count: profileCount, error: verifyError } = await supabaseAdmin
             .from("profiles")
             .select("*", { count: "exact", head: true })
             .eq("id", data.user.id);
 
-        console.log("Profile verification - count:", profileCount);
+        if (verifyError) {
+            console.warn("[Setup] Final verification failed:", verifyError);
+        }
+
+        console.log("[Setup] Setup completed successfully");
 
         return new Response(
             JSON.stringify({
