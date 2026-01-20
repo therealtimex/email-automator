@@ -63,6 +63,11 @@ export async function getDatabaseMigrationInfo(
             .rpc('get_latest_migration_timestamp');
 
         if (error) {
+            // If function doesn't exist (42883), it's a fresh DB that needs migration
+            if ((error as any).code === '42883') {
+                console.info('[Migration Check] RPC function missing - assuming fresh DB.');
+                return { version: null, latestMigrationTimestamp: '0' };
+            }
             console.warn('Could not get latest migration timestamp:', error.message);
             return { version: null, latestMigrationTimestamp: null };
         }

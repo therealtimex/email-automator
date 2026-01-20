@@ -62,7 +62,7 @@ export function AccountSettingsPage() {
 
                     <div className="mt-8 px-4 py-4 border-t border-border/40 text-center md:text-left">
                         <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">Version</p>
-                        <p className="text-xs font-mono text-muted-foreground/70">v{import.meta.env.APP_VERSION}</p>
+                        <p className="text-xs font-mono text-muted-foreground/70">v{import.meta.env.VITE_APP_VERSION}</p>
                     </div>
                 </aside>
 

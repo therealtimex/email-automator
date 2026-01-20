@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.4] - 2026-01-20
+
+### Fixed
+- **Migration Detection**: Improved resilience of the migration check for fresh deployments. The app now correctly identifies empty databases even when the version-tracking RPC function is missing, ensuring users are properly directed to the setup wizard.
+- **Version UI**: Fixed missing version number in the Account Settings profile sidebar.
+
 ## [2.10.3] - 2026-01-20
 
 ### Added
