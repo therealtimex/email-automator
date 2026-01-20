@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.2] - 2026-01-19
+
+### Fixed
+- **Intelligence Resilience**: Relaxed the Zod validation schema for AI analysis to allow `null` values for draft content. This prevents background processing crashes when the LLM decides no draft is necessary for a specific email.
+
 ## [2.9.1] - 2026-01-19
 
 ### Fixed

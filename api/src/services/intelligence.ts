@@ -52,7 +52,7 @@ export const ContextAwareAnalysisSchema = z.object({
         .describe('Actions to execute based on the matched rule'),
 
     // Intent-aware draft content (if draft action is included)
-    draft_content: z.string().optional()
+    draft_content: z.string().nullable().optional()
         .describe('Generated draft reply if the action includes drafting'),
 });
 
