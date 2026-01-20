@@ -377,7 +377,7 @@ function AppContent() {
 
                 <footer className="max-w-7xl mx-auto px-4 sm:px-8 pb-8 text-center sm:text-left">
                     <p className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-[0.2em]">
-                        Email Automator <span className="mx-1">•</span> v{import.meta.env.APP_VERSION}
+                        Email Automator <span className="mx-1">•</span> v{import.meta.env.VITE_APP_VERSION}
                     </p>
                 </footer>
 

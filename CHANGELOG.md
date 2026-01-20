@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.3] - 2026-01-20
+
+### Added
+- **Automated Migration Tracking**: Implemented a build-time script to automatically detect the latest database migration timestamp. This ensures the frontend can accurately prompt for migrations after an update without manual configuration.
+
+### Fixed
+- **Vite Env Prefix**: Standardized application environment variables to use the `VITE_` prefix for better consistency and reliability across different build environments.
+
 ## [2.10.2] - 2026-01-20
 
 ### Changed

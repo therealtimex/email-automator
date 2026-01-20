@@ -1,14 +1,31 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import path from 'path';
 import pkg from './package.json';
+
+// Get latest migration timestamp at build time
+function getLatestMigrationTimestamp() {
+    try {
+        const timestamp = execSync(
+            'node ./scripts/get-latest-migration-timestamp.mjs',
+            {
+                encoding: 'utf8',
+            },
+        ).trim();
+        return timestamp;
+    } catch {
+        console.warn('Warning: Could not determine latest migration timestamp');
+        return 'unknown';
+    }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
     define: {
-        'import.meta.env.APP_VERSION': JSON.stringify(pkg.version),
+        'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
+        'import.meta.env.VITE_LATEST_MIGRATION_TIMESTAMP': JSON.stringify(getLatestMigrationTimestamp()),
     },
     plugins: [
         react(),
