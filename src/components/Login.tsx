@@ -41,11 +41,15 @@ export function Login({ onSuccess, onConfigure }: LoginProps) {
         try {
             const { data, error } = await supabase.from('init_state').select('is_initialized');
             if (error) {
-                // atomic-crm behavior: If check fails, assume initialized (Show Login)
-                // This covers cases where publishable keys block REST access but Auth works.
-                console.warn('[Login] Init check failed, defaulting to initialized (Login):', error);
-                // We do NOT show a blocking error, just log it.
-                // This allows the user to attempt login.
+                // If relation doesn't exist (42P01), it's definitely not initialized
+                if ((error as any).code === '42P01') {
+                    console.info('[Login] init_state relation missing - fresh database detected.');
+                    setIsInitialized(false);
+                    return;
+                }
+
+                // For other errors (API key issues, etc.), default to initialized to allow login attempt
+                console.warn('[Login] Init check error, defaulting to initialized:', error);
                 setIsInitialized(true);
                 return;
             }

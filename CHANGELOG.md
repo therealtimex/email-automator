@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.8] - 2026-01-19
+
+### Fixed
+- **Onboarding Flow**: Fixed an issue where fresh deployments would skip the database migration/setup step and incorrectly show the login screen.
+- **Forced Setup UI**: The application now detects empty databases and forces the "System Setup Required" view before allowing account creation.
+- **Robust Init Detection**: Improved the logic for detecting fresh vs. initialized databases, ensuring the correct "Welcome" vs. "Welcome Back" screen is displayed.
+
 ## [2.9.7] - 2026-01-19
 
 ### Fixed

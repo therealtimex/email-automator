@@ -134,20 +134,25 @@ function AppContent() {
                 setNeedsSetup(true);
                 setCheckingConfig(false);
                 return;
-            } else if (state.isInitialized && state.isAuthenticated) {
-                // Load initial data only after initialization and auth
-                actions.fetchAccounts();
-                actions.fetchRules();
-                actions.fetchSettings();
-                actions.fetchProfile();
-
-                // Check migration status
+            } else if (state.isInitialized) {
+                // Always check migration status if we have a valid connection
                 checkMigrationStatus(supabase).then((status) => {
                     setMigrationStatus(status);
-                    if (status.needsMigration && !isMigrationReminderDismissed()) {
-                        setShowMigrationBanner(true);
+                    if (status.needsMigration) {
+                        // For non-authenticated users, we'll show the modal immediately later
+                        if (state.isAuthenticated && !isMigrationReminderDismissed()) {
+                            setShowMigrationBanner(true);
+                        }
                     }
                 });
+
+                if (state.isAuthenticated) {
+                    // Load data only if authenticated
+                    actions.fetchAccounts();
+                    actions.fetchRules();
+                    actions.fetchSettings();
+                    actions.fetchProfile();
+                }
             }
             setCheckingConfig(false);
         };
@@ -183,6 +188,28 @@ function AppContent() {
 
     if (!state.isInitialized) {
         return <PageLoader text="Initializing..." />;
+    }
+
+    // For non-authenticated users, if migration is needed, show setup UI immediately
+    if (!state.isAuthenticated && migrationStatus?.needsMigration) {
+        return (
+            <MigrationProvider value={migrationContextValue}>
+                <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 gap-8">
+                    <div className="text-center space-y-2">
+                        <Logo className="w-16 h-16 mx-auto mb-4" />
+                        <h1 className="text-3xl font-bold">System Setup Required</h1>
+                        <p className="text-muted-foreground max-w-md">
+                            Your database schema and Edge Functions need to be initialized before you can create an account.
+                        </p>
+                    </div>
+                    <MigrationModal
+                        open={true}
+                        onOpenChange={() => {}}
+                        status={migrationStatus}
+                    />
+                </div>
+            </MigrationProvider>
+        );
     }
 
     // Show login if not authenticated
