@@ -193,8 +193,37 @@ function AppContent() {
         return <PageLoader text="Initializing..." />;
     }
 
-    // For non-authenticated users, if migration is needed, show setup UI immediately
+    // For non-authenticated users with migration needs:
+    // 1. If no Supabase config exists, show setup wizard first
+    // 2. If Supabase is configured but needs migration, show migration modal
     if (!state.isAuthenticated && migrationStatus?.needsMigration) {
+        const config = getSupabaseConfig();
+
+        // If no config, user needs to connect to Supabase first
+        if (!config) {
+            return (
+                <>
+                    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 gap-8">
+                        <div className="text-center space-y-2">
+                            <Logo className="w-16 h-16 mx-auto mb-4" />
+                            <h1 className="text-3xl font-bold">Welcome to Email Automator</h1>
+                            <p className="text-muted-foreground max-w-md">
+                                Let's get you set up. First, connect to your Supabase database.
+                            </p>
+                        </div>
+                    </div>
+                    <SetupWizard
+                        onComplete={() => {
+                            // After Supabase connection, reload to show migration modal
+                            window.location.reload();
+                        }}
+                        canClose={false}
+                    />
+                </>
+            );
+        }
+
+        // Config exists, show migration modal
         return (
             <MigrationProvider value={migrationContextValue}>
                 <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 gap-8">
@@ -207,7 +236,7 @@ function AppContent() {
                     </div>
                     <MigrationModal
                         open={true}
-                        onOpenChange={() => {}}
+                        onOpenChange={() => { }}
                         status={migrationStatus}
                     />
                 </div>
@@ -234,10 +263,10 @@ function AppContent() {
                 console.warn('[App] Keep-alive ping failed');
             }
         };
-        
+
         // Initial ping
         ping();
-        
+
         // Repeat every 30 seconds
         const interval = setInterval(ping, 30000);
         return () => clearInterval(interval);
@@ -250,7 +279,7 @@ function AppContent() {
                 <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                     <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-8">
                         <div className="flex items-center gap-4">
-                            <button 
+                            <button
                                 onClick={() => setActiveTab('dashboard')}
                                 className="text-xl font-bold flex items-center gap-2 hover:opacity-80 transition-opacity"
                             >
@@ -258,12 +287,12 @@ function AppContent() {
                                 <span className="hidden sm:inline">Email Automator</span>
                                 <span className="sm:hidden">Email AI</span>
                             </button>
-                            
+
                             {/* Real-time Status Indicator */}
                             <div className={cn(
                                 "flex items-center gap-1.5 px-2 h-6 rounded-full text-[10px] font-bold border transition-colors",
-                                isSubscribed 
-                                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400" 
+                                isSubscribed
+                                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
                                     : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:text-yellow-400"
                             )}>
                                 <div className="relative flex items-center justify-center">
@@ -383,16 +412,16 @@ function AppContent() {
     );
 }
 
-function RunTraceModal({ 
-    runId, 
+function RunTraceModal({
+    runId,
     accountEmail,
-    isOpen, 
-    onOpenChange 
-}: { 
-    runId: string | null, 
+    isOpen,
+    onOpenChange
+}: {
+    runId: string | null,
     accountEmail?: string,
-    isOpen: boolean, 
-    onOpenChange: (open: boolean) => void 
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void
 }) {
     const [events, setEvents] = useState<ProcessingEvent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -454,7 +483,7 @@ function RunTraceModal({
                                 {i !== events.length - 1 && (
                                     <div className="absolute left-[15px] top-8 bottom-[-24px] w-px bg-border" />
                                 )}
-                                
+
                                 {/* Icon Badge */}
                                 <div className="absolute left-0 top-0 w-8 h-8 rounded-full border bg-background flex items-center justify-center z-10 shadow-sm">
                                     {getIcon(event.event_type)}
@@ -499,7 +528,7 @@ function RunTraceModal({
                                                         </span>
                                                     ))}
                                                 </div>
-                                                
+
                                                 {event.details?.usage && (
                                                     <div className="flex gap-3 pt-1.5 mt-1 border-t border-border/50 text-[9px] text-muted-foreground">
                                                         <span>In: <b>{event.details.usage.prompt_tokens}</b></span>
@@ -633,13 +662,13 @@ function AnalyticsPage() {
                 ) : (
                     <div className="space-y-3">
                         {stats.recentSyncs.map((log: any) => {
-                            const duration = log.completed_at 
+                            const duration = log.completed_at
                                 ? Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)
                                 : null;
-                                
+
                             return (
-                                <div 
-                                    key={log.id} 
+                                <div
+                                    key={log.id}
                                     className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg hover:bg-secondary/30 transition-colors gap-3 cursor-pointer group"
                                     onClick={() => handleViewRunTrace(log.id, log.email_accounts?.email_address)}
                                 >
@@ -647,7 +676,7 @@ function AnalyticsPage() {
                                         <div className={cn(
                                             "w-2.5 h-2.5 rounded-full",
                                             log.status === 'success' ? 'bg-emerald-500' :
-                                            log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] animate-pulse'
+                                                log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] animate-pulse'
                                         )} />
                                         <div className="flex flex-col">
                                             <span className="text-sm font-medium group-hover:text-primary transition-colors">
@@ -679,11 +708,11 @@ function AnalyticsPage() {
                 )}
             </div>
 
-            <RunTraceModal 
-                runId={selectedRunId} 
+            <RunTraceModal
+                runId={selectedRunId}
                 accountEmail={selectedAccountEmail}
-                isOpen={isRunTraceOpen} 
-                onOpenChange={setIsRunTraceOpen} 
+                isOpen={isRunTraceOpen}
+                onOpenChange={setIsRunTraceOpen}
             />
         </div>
     );

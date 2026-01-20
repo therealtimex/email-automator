@@ -185,8 +185,8 @@ export function MigrationModal({
                 return result;
             };
 
-            // Step 1: Run migration
-            setMigrationLogs((prev) => [...prev, "", "📦 Step 1/2: Database Migration"]);
+            // Step 1: Run migration (includes Edge Functions deployment)
+            setMigrationLogs((prev) => [...prev, "", "📦 Database Migration & Edge Functions Deployment"]);
             const migrateResponse = await fetch("/api/migrate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -211,34 +211,7 @@ export function MigrationModal({
                 throw new Error("Migration did not complete successfully");
             }
 
-            // Step 2: Deploy Edge Functions
-            setMigrationLogs((prev) => [...prev, "", "⚡ Step 2/2: Deploying Edge Functions"]);
-
-            const deployResponse = await fetch("/api/deploy", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    projectRef: projectId,
-                    dbPassword,
-                    accessToken,
-                }),
-            });
-
-            if (!deployResponse.ok) {
-                throw new Error(
-                    `Deployment failed: ${deployResponse.status} ${deployResponse.statusText}`,
-                );
-            }
-
-            const deployReader = deployResponse.body?.getReader();
-            if (!deployReader) throw new Error("No deployment response stream received.");
-
-            const deployResult = await readStreamWithResult(deployReader);
-            if (deployResult !== "success") {
-                throw new Error("Edge Functions deployment did not complete successfully");
-            }
-
-            // Final success message
+            // Migration complete (includes Edge Functions deployment)
             setMigrationLogs((prev) => [
                 ...prev,
                 "",

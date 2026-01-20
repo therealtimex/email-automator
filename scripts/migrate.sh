@@ -135,29 +135,30 @@ else
 fi
 
 echo "---------------------------------------------------------"
-if [ "$SKIP_FUNCTIONS" = "1" ]; then
-    echo "⏭️  Skipping Edge Functions deployment (SKIP_FUNCTIONS=1)."
-else
-    echo "⚡ Deploying Edge Functions..."
-    # Deploys API logic explicitly for each function to ensure they are all deployed
-    # We skip _shared and hidden folders
-    if [ -d "supabase/functions" ]; then
-        for func in supabase/functions/*; do
-            if [ -d "$func" ]; then
-                func_name=$(basename "$func")
-                # Skip _shared and hidden folders
-                if [[ "$func_name" != "_shared" && "$func_name" != .* ]]; then
+echo "⚡ Deploying Edge Functions..."
+# Deploys API logic explicitly for each function to ensure they are all deployed
+# We skip _shared and hidden folders
+if [ -d "supabase/functions" ]; then
+    for func in supabase/functions/*; do
+        if [ -d "$func" ]; then
+            func_name=$(basename "$func")
+            # Skip _shared, hidden folders, and empty directories
+            if [[ "$func_name" != "_shared" && "$func_name" != .* ]]; then
+                # Check if index.ts exists before deploying
+                if [ -f "$func/index.ts" ]; then
                     echo "   Deploying $func_name..."
                     if ! $SUPABASE_CMD functions deploy "$func_name" --no-verify-jwt; then
                         echo "❌ Error: Failed to deploy function '$func_name'."
                         exit 1
                     fi
+                else
+                    echo "   ⏭️  Skipping $func_name (no index.ts found)"
                 fi
             fi
-        done
-    else
-        echo "⚠️ Warning: supabase/functions directory not found. Skipping function deployment."
-    fi
+        fi
+    done
+else
+    echo "⚠️ Warning: supabase/functions directory not found. Skipping function deployment."
 fi
 
 
