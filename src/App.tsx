@@ -136,7 +136,8 @@ function AppContent() {
                 return;
             } else if (state.isInitialized) {
                 // Always check migration status if we have a valid connection
-                checkMigrationStatus(supabase).then((status) => {
+                try {
+                    const status = await checkMigrationStatus(supabase);
                     setMigrationStatus(status);
                     if (status.needsMigration) {
                         // For non-authenticated users, we'll show the modal immediately later
@@ -144,7 +145,9 @@ function AppContent() {
                             setShowMigrationBanner(true);
                         }
                     }
-                });
+                } catch (e) {
+                    console.error('[App] Migration check failed:', e);
+                }
 
                 if (state.isAuthenticated) {
                     // Load data only if authenticated

@@ -55,7 +55,7 @@ export function Login({ onSuccess, onConfigure }: LoginProps) {
             }
 
             // The view returns { is_initialized: 1 } if initialized, or 0/null if not
-            const initialized = data?.[0]?.is_initialized > 0;
+            const initialized = data && data.length > 0 && data[0].is_initialized > 0;
             setIsInitialized(initialized);
         } catch (err: any) {
             console.warn('[Login] Init check exception, defaulting to initialized:', err);
