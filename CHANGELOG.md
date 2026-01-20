@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.10.0] - 2026-01-20
+
+### Added
+- **Robust Setup Flow**: Significantly improved the initial admin account creation process.
+  - Added comprehensive logging to the `setup` Edge Function for better troubleshooting.
+  - Implemented strict verification of profile creation during onboarding.
+  - Improved error reporting for database and environment configuration issues.
+- **Fixed Auth Triggers**: Added a new migration to set a robust `search_path` for Supabase Auth triggers, resolving "unexpected_failure" errors during user registration.
+
+### Changed
+- **Consolidated Deployment**: Refactored the backend orchestration logic to consolidate Edge Function deployment within the primary `migrate.sh` workflow, simplifying the update process for all environments.
+
 ## [2.9.10] - 2026-01-19
 
 ### Fixed
