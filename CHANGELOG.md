@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.9.6] - 2026-01-19
+
+### Added
+- **Automated Setup**: Users can now deploy Supabase Edge Functions directly from the UI during the initial configuration or migration process.
+- **Improved Scripts**: Refactored `migrate.sh` and `deploy-functions.sh` to prioritize the bundled Supabase CLI, making setup significantly more reliable in restricted sandbox environments.
+- **Deployment API**: Added a new `/api/deploy` endpoint to the Express server to facilitate remote Edge Function orchestration.
+
 ## [2.9.5] - 2026-01-19
 
 ### Added
