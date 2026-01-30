@@ -42,28 +42,16 @@ import { sounds } from './lib/sounds';
 
 function AppContent() {
     const { state, isSubscribed, actions } = useApp();
+    const [user, setUser] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
     const [needsSetup, setNeedsSetup] = useState(false);
+    const [isSystemInitialized, setIsSystemInitialized] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-    const [checkingConfig, setCheckingConfig] = useState(true);
     const [processingAuth, setProcessingAuth] = useState(false);
-
-    // Resume AudioContext on first interaction
-    useEffect(() => {
-        const resumeAudio = () => {
-            if (sounds.isEnabled()) {
-                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-                if (ctx.state === 'suspended') ctx.resume();
-            }
-            window.removeEventListener('click', resumeAudio);
-            window.removeEventListener('keydown', resumeAudio);
-        };
-        window.addEventListener('click', resumeAudio);
-        window.addEventListener('keydown', resumeAudio);
-        return () => {
-            window.removeEventListener('click', resumeAudio);
-            window.removeEventListener('keydown', resumeAudio);
-        };
-    }, []);
+    const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
+    const [showMigrationBanner, setShowMigrationBanner] = useState(false);
+    const [showMigrationModal, setShowMigrationModal] = useState(false);
+    const [suppressMigrationBanner, setSuppressMigrationBanner] = useState(false);
 
     // Handle OAuth Callback (e.g. Gmail)
     useEffect(() => {
@@ -109,74 +97,107 @@ function AppContent() {
         return <PageLoader text="Connecting account..." />;
     }
 
-    // Migration state
-    const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
-    const [showMigrationBanner, setShowMigrationBanner] = useState(false);
-    const [showMigrationModal, setShowMigrationModal] = useState(false);
-    const [suppressMigrationBanner, setSuppressMigrationBanner] = useState(false);
-
-    // Initial Config Check
+    // Initial App Status Check
     useEffect(() => {
-        const checkConfig = async () => {
+        const checkAppStatus = async () => {
             const config = getSupabaseConfig();
 
             if (!config) {
                 setNeedsSetup(true);
-                setCheckingConfig(false);
+                setLoading(false);
                 return;
             }
 
-            // Validate the configuration (especially if it came from environment variables)
-            const validation = await validateSupabaseConnection(config.url, config.anonKey);
+            try {
+                // 1. Check if DB is initialized (init_state exists and is true)
+                const { data: initData, error: initError } = await supabase
+                    .from('init_state')
+                    .select('is_initialized')
+                    .single();
 
-            if (!validation.valid) {
-                // Force setup wizard on invalid config
-                setNeedsSetup(true);
-                setCheckingConfig(false);
-                return;
-            } else if (state.isInitialized) {
-                // Always check migration status if we have a valid connection
-                try {
-                    const status = await checkMigrationStatus(supabase);
-                    setMigrationStatus(status);
-                    if (status.needsMigration) {
-                        // For non-authenticated users, we'll show the modal immediately later
-                        if (state.isAuthenticated && !isMigrationReminderDismissed()) {
-                            setShowMigrationBanner(true);
-                        }
+                if (initError) {
+                    console.warn('[App] Init check error (might be fresh DB):', initError);
+                    if ((initError as any).code === '42P01') {
+                        setIsSystemInitialized(false);
                     }
-                } catch (e) {
-                    console.error('[App] Migration check failed:', e);
+                } else {
+                    setIsSystemInitialized(initData.is_initialized > 0);
                 }
 
-                if (state.isAuthenticated) {
-                    // Load data only if authenticated
-                    actions.fetchAccounts();
-                    actions.fetchRules();
-                    actions.fetchSettings();
-                    actions.fetchProfile();
+                // 2. Initial session check
+                const { data: { session } } = await supabase.auth.getSession();
+                setUser(session?.user ?? null);
+
+                // 3. Migration Check (Only for authenticated users)
+                if (session?.user) {
+                    const status = await checkMigrationStatus(supabase);
+                    setMigrationStatus(status.needsMigration ? status : null);
+                    if (status.needsMigration && !isMigrationReminderDismissed()) {
+                        setShowMigrationBanner(true);
+                    }
                 }
+            } catch (err) {
+                console.error('[App] Status check failed:', err);
+                // If it's a connection error, but we have config, maybe don't force setup
+                // unless it's an explicit "Invalid API key" error
+                if (err instanceof Error && err.message.includes('Invalid API key')) {
+                    setNeedsSetup(true);
+                }
+            } finally {
+                setLoading(false);
             }
-            setCheckingConfig(false);
         };
-        checkConfig();
-    }, [state.isInitialized, state.isAuthenticated]);
+
+        checkAppStatus();
+
+        // Auth listener
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+            if (!session) {
+                setMigrationStatus(null);
+                setShowMigrationBanner(false);
+            }
+        });
+
+        // Resume AudioContext on first interaction
+        const resumeAudio = () => {
+            if (sounds.isEnabled()) {
+                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+            }
+            window.removeEventListener('click', resumeAudio);
+            window.removeEventListener('keydown', resumeAudio);
+        };
+        window.addEventListener('click', resumeAudio);
+        window.addEventListener('keydown', resumeAudio);
+
+        return () => {
+            subscription.unsubscribe();
+            window.removeEventListener('click', resumeAudio);
+            window.removeEventListener('keydown', resumeAudio);
+        };
+    }, []);
+
+    // Data loading when authenticated
+    useEffect(() => {
+        if (user) {
+            actions.fetchAccounts();
+            actions.fetchRules();
+            actions.fetchSettings();
+            actions.fetchProfile();
+        }
+    }, [user]);
 
     // Keep-alive ping to backend
     useEffect(() => {
         const ping = async () => {
             try {
-                // Only ping if the server is likely running
                 await api.healthCheck();
             } catch (e) {
                 console.warn('[App] Keep-alive ping failed');
             }
         };
-
-        // Initial ping
         ping();
-
-        // Repeat every 30 seconds
         const interval = setInterval(ping, 30000);
         return () => clearInterval(interval);
     }, []);
@@ -195,77 +216,22 @@ function AppContent() {
         setSuppressMigrationBanner,
     };
 
-    if (checkingConfig) {
-        return <PageLoader text="Checking configuration..." />;
+    if (loading) {
+        return <PageLoader text="Loading your workspace..." />;
     }
 
     if (needsSetup) {
         return (
-            <SetupWizard onComplete={() => {
-                setNeedsSetup(false);
-                window.location.reload();
-            }} />
+            <SetupWizard onComplete={() => setNeedsSetup(false)} />
         );
     }
 
-    if (!state.isInitialized) {
-        return <PageLoader text="Initializing..." />;
-    }
-
-    // For non-authenticated users with migration needs:
-    // 1. If no Supabase config exists, show setup wizard first
-    // 2. If Supabase is configured but needs migration, show migration modal
-    if (!state.isAuthenticated && migrationStatus?.needsMigration) {
-        const config = getSupabaseConfig();
-
-        // If no config, user needs to connect to Supabase first
-        if (!config) {
-            return (
-                <>
-                    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 gap-8">
-                        <div className="text-center space-y-2">
-                            <Logo className="w-16 h-16 mx-auto mb-4" />
-                            <h1 className="text-3xl font-bold">Welcome to Email Automator</h1>
-                            <p className="text-muted-foreground max-w-md">
-                                Let's get you set up. First, connect to your Supabase database.
-                            </p>
-                        </div>
-                    </div>
-                    <SetupWizard
-                        onComplete={() => {
-                            // After Supabase connection, reload to show migration modal
-                            window.location.reload();
-                        }}
-                        canClose={false}
-                    />
-                </>
-            );
-        }
-
-        // Config exists, show migration modal
-        return (
-            <MigrationProvider value={migrationContextValue}>
-                <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 gap-8">
-                    <div className="text-center space-y-2">
-                        <Logo className="w-16 h-16 mx-auto mb-4" />
-                        <h1 className="text-3xl font-bold">System Setup Required</h1>
-                        <p className="text-muted-foreground max-w-md">
-                            Your database schema and Edge Functions need to be initialized before you can create an account.
-                        </p>
-                    </div>
-                    <MigrationModal
-                        open={true}
-                        onOpenChange={() => { }}
-                        status={migrationStatus}
-                    />
-                </div>
-            </MigrationProvider>
-        );
-    }
-
-    // Show login if not authenticated
-    if (!state.isAuthenticated) {
-        return <Login onConfigure={() => setNeedsSetup(true)} />;
+    if (!user) {
+        return <Login
+            onSuccess={() => actions.fetchProfile()}
+            onConfigure={() => setNeedsSetup(true)}
+            isInitialized={isSystemInitialized}
+        />;
     }
 
     const handleLogout = async () => {

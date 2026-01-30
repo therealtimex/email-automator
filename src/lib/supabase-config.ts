@@ -8,27 +8,36 @@ export interface SupabaseConfig {
 }
 
 export function getSupabaseConfig(): SupabaseConfig | null {
+    const validate = (cfg: any): cfg is SupabaseConfig => {
+        return (
+            cfg &&
+            typeof cfg.url === 'string' &&
+            typeof cfg.anonKey === 'string' &&
+            cfg.url.startsWith('http') &&
+            !cfg.url.includes('placeholder.supabase.co') &&
+            cfg.url !== 'your_supabase_url' &&
+            cfg.anonKey !== 'your_supabase_anon_key'
+        );
+    };
+
     try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
-            return JSON.parse(stored);
+            const parsed = JSON.parse(stored);
+            if (validate(parsed)) return parsed;
         }
     } catch (error) {
         console.error('Error reading Supabase config:', error);
     }
 
     // Fallback to env vars
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const envConfig = {
+        url: import.meta.env.VITE_SUPABASE_URL,
+        anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    };
 
-    if (
-        url && 
-        anonKey && 
-        url !== 'your_supabase_url' && 
-        anonKey !== 'your_supabase_anon_key' &&
-        url.startsWith('http')
-    ) {
-        return { url, anonKey };
+    if (validate(envConfig)) {
+        return envConfig;
     }
 
     return null;
