@@ -82,8 +82,7 @@ export const schemas = {
     // Migration schemas
     migrate: z.object({
         projectRef: z.string().min(1, 'Project reference is required'),
-        dbPassword: z.string().optional(),
-        accessToken: z.string().optional(),
+        accessToken: z.string().min(1, 'Access token is required for automatic migration'),
     }),
 
     // Rule schemas - supports both single action (legacy) and actions array
@@ -116,9 +115,8 @@ export const schemas = {
 
     // Settings schemas
     updateSettings: z.object({
+        llm_provider: z.string().optional(),
         llm_model: z.string().optional(),
-        llm_base_url: z.string().url().optional().or(z.literal('')),
-        llm_api_key: z.string().optional(),
         auto_trash_spam: z.boolean().optional(),
         smart_drafts: z.boolean().optional(),
         sync_interval_minutes: z.number().min(1).max(60).optional(),

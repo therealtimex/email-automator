@@ -152,16 +152,7 @@ router.post('/draft/:emailId',
             throw new NotFoundError('Email');
         }
 
-        // Get user settings for LLM config
-        const { data: settings } = await req.supabase!
-            .from('user_settings')
-            .select('llm_model, llm_base_url')
-            .eq('user_id', userId)
-            .single();
-
-        const intelligenceService = getIntelligenceService(
-            settings ? { model: settings.llm_model, baseUrl: settings.llm_base_url } : undefined
-        );
+        const intelligenceService = getIntelligenceService();
 
         const draft = await intelligenceService.generateDraftReply(
             {

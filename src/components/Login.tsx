@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Loader2, LogIn, UserPlus, KeyRound, ArrowLeft, Eye, EyeOff, Shield, Settings } from 'lucide-react';
+import { Mail, Loader2, LogIn, UserPlus, KeyRound, ArrowLeft, Eye, EyeOff, Shield, Settings, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { Button } from './ui/button';

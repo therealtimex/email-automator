@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { apiRateLimit } from '../middleware/rateLimit.js';
 import { validateBody, schemas } from '../middleware/validation.js';
 import { createLogger } from '../utils/logger.js';
+import { SDKService } from '../services/SDKService.js';
 
 const router = Router();
 const logger = createLogger('SettingsRoutes');
@@ -28,12 +29,20 @@ router.get('/',
         const settingsData = settingsResult.data;
         const integrationsData = integrationsResult.data || [];
 
-        // Return defaults if no settings exist
-        const settings = settingsData || {
-            llm_model: null,
-            llm_base_url: null,
+        // Return defaults if no settings exist, or upgrade old defaults
+        let settings = settingsData || {
+            llm_provider: SDKService.DEFAULT_LLM_PROVIDER,
+            llm_model: 'gpt-4o-mini',
             sync_interval_minutes: 5,
         };
+
+        // Proactive upgrade for existing settings objects
+        if (settings.llm_model === 'gpt-4.1-mini' || !settings.llm_model) {
+            settings.llm_model = 'gpt-4o-mini';
+        }
+        if (!settings.llm_provider) {
+            settings.llm_provider = SDKService.DEFAULT_LLM_PROVIDER;
+        }
 
         // Merge integration credentials back into settings for frontend compatibility
         const googleIntegration = integrationsData.find((i: any) => i.provider === 'google');
@@ -67,7 +76,7 @@ router.patch('/',
             microsoft_tenant_id,
             ...userSettingsUpdates
         } = req.body;
-        
+
         const userId = req.user!.id;
 
         // 1. Update user_settings
@@ -91,7 +100,7 @@ router.patch('/',
                 .eq('user_id', userId)
                 .eq('provider', 'google')
                 .single();
-                
+
             const credentials: any = {};
             if (google_client_id) credentials.client_id = google_client_id;
             if (google_client_secret) credentials.client_secret = google_client_secret;
@@ -110,19 +119,19 @@ router.patch('/',
 
         // 3. Handle Microsoft Integration
         if (microsoft_client_id || microsoft_client_secret || microsoft_tenant_id) {
-             const { data: existing } = await req.supabase!
+            const { data: existing } = await req.supabase!
                 .from('integrations')
                 .select('credentials')
                 .eq('user_id', userId)
                 .eq('provider', 'microsoft')
                 .single();
 
-             const credentials: any = {};
-             if (microsoft_client_id) credentials.client_id = microsoft_client_id;
-             if (microsoft_client_secret) credentials.client_secret = microsoft_client_secret;
-             if (microsoft_tenant_id) credentials.tenant_id = microsoft_tenant_id;
+            const credentials: any = {};
+            if (microsoft_client_id) credentials.client_id = microsoft_client_id;
+            if (microsoft_client_secret) credentials.client_secret = microsoft_client_secret;
+            if (microsoft_tenant_id) credentials.tenant_id = microsoft_tenant_id;
 
-             const newCredentials = { ...(existing?.credentials || {}), ...credentials };
+            const newCredentials = { ...(existing?.credentials || {}), ...credentials };
 
             await req.supabase!
                 .from('integrations')
@@ -156,14 +165,8 @@ router.post('/test-llm',
     apiRateLimit,
     authMiddleware,
     asyncHandler(async (req, res) => {
-        const { llm_model, llm_base_url, llm_api_key } = req.body;
-
         const { getIntelligenceService } = await import('../services/intelligence.js');
-        const intelligence = getIntelligenceService({
-            model: llm_model,
-            baseUrl: llm_base_url,
-            apiKey: llm_api_key,
-        });
+        const intelligence = getIntelligenceService();
 
         const result = await intelligence.testConnection();
         res.json(result);

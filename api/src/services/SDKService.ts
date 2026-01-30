@@ -106,4 +106,151 @@ export class SDKService {
             clearTimeout(timeoutHandle);
         }
     }
+
+    // Cache for default providers (avoid repeated SDK calls)
+    private static defaultChatProvider: { provider: string; model: string } | null = null;
+    private static defaultEmbedProvider: { provider: string; model: string } | null = null;
+
+    /**
+     * Get default chat provider/model from SDK dynamically
+     * Caches result to avoid repeated SDK calls
+     */
+    static async getDefaultChatProvider(): Promise<{ provider: string; model: string }> {
+        // Return cached if available
+        if (this.defaultChatProvider) {
+            return this.defaultChatProvider;
+        }
+
+        const sdk = this.getSDK();
+        if (!sdk) {
+            throw new Error('RealTimeX SDK not available. Cannot determine default LLM provider.');
+        }
+
+        try {
+            const { providers } = await this.withTimeout<ProvidersResponse>(
+                sdk.llm.chatProviders(),
+                30000,
+                'Chat providers fetch timed out'
+            );
+
+            if (!providers || providers.length === 0) {
+                throw new Error('No LLM providers available. Please configure a provider in RealTimeX Desktop.');
+            }
+
+            // Find first provider with available models
+            for (const p of providers) {
+                if (p.models && p.models.length > 0) {
+                    this.defaultChatProvider = {
+                        provider: p.provider,
+                        model: p.models[0].id
+                    };
+                    console.log(`[SDKService] Default chat provider: ${this.defaultChatProvider.provider}/${this.defaultChatProvider.model}`);
+                    return this.defaultChatProvider;
+                }
+            }
+
+            throw new Error('No LLM models available. Please configure a model in RealTimeX Desktop.');
+        } catch (error: any) {
+            console.error('[SDKService] Failed to get default chat provider:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Get default embedding provider/model from SDK dynamically
+     * Caches result to avoid repeated SDK calls
+     */
+    static async getDefaultEmbedProvider(): Promise<{ provider: string; model: string }> {
+        // Return cached if available
+        if (this.defaultEmbedProvider) {
+            return this.defaultEmbedProvider;
+        }
+
+        const sdk = this.getSDK();
+        if (!sdk) {
+            throw new Error('RealTimeX SDK not available. Cannot determine default embedding provider.');
+        }
+
+        try {
+            const { providers } = await this.withTimeout<ProvidersResponse>(
+                sdk.llm.embedProviders(),
+                30000,
+                'Embed providers fetch timed out'
+            );
+
+            if (!providers || providers.length === 0) {
+                throw new Error('No embedding providers available. Please configure a provider in RealTimeX Desktop.');
+            }
+
+            // Find first provider with available models
+            for (const p of providers) {
+                if (p.models && p.models.length > 0) {
+                    this.defaultEmbedProvider = {
+                        provider: p.provider,
+                        model: p.models[0].id
+                    };
+                    console.log(`[SDKService] Default embed provider: ${this.defaultEmbedProvider.provider}/${this.defaultEmbedProvider.model}`);
+                    return this.defaultEmbedProvider;
+                }
+            }
+
+            throw new Error('No embedding models available. Please configure a model in RealTimeX Desktop.');
+        } catch (error: any) {
+            console.error('[SDKService] Failed to get default embed provider:', error.message);
+            throw error;
+        }
+    }
+
+    // Default provider/model configuration
+    // realtimexai routes through RealTimeX Desktop to user's configured providers
+    static readonly DEFAULT_LLM_PROVIDER = 'realtimexai';
+    static readonly DEFAULT_LLM_MODEL = 'gpt-4o-mini';
+    static readonly DEFAULT_EMBED_PROVIDER = 'realtimexai';
+    static readonly DEFAULT_EMBED_MODEL = 'text-embedding-3-small';
+
+    /**
+     * Resolve LLM provider/model - use settings if available, otherwise use defaults
+     */
+    static async resolveChatProvider(settings: { llm_provider?: string; llm_model?: string }): Promise<{ provider: string; model: string }> {
+        // If both provider and model are set in settings, use them
+        if (settings.llm_provider && settings.llm_model) {
+            return { provider: settings.llm_provider, model: settings.llm_model };
+        }
+
+        // Try to get from SDK discovery first
+        try {
+            return await this.getDefaultChatProvider();
+        } catch (error) {
+            // Fallback to hardcoded defaults if SDK discovery fails
+            console.log(`[SDKService] Using default LLM: ${this.DEFAULT_LLM_PROVIDER}/${this.DEFAULT_LLM_MODEL}`);
+            return { provider: this.DEFAULT_LLM_PROVIDER, model: this.DEFAULT_LLM_MODEL };
+        }
+    }
+
+    /**
+     * Resolve embedding provider/model - use settings if available, otherwise use defaults
+     */
+    static async resolveEmbedProvider(settings: { embedding_provider?: string; embedding_model?: string }): Promise<{ provider: string; model: string }> {
+        // If both provider and model are set in settings, use them
+        if (settings.embedding_provider && settings.embedding_model) {
+            return { provider: settings.embedding_provider, model: settings.embedding_model };
+        }
+
+        // Try to get from SDK discovery first
+        try {
+            return await this.getDefaultEmbedProvider();
+        } catch (error) {
+            // Fallback to hardcoded defaults if SDK discovery fails
+            console.log(`[SDKService] Using default embedding: ${this.DEFAULT_EMBED_PROVIDER}/${this.DEFAULT_EMBED_MODEL}`);
+            return { provider: this.DEFAULT_EMBED_PROVIDER, model: this.DEFAULT_EMBED_MODEL };
+        }
+    }
+
+    /**
+     * Clear provider cache (useful when providers change)
+     */
+    static clearProviderCache(): void {
+        this.defaultChatProvider = null;
+        this.defaultEmbedProvider = null;
+    }
 }

@@ -13,7 +13,7 @@ const logger = createLogger('MigrateRoutes');
 router.post('/',
     validateBody(schemas.migrate),
     asyncHandler(async (req, res) => {
-        const { projectRef, dbPassword, accessToken } = req.body;
+        const { projectRef, accessToken } = req.body;
 
         logger.info('Starting migration', { projectRef });
 
@@ -33,7 +33,6 @@ router.post('/',
             const env = {
                 ...process.env,
                 SUPABASE_PROJECT_ID: projectRef,
-                SUPABASE_DB_PASSWORD: dbPassword || '',
                 SUPABASE_ACCESS_TOKEN: accessToken || '',
                 SKIP_FUNCTIONS: '0',
             };

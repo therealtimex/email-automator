@@ -70,6 +70,55 @@ export function Configuration() {
     const [newRuleAttachments, setNewRuleAttachments] = useState<RuleAttachment[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [savingRule, setSavingRule] = useState(false);
+    // LLM Provider Discovery state
+    const [chatProviders, setChatProviders] = useState<any[]>([]);
+    const [isLoadingProviders, setIsLoadingProviders] = useState(false);
+
+    useEffect(() => {
+        const fetchProviders = async () => {
+            setIsLoadingProviders(true);
+            try {
+                const response = await api.getChatProviders();
+                if (response.data?.success) {
+                    setChatProviders(response.data.providers || []);
+
+                    // If no provider set, or old default, auto-select gpt-4o-mini
+                    const isOldDefault = localSettings.llm_model === 'gpt-4.1-mini';
+                    if ((!localSettings.llm_provider || isOldDefault) && response.data.providers.length > 0) {
+                        const firstProvider = response.data.providers.find((p: any) => p.models && p.models.some((m: any) => m.id === 'gpt-4o-mini'))
+                            || response.data.providers.find((p: any) => p.models && p.models.length > 0);
+
+                        if (firstProvider) {
+                            const targetModel = firstProvider.models.find((m: any) => m.id === 'gpt-4o-mini')?.id || firstProvider.models[0].id;
+                            setLocalSettings(s => ({
+                                ...s,
+                                llm_provider: firstProvider.provider,
+                                llm_model: targetModel
+                            }));
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch providers:', error);
+            } finally {
+                setIsLoadingProviders(false);
+            }
+        };
+        fetchProviders();
+    }, []);
+
+    const selectedProvider = chatProviders.find(p => p.provider === (localSettings.llm_provider || 'realtimexai'));
+    const availableModels = selectedProvider?.models || [];
+
+    const handleProviderChange = (providerId: string) => {
+        const provider = chatProviders.find(p => p.provider === providerId);
+        setLocalSettings(s => ({
+            ...s,
+            llm_provider: providerId,
+            llm_model: provider?.models?.[0]?.id || ''
+        }));
+    };
+
     const [loadingSetting, setLoadingSetting] = useState<string | null>(null);
     const [editingRule, setEditingRule] = useState<Rule | null>(null);
 
@@ -110,7 +159,7 @@ export function Configuration() {
     const handleEditClick = (rule: Rule) => {
         setEditingRule(rule);
         setNewRuleName(rule.name);
-        
+
         // Extract condition details
         const condition = rule.condition as any;
         const keys = Object.keys(condition).filter(k => k !== 'older_than_days');
@@ -118,13 +167,13 @@ export function Configuration() {
         setNewRuleKey(mainKey);
         setNewRuleValue(condition[mainKey] || '');
         setNewRuleOlderThan(condition.older_than_days?.toString() || '');
-        
+
         // Actions
         const ruleActions = rule.actions && rule.actions.length > 0
             ? rule.actions
             : (rule.action ? [rule.action] : ['archive']);
         setNewRuleActions(ruleActions);
-        
+
         setNewRuleInstructions(rule.instructions || '');
         setNewRuleDescription(rule.description || '');
         setNewRuleIntent(rule.intent || '');
@@ -457,11 +506,7 @@ export function Configuration() {
     const handleTestConnection = async () => {
         setTestingLlm(true);
         try {
-            const result = await api.testLlm({
-                llm_model: localSettings.llm_model || null,
-                llm_base_url: localSettings.llm_base_url || null,
-                llm_api_key: localSettings.llm_api_key || null,
-            });
+            const result = await api.testLlm();
 
             if (result.data?.success) {
                 toast.success(result.data.message);
@@ -898,8 +943,8 @@ export function Configuration() {
                                     <Input
                                         placeholder={
                                             newRuleKey === 'sender_domain' ? 'rta.vn' :
-                                            newRuleKey === 'sender_email' ? 'john@example.com' :
-                                            'Keywords...'
+                                                newRuleKey === 'sender_email' ? 'john@example.com' :
+                                                    'Keywords...'
                                         }
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
@@ -944,11 +989,10 @@ export function Configuration() {
                                 ].map((option) => (
                                     <label
                                         key={option.value}
-                                        className={`flex items-center gap-2 p-2 border rounded-md cursor-pointer transition-colors ${
-                                            newRuleActions.includes(option.value)
-                                                ? 'bg-primary/10 border-primary'
-                                                : 'bg-background hover:bg-secondary/50'
-                                        }`}
+                                        className={`flex items-center gap-2 p-2 border rounded-md cursor-pointer transition-colors ${newRuleActions.includes(option.value)
+                                            ? 'bg-primary/10 border-primary'
+                                            : 'bg-background hover:bg-secondary/50'
+                                            }`}
                                     >
                                         <input
                                             type="checkbox"
@@ -988,14 +1032,14 @@ export function Configuration() {
                                         <Paperclip className="w-4 h-4" />
                                         Attachments (Optional)
                                     </label>
-                                    
+
                                     <div className="flex flex-col gap-2">
                                         {newRuleAttachments.map(file => (
                                             <div key={file.path} className="flex items-center justify-between p-2 bg-secondary/50 rounded border text-xs">
                                                 <span className="truncate max-w-[200px]">{file.name}</span>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="sm" 
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     className="h-6 w-6 p-0 text-destructive"
                                                     onClick={() => removeAttachment(file.path)}
                                                 >
@@ -1003,7 +1047,7 @@ export function Configuration() {
                                                 </Button>
                                             </div>
                                         ))}
-                                        
+
                                         <div className="relative">
                                             <input
                                                 type="file"
@@ -1011,9 +1055,9 @@ export function Configuration() {
                                                 onChange={handleFileUpload}
                                                 disabled={isUploading}
                                             />
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
                                                 className="w-full border-dashed"
                                                 disabled={isUploading}
                                             >
@@ -1271,67 +1315,68 @@ export function Configuration() {
                             {state.rules.length > 0 && state.rules
                                 .filter(r => r.name !== 'Auto-Trash Spam' && r.name !== 'Smart Drafts')
                                 .map((rule: Rule) => {
-                                const ruleActions = rule.actions && rule.actions.length > 0
-                                    ? rule.actions
-                                    : (rule.action ? [rule.action] : []);
-                                return (
-                                <div
-                                    key={rule.id}
-                                    className="p-3 bg-secondary/30 rounded-lg mb-2"
-                                >
-                                    <div className="flex justify-between items-center mb-1">
-                                        <div>
-                                            <span className="text-sm font-medium">{rule.name}</span>
-                                            <span className="text-xs text-muted-foreground ml-2">
-                                                → {ruleActions.join(' + ')}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 w-7 p-0"
-                                                onClick={() => handleEditClick(rule)}
-                                                title="Edit Rule"
-                                            >
-                                                <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                                            </Button>
-                                            <Button
-                                                variant={rule.is_enabled ? 'default' : 'outline'}
-                                                size="sm"
-                                                onClick={() => handleToggleRule(rule.id)}
-                                                className="h-7 px-2"
-                                            >
-                                                <Power className="w-3.5 h-3.5 mr-1" />
-                                                {rule.is_enabled ? 'On' : 'Off'}
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="text-destructive"
-                                                onClick={() => actions.deleteRule(rule.id)}
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    {rule.instructions && (
-                                        <p className="text-[10px] text-muted-foreground italic border-t border-border/50 pt-1 mt-1 truncate">
-                                            "{rule.instructions}"
-                                        </p>
-                                    )}
-                                    {rule.attachments && rule.attachments.length > 0 && (
-                                        <div className="flex gap-1 mt-1">
-                                            {rule.attachments.map(a => (
-                                                <div key={a.path} className="flex items-center gap-1 text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">
-                                                    <Paperclip className="w-2.5 h-2.5" />
-                                                    {a.name}
+                                    const ruleActions = rule.actions && rule.actions.length > 0
+                                        ? rule.actions
+                                        : (rule.action ? [rule.action] : []);
+                                    return (
+                                        <div
+                                            key={rule.id}
+                                            className="p-3 bg-secondary/30 rounded-lg mb-2"
+                                        >
+                                            <div className="flex justify-between items-center mb-1">
+                                                <div>
+                                                    <span className="text-sm font-medium">{rule.name}</span>
+                                                    <span className="text-xs text-muted-foreground ml-2">
+                                                        → {ruleActions.join(' + ')}
+                                                    </span>
                                                 </div>
-                                            ))}
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() => handleEditClick(rule)}
+                                                        title="Edit Rule"
+                                                    >
+                                                        <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                                    </Button>
+                                                    <Button
+                                                        variant={rule.is_enabled ? 'default' : 'outline'}
+                                                        size="sm"
+                                                        onClick={() => handleToggleRule(rule.id)}
+                                                        className="h-7 px-2"
+                                                    >
+                                                        <Power className="w-3.5 h-3.5 mr-1" />
+                                                        {rule.is_enabled ? 'On' : 'Off'}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive"
+                                                        onClick={() => actions.deleteRule(rule.id)}
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            {rule.instructions && (
+                                                <p className="text-[10px] text-muted-foreground italic border-t border-border/50 pt-1 mt-1 truncate">
+                                                    "{rule.instructions}"
+                                                </p>
+                                            )}
+                                            {rule.attachments && rule.attachments.length > 0 && (
+                                                <div className="flex gap-1 mt-1">
+                                                    {rule.attachments.map(a => (
+                                                        <div key={a.path} className="flex items-center gap-1 text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">
+                                                            <Paperclip className="w-2.5 h-2.5" />
+                                                            {a.name}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            );})}
+                                    );
+                                })}
                         </div>
 
                     </CardContent>
@@ -1348,37 +1393,50 @@ export function Configuration() {
                     <CardDescription>Configure Local LLM or API settings</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">LLM Provider</label>
+                            <select
+                                className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                                value={localSettings.llm_provider || 'realtimexai'}
+                                onChange={(e) => handleProviderChange(e.target.value)}
+                                disabled={isLoadingProviders}
+                            >
+                                {chatProviders.length > 0 ? (
+                                    chatProviders.map((p: any) => (
+                                        <option key={p.provider} value={p.provider}>
+                                            {p.name || p.provider}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="realtimexai">RealTimeX (Local)</option>
+                                )}
+                            </select>
+                        </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Model Name</label>
-                            <Input
-                                placeholder="gpt-4o-mini"
-                                value={localSettings.llm_model || ''}
-                                onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Base URL</label>
-                            <Input
-                                placeholder="https://api.openai.com/v1"
-                                value={localSettings.llm_base_url || ''}
-                                onChange={(e) => setLocalSettings(s => ({ ...s, llm_base_url: e.target.value }))}
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                                Use http://localhost:11434/v1 for Ollama
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">API Key</label>
-                            <Input
-                                type="password"
-                                placeholder="sk-..."
-                                value={localSettings.llm_api_key || ''}
-                                onChange={(e) => setLocalSettings(s => ({ ...s, llm_api_key: e.target.value }))}
-                            />
+                            {availableModels.length > 0 ? (
+                                <select
+                                    className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                    value={localSettings.llm_model || ''}
+                                    onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
+                                >
+                                    {availableModels.map((m: any) => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.name || m.id}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <Input
+                                    placeholder="e.g. gpt-4o-mini"
+                                    value={localSettings.llm_model || ''}
+                                    onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
+                                />
+                            )}
                         </div>
                     </div>
-                    
+
                     <div className="space-y-2 pt-2 border-t border-border/50">
                         <label className="text-sm font-medium flex items-center gap-2">
                             <Database className="w-4 h-4" />

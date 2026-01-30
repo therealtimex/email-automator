@@ -92,9 +92,8 @@ export interface RuleAttachment {
 export interface UserSettings {
     id?: string;
     user_id?: string;
+    llm_provider: string | null;
     llm_model: string | null;
-    llm_base_url: string | null;
-    llm_api_key: string | null;
     auto_trash_spam?: boolean;
     smart_drafts?: boolean;
     storage_path?: string | null;

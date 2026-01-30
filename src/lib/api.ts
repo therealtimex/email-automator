@@ -313,11 +313,14 @@ class HybridApiClient {
         return this.edgeRequest<{ stats: any }>('/api-v1-settings/stats');
     }
 
-    async testLlm(config: { llm_model: string | null; llm_base_url: string | null; llm_api_key: string | null }) {
+    async testLlm() {
         return this.expressRequest<{ success: boolean; message: string }>('/api/settings/test-llm', {
             method: 'POST',
-            body: JSON.stringify(config),
         });
+    }
+
+    async getChatProviders() {
+        return this.expressRequest<{ success: boolean; providers: any[]; message?: string }>('/api/sdk/providers/chat');
     }
 
     // ============================================================================

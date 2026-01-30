@@ -38,13 +38,8 @@ fi
 
 # 3. EXECUTE MIGRATION
 echo "🔗 Linking to project: $SUPABASE_PROJECT_ID"
-# Try to link. If db password is provided, use it.
-if [ -n "$SUPABASE_DB_PASSWORD" ]; then
-    $SUPABASE_CMD link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
-else
-    # Link will use access token if available, otherwise might prompt
-    $SUPABASE_CMD link --project-ref "$SUPABASE_PROJECT_ID" --yes
-fi
+# Link using access token (required for automated flow)
+$SUPABASE_CMD link --project-ref "$SUPABASE_PROJECT_ID" --yes
 
 echo "📂 Pushing Database Schema Changes..."
 $SUPABASE_CMD db push --include-all --yes

@@ -635,15 +635,7 @@ export class EmailProcessorService {
             }
 
             // 5. Context-Aware Analysis: AI evaluates email against user's rules
-            const intelligenceService = getIntelligenceService(
-                settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
-                    ? {
-                        model: settings.llm_model,
-                        baseUrl: settings.llm_base_url,
-                        apiKey: settings.llm_api_key,
-                    }
-                    : undefined
-            );
+            const intelligenceService = getIntelligenceService();
 
             const analysis = await intelligenceService.analyzeEmailWithRules(
                 cleanContent,
@@ -791,15 +783,7 @@ export class EmailProcessorService {
                     if (action === 'draft' && rule.instructions) {
                         if (eventLogger) await eventLogger.info('Thinking', `Generating customized draft based on rule: ${rule.name}`, undefined, email.id);
 
-                        const intelligenceService = getIntelligenceService(
-                            settings?.llm_model || settings?.llm_base_url || settings?.llm_api_key
-                                ? {
-                                    model: settings.llm_model,
-                                    baseUrl: settings.llm_base_url,
-                                    apiKey: settings.llm_api_key,
-                                }
-                                : undefined
-                        );
+                        const intelligenceService = getIntelligenceService();
 
                         const customizedDraft = await intelligenceService.generateDraftReply({
                             subject: email.subject || '',

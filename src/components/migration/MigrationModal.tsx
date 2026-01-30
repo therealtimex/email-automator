@@ -40,67 +40,6 @@ interface MigrationModalProps {
     status: MigrationStatus;
 }
 
-interface CodeBlockProps {
-    code: string;
-    label?: string;
-}
-
-function CodeBlock({ code, label }: CodeBlockProps) {
-    const [copied, setCopied] = useState(false);
-
-    const canCopy =
-        typeof navigator !== "undefined" && !!navigator.clipboard?.writeText;
-
-    const handleCopy = async () => {
-        if (!canCopy) {
-            toast.error("Clipboard not supported");
-            return;
-        }
-
-        try {
-            await navigator.clipboard.writeText(code);
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 2000);
-            toast.success("Copied to clipboard");
-        } catch (error) {
-            console.error("Failed to copy:", error);
-            toast.error("Failed to copy to clipboard");
-        }
-    };
-
-    return (
-        <div className="relative">
-            {label && (
-                <div className="mb-2 text-sm font-medium text-muted-foreground">
-                    {label}
-                </div>
-            )}
-            <div className="group relative">
-                <pre className="overflow-hidden rounded-md bg-muted p-3 pr-12 text-sm">
-                    <code className="block whitespace-pre-wrap break-all">{code}</code>
-                </pre>
-                <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="absolute right-2 top-2 h-8 w-8"
-                    onClick={handleCopy}
-                    disabled={!canCopy}
-                >
-                    {copied ? (
-                        <Check className="h-4 w-4 text-green-600" />
-                    ) : (
-                        <Copy className="h-4 w-4" />
-                    )}
-                    <span className="sr-only">
-                        {copied ? "Copied" : "Copy code"}
-                    </span>
-                </Button>
-            </div>
-        </div>
-    );
-}
-
 export function MigrationModal({
     open,
     onOpenChange,
@@ -109,10 +48,8 @@ export function MigrationModal({
     const config = getSupabaseConfig();
 
     // Auto-migration state
-    const [showAutoMigrate, setShowAutoMigrate] = useState(true);
     const [isMigrating, setIsMigrating] = useState(false);
     const [migrationLogs, setMigrationLogs] = useState<string[]>([]);
-    const [dbPassword, setDbPassword] = useState("");
     const [accessToken, setAccessToken] = useState("");
     const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -140,8 +77,8 @@ export function MigrationModal({
             toast.error("Missing Project ID");
             return;
         }
-        if (!accessToken && !dbPassword) {
-            toast.error("Provide an access token or database password.");
+        if (!accessToken) {
+            toast.error("Provide a Supabase Personal Access Token.");
             return;
         }
 
@@ -157,16 +94,24 @@ export function MigrationModal({
                 let result: "success" | "failure" | null = null;
 
                 const handleLine = (line: string) => {
-                    const cleaned = line.replace(/\r$/, "");
-                    if (!cleaned.trim()) return;
-                    if (cleaned.startsWith("RESULT:")) {
-                        const status = cleaned.replace("RESULT:", "").trim();
-                        if (status === "success" || status === "failure") {
-                            result = status;
+                    const cleaned = line.trim();
+                    if (!cleaned || !cleaned.startsWith("data: ")) return;
+
+                    try {
+                        const jsonStr = cleaned.substring(6);
+                        const event = JSON.parse(jsonStr);
+
+                        if (event.type === "done") {
+                            if (event.data === "success" || event.data === "failed") {
+                                result = event.data === "success" ? "success" : "failure";
+                            }
+                        } else if (event.data) {
+                            // Add to logs if it's info, stdout, or stderr
+                            setMigrationLogs((prev) => [...prev, event.data]);
                         }
-                        return;
+                    } catch (e) {
+                        console.error("Failed to parse SSE line:", cleaned, e);
                     }
-                    setMigrationLogs((prev) => [...prev, cleaned]);
                 };
 
                 while (true) {
@@ -192,7 +137,6 @@ export function MigrationModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     projectRef: projectId,
-                    dbPassword,
                     accessToken,
                 }),
             });
@@ -284,209 +228,93 @@ export function MigrationModal({
                         </AlertDescription>
                     </Alert>
 
-                    {/* Mode Selection Tabs */}
-                    <div className="flex border-b">
-                        <button
-                            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${showAutoMigrate ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-                            onClick={() => setShowAutoMigrate(true)}
-                        >
-                            Automatic (Recommended)
-                        </button>
-                        <button
-                            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${!showAutoMigrate ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-                            onClick={() => setShowAutoMigrate(false)}
-                        >
-                            Manual CLI
-                        </button>
-                    </div>
+                    {/* Automatic Setup (Now the only option) */}
+                    <div className="space-y-4 py-2">
+                        <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+                            <h3 className="text-lg font-semibold mb-2">
+                                Automated Setup
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Run database migration and deploy Edge Functions directly from your browser. A Supabase Personal Access Token is required to authenticate with your project.
+                            </p>
 
-                    {showAutoMigrate ? (
-                        <div className="space-y-4 py-2">
-                            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
-                                <h3 className="text-lg font-semibold mb-2">
-                                    Automated Setup
-                                </h3>
-                                <p className="text-sm text-muted-foreground mb-4">
-                                    Run database migration and deploy Edge Functions directly from your browser. No CLI installation required - everything is bundled.
-                                </p>
-
-                                <div className="grid gap-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="project-id">
-                                            Supabase Project ID
-                                        </Label>
-                                        <Input
-                                            id="project-id"
-                                            value={projectId}
-                                            disabled
-                                            readOnly
-                                            className="bg-muted"
-                                        />
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label htmlFor="access-token">
-                                                Access Token (Optional)
-                                            </Label>
-                                            <a
-                                                href="https://supabase.com/dashboard/account/tokens"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-xs text-primary hover:underline flex items-center gap-1"
-                                            >
-                                                Generate Token <ExternalLink className="h-3 w-3" />
-                                            </a>
-                                        </div>
-                                        <Input
-                                            id="access-token"
-                                            type="password"
-                                            placeholder="sbp_..."
-                                            value={accessToken}
-                                            onChange={(e) => setAccessToken(e.target.value)}
-                                            disabled={isMigrating}
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Recommended for more reliable authentication.
-                                        </p>
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="db-password">
-                                            Database Password
-                                        </Label>
-                                        <Input
-                                            id="db-password"
-                                            type="password"
-                                            placeholder="Your database password"
-                                            value={dbPassword}
-                                            onChange={(e) => setDbPassword(e.target.value)}
-                                            disabled={isMigrating}
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Required if no access token is provided.
-                                        </p>
-                                    </div>
-
-                                    <Button
-                                        onClick={handleAutoMigrate}
-                                        disabled={isMigrating}
-                                        className="w-full"
-                                    >
-                                        {isMigrating ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Running Setup...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Terminal className="mr-2 h-4 w-4" />
-                                                Start Setup
-                                            </>
-                                        )}
-                                    </Button>
+                            <div className="grid gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="project-id">
+                                        Supabase Project ID
+                                    </Label>
+                                    <Input
+                                        id="project-id"
+                                        value={projectId}
+                                        disabled
+                                        readOnly
+                                        className="bg-muted"
+                                    />
                                 </div>
-                            </div>
 
-                            {/* Logs Terminal */}
-                            <div className="rounded-lg border bg-black text-white font-mono text-xs p-4 h-64 overflow-y-auto">
-                                {migrationLogs.length === 0 ? (
-                                    <div className="text-gray-500 italic">
-                                        Waiting to start...
+                                <div className="grid gap-2">
+                                    <div className="flex justify-between items-center">
+                                        <Label htmlFor="access-token">
+                                            Access Token
+                                        </Label>
+                                        <a
+                                            href="https://supabase.com/dashboard/account/tokens"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                                        >
+                                            Generate Token <ExternalLink className="h-3 w-3" />
+                                        </a>
                                     </div>
-                                ) : (
-                                    migrationLogs.map((log, i) => (
-                                        <div key={i} className="mb-1 whitespace-pre-wrap">
-                                            {log}
-                                        </div>
-                                    ))
-                                )}
-                                <div ref={logsEndRef} />
+                                    <Input
+                                        id="access-token"
+                                        type="password"
+                                        placeholder="sbp_..."
+                                        value={accessToken}
+                                        onChange={(e) => setAccessToken(e.target.value)}
+                                        disabled={isMigrating}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        This token is used only for this migration and is not stored.
+                                    </p>
+                                </div>
+
+                                <Button
+                                    onClick={handleAutoMigrate}
+                                    disabled={isMigrating || !accessToken}
+                                    className="w-full"
+                                >
+                                    {isMigrating ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Running Setup...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Terminal className="mr-2 h-4 w-4" />
+                                            Start Setup
+                                        </>
+                                    )}
+                                </Button>
                             </div>
                         </div>
-                    ) : (
-                        // Manual Instructions
-                        <>
-                            {/* Step 1: Prerequisites */}
-                            <div>
-                                <h4 className="mb-3 flex items-center gap-2 font-semibold">
-                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                                        1
-                                    </span>
-                                    Prerequisites
-                                </h4>
-                                <div className="ml-8 space-y-3">
-                                    <p className="text-sm text-muted-foreground">
-                                        You will need the following before proceeding:
-                                    </p>
-                                    <ul className="list-inside list-disc space-y-1 text-sm">
-                                        <li>
-                                            Supabase CLI installed
-                                        </li>
-                                        <li>
-                                            Project ID:{" "}
-                                            <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                                {projectId || "your-project-id"}
-                                            </code>
-                                        </li>
-                                        <li>
-                                            Database Password
-                                        </li>
-                                    </ul>
+
+                        {/* Logs Terminal */}
+                        <div className="rounded-lg border bg-black text-white font-mono text-xs p-4 h-64 overflow-y-auto">
+                            {migrationLogs.length === 0 ? (
+                                <div className="text-gray-500 italic">
+                                    Waiting to start...
                                 </div>
-                            </div>
-
-                            {/* Step 2: Install Supabase CLI */}
-                            <div>
-                                <h4 className="mb-3 flex items-center gap-2 font-semibold">
-                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                                        2
-                                    </span>
-                                    Install Supabase CLI
-                                </h4>
-                                <div className="ml-8 space-y-3">
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-medium">
-                                            MacOS (Brew)
-                                        </p>
-                                        <CodeBlock code="brew install supabase/tap/supabase" />
+                            ) : (
+                                migrationLogs.map((log, i) => (
+                                    <div key={i} className="mb-1 whitespace-pre-wrap">
+                                        {log}
                                     </div>
-
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-medium">
-                                            Windows (Scoop)
-                                        </p>
-                                        <CodeBlock
-                                            code={`scoop bucket add supabase https://github.com/supabase/scoop-bucket.git\nscoop install supabase`}
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-medium">
-                                            NPM (Universal)
-                                        </p>
-                                        <CodeBlock code="npm install -g supabase" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Step 3: Run Migration */}
-                            <div>
-                                <h4 className="mb-3 flex items-center gap-2 font-semibold">
-                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                                        3
-                                    </span>
-                                    Run Migration
-                                </h4>
-                                <div className="ml-8 space-y-3">
-                                    <p className="text-sm text-muted-foreground">
-                                        Run the built-in migration tool:
-                                    </p>
-                                    <CodeBlock code="npx email-automator migrate" />
-                                </div>
-                            </div>
-                        </>
-                    )}
+                                ))
+                            )}
+                            <div ref={logsEndRef} />
+                        </div>
+                    </div>
 
                     {/* Troubleshooting */}
                     <Alert className="border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20">
@@ -495,10 +323,10 @@ export function MigrationModal({
                             <strong>Troubleshooting</strong>
                             <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
                                 <li>
-                                    Try logging out: <code>supabase logout</code>
+                                    Ensure your Access Token has <code>read</code> and <code>write</code> permissions.
                                 </li>
                                 <li>
-                                    Verify your database password is correct
+                                    Verify that your Supabase Project ID is correct and active.
                                 </li>
                             </ul>
                         </AlertDescription>

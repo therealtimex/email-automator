@@ -107,8 +107,8 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && pathParts.length === 1) {
       // Fetch settings and integrations
       const [settingsRes, integrationsRes] = await Promise.all([
-         supabaseAdmin.from('user_settings').select('*').eq('user_id', user.id).maybeSingle(),
-         supabaseAdmin.from('integrations').select('*').eq('user_id', user.id)
+        supabaseAdmin.from('user_settings').select('*').eq('user_id', user.id).maybeSingle(),
+        supabaseAdmin.from('integrations').select('*').eq('user_id', user.id)
       ]);
 
       const settingsData = settingsRes.data;
@@ -117,21 +117,31 @@ Deno.serve(async (req) => {
       // Return default settings if none exist
       const settings = settingsData || {
         user_id: user.id,
+        llm_provider: 'realtimexai',
+        llm_model: 'gpt-4o-mini',
         sync_interval_minutes: 5,
       };
-      
+
+      // Proactive upgrade for existing settings objects
+      if (settings.llm_model === 'gpt-4.1-mini' || !settings.llm_model) {
+        settings.llm_model = 'gpt-4o-mini';
+      }
+      if (!settings.llm_provider) {
+        settings.llm_provider = 'realtimexai';
+      }
+
       // Merge credentials
       const google = integrationsData.find((i: any) => i.provider === 'google');
       if (google?.credentials) {
-          settings.google_client_id = google.credentials.client_id;
-          settings.google_client_secret = google.credentials.client_secret;
+        settings.google_client_id = google.credentials.client_id;
+        settings.google_client_secret = google.credentials.client_secret;
       }
-      
+
       const microsoft = integrationsData.find((i: any) => i.provider === 'microsoft');
       if (microsoft?.credentials) {
-          settings.microsoft_client_id = microsoft.credentials.client_id;
-          settings.microsoft_client_secret = microsoft.credentials.client_secret;
-          settings.microsoft_tenant_id = microsoft.credentials.tenant_id;
+        settings.microsoft_client_id = microsoft.credentials.client_id;
+        settings.microsoft_client_secret = microsoft.credentials.client_secret;
+        settings.microsoft_tenant_id = microsoft.credentials.tenant_id;
       }
 
       return createSuccessResponse({ settings });
@@ -141,12 +151,12 @@ Deno.serve(async (req) => {
     if (req.method === 'PATCH' && pathParts.length === 1) {
       const updates = await req.json();
       const {
-          google_client_id,
-          google_client_secret,
-          microsoft_client_id,
-          microsoft_client_secret,
-          microsoft_tenant_id,
-          ...userSettingsUpdates
+        google_client_id,
+        google_client_secret,
+        microsoft_client_id,
+        microsoft_client_secret,
+        microsoft_tenant_id,
+        ...userSettingsUpdates
       } = updates;
 
       // Update user_settings
@@ -167,52 +177,52 @@ Deno.serve(async (req) => {
         console.error('Database error:', error);
         return createErrorResponse(500, 'Failed to update settings');
       }
-      
+
       // Handle Integrations (Google)
       if (google_client_id !== undefined || google_client_secret !== undefined) {
-          const { data: existing } = await supabaseAdmin
-            .from('integrations')
-            .select('credentials')
-            .eq('user_id', user.id)
-            .eq('provider', 'google')
-            .maybeSingle();
-            
-          const credentials: any = {};
-          if (google_client_id !== undefined) credentials.client_id = google_client_id;
-          if (google_client_secret !== undefined) credentials.client_secret = google_client_secret;
-          
-          const newCredentials = { ...(existing?.credentials || {}), ...credentials };
-          
-          await supabaseAdmin.from('integrations').upsert({
-              user_id: user.id,
-              provider: 'google',
-              credentials: newCredentials,
-              updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id, provider' });
+        const { data: existing } = await supabaseAdmin
+          .from('integrations')
+          .select('credentials')
+          .eq('user_id', user.id)
+          .eq('provider', 'google')
+          .maybeSingle();
+
+        const credentials: any = {};
+        if (google_client_id !== undefined) credentials.client_id = google_client_id;
+        if (google_client_secret !== undefined) credentials.client_secret = google_client_secret;
+
+        const newCredentials = { ...(existing?.credentials || {}), ...credentials };
+
+        await supabaseAdmin.from('integrations').upsert({
+          user_id: user.id,
+          provider: 'google',
+          credentials: newCredentials,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id, provider' });
       }
 
       // Handle Integrations (Microsoft)
       if (microsoft_client_id !== undefined || microsoft_client_secret !== undefined || microsoft_tenant_id !== undefined) {
-          const { data: existing } = await supabaseAdmin
-            .from('integrations')
-            .select('credentials')
-            .eq('user_id', user.id)
-            .eq('provider', 'microsoft')
-            .maybeSingle();
+        const { data: existing } = await supabaseAdmin
+          .from('integrations')
+          .select('credentials')
+          .eq('user_id', user.id)
+          .eq('provider', 'microsoft')
+          .maybeSingle();
 
-          const credentials: any = {};
-          if (microsoft_client_id !== undefined) credentials.client_id = microsoft_client_id;
-          if (microsoft_client_secret !== undefined) credentials.client_secret = microsoft_client_secret;
-          if (microsoft_tenant_id !== undefined) credentials.tenant_id = microsoft_tenant_id;
+        const credentials: any = {};
+        if (microsoft_client_id !== undefined) credentials.client_id = microsoft_client_id;
+        if (microsoft_client_secret !== undefined) credentials.client_secret = microsoft_client_secret;
+        if (microsoft_tenant_id !== undefined) credentials.tenant_id = microsoft_tenant_id;
 
-          const newCredentials = { ...(existing?.credentials || {}), ...credentials };
+        const newCredentials = { ...(existing?.credentials || {}), ...credentials };
 
-          await supabaseAdmin.from('integrations').upsert({
-              user_id: user.id,
-              provider: 'microsoft',
-              credentials: newCredentials,
-              updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id, provider' });
+        await supabaseAdmin.from('integrations').upsert({
+          user_id: user.id,
+          provider: 'microsoft',
+          credentials: newCredentials,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id, provider' });
       }
 
       // Construct final response object by merging latest from both sources
@@ -222,18 +232,18 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id);
 
       const responseSettings = { ...updatedSettings };
-      
+
       const google = finalIntegrations?.find((i: any) => i.provider === 'google');
       if (google?.credentials) {
-          responseSettings.google_client_id = google.credentials.client_id;
-          responseSettings.google_client_secret = google.credentials.client_secret;
+        responseSettings.google_client_id = google.credentials.client_id;
+        responseSettings.google_client_secret = google.credentials.client_secret;
       }
-      
+
       const microsoft = finalIntegrations?.find((i: any) => i.provider === 'microsoft');
       if (microsoft?.credentials) {
-          responseSettings.microsoft_client_id = microsoft.credentials.client_id;
-          responseSettings.microsoft_client_secret = microsoft.credentials.client_secret;
-          responseSettings.microsoft_tenant_id = microsoft.credentials.tenant_id;
+        responseSettings.microsoft_client_id = microsoft.credentials.client_id;
+        responseSettings.microsoft_client_secret = microsoft.credentials.client_secret;
+        responseSettings.microsoft_tenant_id = microsoft.credentials.tenant_id;
       }
 
       return createSuccessResponse({ settings: responseSettings });

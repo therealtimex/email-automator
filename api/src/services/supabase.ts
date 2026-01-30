@@ -21,7 +21,7 @@ function getConfigHash() {
 
 export function getServerSupabase(forceRefresh = false): SupabaseClient | null {
     const currentHash = getConfigHash();
-    
+
     if (serverClient && !forceRefresh && currentHash === lastConfigHash) {
         return serverClient;
     }
@@ -151,9 +151,8 @@ export interface ProcessingLog {
 export interface UserSettings {
     id: string;
     user_id: string;
+    llm_provider: string | null;
     llm_model: string | null;
-    llm_base_url: string | null;
-    llm_api_key: string | null;
     auto_trash_spam: boolean;
     smart_drafts: boolean;
     sync_interval_minutes: number;
