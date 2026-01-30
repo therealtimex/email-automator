@@ -24,7 +24,8 @@ import {
     Cpu,
     Zap,
     Boxes,
-    Cpu as Engine
+    Cpu as Engine,
+    X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
@@ -94,6 +95,8 @@ function validateKeyFormat(input: string): { valid: boolean; message?: string } 
 }
 
 export function SetupWizard({ onComplete, open = true, canClose = false }: SetupWizardProps) {
+    if (!open) return null;
+
     const [step, setStep] = useState<WizardStep>('welcome');
 
     // Managed Flow State
@@ -413,6 +416,15 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
 
                 {/* Right Side - Interactive Surface */}
                 <div className="flex-1 p-8 md:p-12 flex flex-col relative">
+                    {canClose && (
+                        <button
+                            onClick={onComplete}
+                            className="absolute top-6 right-6 p-2 rounded-full hover:bg-secondary transition-colors z-[60]"
+                            title="Close"
+                        >
+                            <X className="w-5 h-5 text-muted-foreground opacity-40 hover:opacity-100 transition-opacity" />
+                        </button>
+                    )}
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={step}
