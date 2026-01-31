@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.12.1] - 2026-01-31
+
+### Fixed
+- **Rule Categories**: Fixed an issue where system-managed rules were missing their category metadata. Added a new migration (`20260131170000_fix_rule_categories`) to backfill categories from templates and updated the user initialization triggers to populate them correctly.
+- **Migration Resilience**: Improved the safety of the "Intelligent Rename" migration by adding `IF NOT EXISTS` checks, ensuring it can be re-run without errors.
+
 ## [2.12.0] - 2026-01-31
 
 ### Added
