@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.12.0] - 2026-01-31
+
+### Added
+- **Auto-Pilot Dashboard**: Introduced a new "Auto-Pilot" view that simplifies automation configuration. Users can now enable pre-built "Rule Packs" (e.g., "Founder Mode", "Support Team", "Recruiter") to instantly apply best-practice automation rules without manual setup.
+- **Rule Packs**: Implemented a role-based preset system. Rule packs automatically configure categorization, drafting instructions, and priority handling based on specific user personas.
+- **Rule Editing**: Users can now fully edit existing automation rules. The rule creation modal has been upgraded to support modification of conditions, instructions, and actions for any rule.
+- **Intelligent Rename Default**: The "Intelligent Rename" feature (slugified filenames like `2024-01-01-subject-id.eml`) is now enabled by default for all new and existing users to ensure better filesystem compatibility.
+
+### Changed
+- **Account Settings UI**: Refactored the "Connected Accounts" section in the Configuration page. It now features a cleaner, card-based layout with clearer status indicators and action buttons for managing Gmail and Outlook connections.
+- **Rule Schema**: Enhanced the database schema to support richer metadata for rules, enabling the new "Rule Pack" functionality.
+
 ## [2.11.3] - 2026-01-31
 
 ### Fixed
