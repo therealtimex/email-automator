@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock, Cpu, Brain, Zap, AlertCircle, Info, Code, CheckCircle2, UserCircle } from 'lucide-react';
+import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock, Cpu, Brain, Zap, AlertCircle, Info, Code, CheckCircle2, UserCircle, Sparkles } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/mode-toggle';
 import { Button } from './components/ui/button';
@@ -13,6 +13,7 @@ import { SetupWizard } from './components/SetupWizard';
 import { Dashboard } from './components/Dashboard';
 import { Configuration } from "./components/Configuration";
 import { AccountSettingsPage } from './components/AccountSettingsPage';
+import { AutoPilotDashboard } from './components/AutoPilot';
 import { Login } from './components/Login';
 import { Logo } from './components/Logo';
 import { getSupabaseConfig, validateSupabaseConnection } from './lib/supabase-config';
@@ -36,7 +37,7 @@ import {
     DialogTitle,
 } from './components/ui/dialog';
 
-type TabType = 'dashboard' | 'config' | 'analytics' | 'account';
+type TabType = 'dashboard' | 'autopilot' | 'config' | 'analytics' | 'account';
 
 import { sounds } from './lib/sounds';
 
@@ -287,6 +288,15 @@ function AppContent() {
                                     <span className="hidden sm:inline">Dashboard</span>
                                 </Button>
                                 <Button
+                                    variant={activeTab === 'autopilot' ? 'secondary' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setActiveTab('autopilot')}
+                                    className="gap-2"
+                                >
+                                    <Sparkles className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Auto-Pilot</span>
+                                </Button>
+                                <Button
                                     variant={activeTab === 'analytics' ? 'secondary' : 'ghost'}
                                     size="sm"
                                     onClick={() => setActiveTab('analytics')}
@@ -327,6 +337,7 @@ function AppContent() {
                 {/* Main Content */}
                 <main className="max-w-7xl mx-auto p-4 sm:p-8 mt-4 mb-12">
                     {activeTab === 'dashboard' && <Dashboard />}
+                    {activeTab === 'autopilot' && <AutoPilotDashboard />}
                     {activeTab === 'config' && <Configuration />}
                     {activeTab === 'analytics' && <AnalyticsPage />}
                     {activeTab === 'account' && <AccountSettingsPage />}

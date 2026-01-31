@@ -403,6 +403,105 @@ export class MicrosoftService {
         return draft.id;
     }
 
+    /**
+     * Get or create a folder by path (supports nested folders like "Finance/Receipts")
+     * Returns the folder ID
+     */
+    async getOrCreateFolder(account: EmailAccount, folderPath: string): Promise<string> {
+        const accessToken = account.access_token || '';
+
+        // Split path into parts
+        const parts = folderPath.split('/');
+        let parentFolderId: string | null = null;
+
+        for (const folderName of parts) {
+            // List folders (either root or under parent)
+            const listUrl: string = parentFolderId
+                ? `https://graph.microsoft.com/v1.0/me/mailFolders/${parentFolderId}/childFolders`
+                : 'https://graph.microsoft.com/v1.0/me/mailFolders';
+
+            const listResponse: Response = await fetch(listUrl, {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+
+            if (!listResponse.ok) {
+                throw new Error(`Failed to list folders: ${listResponse.statusText}`);
+            }
+
+            const foldersData: any = await listResponse.json();
+            const folders: any[] = foldersData.value || [];
+
+            // Check if folder exists at this level
+            const existingFolder: any = folders.find((f: any) => f.displayName === folderName);
+            if (existingFolder) {
+                parentFolderId = existingFolder.id;
+                logger.debug('Folder exists', { folderName, folderId: existingFolder.id });
+                continue;
+            }
+
+            // Create folder at this level
+            const createUrl = parentFolderId
+                ? `https://graph.microsoft.com/v1.0/me/mailFolders/${parentFolderId}/childFolders`
+                : 'https://graph.microsoft.com/v1.0/me/mailFolders';
+
+            const createResponse = await fetch(createUrl, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    displayName: folderName,
+                }),
+            });
+
+            if (!createResponse.ok) {
+                throw new Error(`Failed to create folder: ${folderName}`);
+            }
+
+            const newFolder = await createResponse.json();
+            parentFolderId = newFolder.id;
+            logger.info('Created folder', { folderName, folderId: newFolder.id });
+        }
+
+        if (!parentFolderId) {
+            throw new Error(`Failed to get or create folder: ${folderPath}`);
+        }
+
+        return parentFolderId;
+    }
+
+    /**
+     * Move a message to a folder by folder path (creates folder if needed)
+     * Supports nested folders like "Finance/Receipts"
+     */
+    async moveToFolderByPath(account: EmailAccount, messageId: string, folderPath: string): Promise<void> {
+        const folderId = await this.getOrCreateFolder(account, folderPath);
+        const accessToken = account.access_token || '';
+
+        const response = await fetch(
+            `https://graph.microsoft.com/v1.0/me/messages/${messageId}/move`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    destinationId: folderId,
+                }),
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to move message to folder: ${folderPath}`);
+        }
+
+        logger.debug('Moved message to folder', { messageId, folderPath, folderId });
+    }
+
     async getProfile(account: EmailAccount): Promise<{ emailAddress: string; displayName: string }> {
         const accessToken = account.access_token || '';
 

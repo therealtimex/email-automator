@@ -133,6 +133,10 @@ export interface Rule {
     attachments?: any[];
     is_enabled: boolean;
     created_at: string;
+    // Rule Pack Support (Zero-Config UX)
+    pack?: string | null;              // Pack identifier (e.g., 'universal', 'executive', 'developer')
+    rule_template_id?: string | null;  // Template ID (e.g., 'universal-newsletters')
+    is_system_managed?: boolean;       // If true, part of a pack - can be disabled but not deleted
 }
 
 export interface ProcessingLog {
@@ -158,4 +162,40 @@ export interface UserSettings {
     sync_interval_minutes: number;
     created_at: string;
     updated_at: string;
+    // Zero-Config UX Support
+    user_role?: string | null;           // User role (executive, developer, sales, operations, other)
+    onboarding_completed?: boolean;      // Whether user completed role selection onboarding
+}
+
+// Zero-Config UX: Pack Installation Tracking
+export interface PackInstallation {
+    id: string;
+    user_id: string;
+    pack_id: string;
+    installed_at: string;
+    uninstalled_at: string | null;
+    source: 'onboarding' | 'manual' | 'auto';
+}
+
+// Zero-Config UX: Rule Effectiveness Metrics
+export interface RuleMetrics {
+    rule_id: string;
+    date: string;
+    times_triggered: number;
+    times_undone: number;
+    times_edited: number;
+    enabled: boolean;
+}
+
+// Zero-Config UX: Action History for Undo Capability
+export interface ActionHistory {
+    id: string;
+    email_id: string;
+    rule_id: string | null;
+    action: string;
+    sync_id: string | null;
+    executed_at: string;
+    undone: boolean;
+    undone_at: string | null;
+    metadata: Record<string, unknown> | null;
 }

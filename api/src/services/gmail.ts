@@ -441,6 +441,74 @@ export class GmailService {
         logger.debug('Message starred', { messageId });
     }
 
+    /**
+     * Get or create a label by name (supports nested labels like "Finance/Receipts")
+     * Returns the label ID
+     */
+    async getOrCreateLabel(account: EmailAccount, labelPath: string): Promise<string> {
+        const gmail = await this.getAuthenticatedClient(account);
+
+        // List existing labels
+        const { data: labelsData } = await gmail.users.labels.list({ userId: 'me' });
+        const existingLabels = labelsData.labels || [];
+
+        // Check if label already exists
+        const existingLabel = existingLabels.find(l => l.name === labelPath);
+        if (existingLabel?.id) {
+            logger.debug('Label already exists', { labelPath, labelId: existingLabel.id });
+            return existingLabel.id;
+        }
+
+        // Create nested labels if needed (e.g., "Finance/Receipts" creates "Finance" then "Finance/Receipts")
+        const parts = labelPath.split('/');
+        let currentPath = '';
+        let parentId: string | undefined;
+
+        for (const part of parts) {
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+
+            // Check if this level exists
+            const existing = existingLabels.find(l => l.name === currentPath);
+            if (existing?.id) {
+                parentId = existing.id;
+                continue;
+            }
+
+            // Create this level
+            const { data: newLabel } = await gmail.users.labels.create({
+                userId: 'me',
+                requestBody: {
+                    name: currentPath,
+                    labelListVisibility: 'labelShow',
+                    messageListVisibility: 'show'
+                }
+            });
+
+            if (!newLabel.id) {
+                throw new Error(`Failed to create label: ${currentPath}`);
+            }
+
+            logger.info('Created label', { labelPath: currentPath, labelId: newLabel.id });
+            parentId = newLabel.id;
+        }
+
+        if (!parentId) {
+            throw new Error(`Failed to get or create label: ${labelPath}`);
+        }
+
+        return parentId;
+    }
+
+    /**
+     * Apply a label to a message by label name (creates label if needed)
+     * Supports nested labels like "Finance/Receipts"
+     */
+    async applyLabelByName(account: EmailAccount, messageId: string, labelName: string): Promise<void> {
+        const labelId = await this.getOrCreateLabel(account, labelName);
+        await this.addLabel(account, messageId, [labelId]);
+        logger.debug('Applied label to message', { messageId, labelName, labelId });
+    }
+
     private async fetchAttachment(supabase: SupabaseClient, path: string): Promise<Uint8Array> {
         const { data, error } = await supabase.storage
             .from('rule-attachments')

@@ -9,6 +9,7 @@ import { getStorageService } from './storage.js';
 import { generateEmailFilename } from '../utils/filename.js';
 import { EmailAccount, Email, Rule, ProcessingLog } from './supabase.js';
 import { EventLogger } from './eventLogger.js';
+import { RulePackService } from './RulePackService.js';
 
 const logger = createLogger('Processor');
 
@@ -31,6 +32,18 @@ export class EmailProcessorService {
 
     async syncAccount(accountId: string, userId: string): Promise<ProcessingResult> {
         const result: ProcessingResult = { processed: 0, deleted: 0, drafted: 0, errors: 0 };
+
+        // Zero-Config UX: Auto-install Universal Pack for new users (self-healing)
+        try {
+            const rulePackService = new RulePackService(this.supabase);
+            const { installed } = await rulePackService.ensureUniversalPack(userId);
+            if (installed) {
+                logger.info(`Auto-installed Universal Pack for user ${userId}`);
+            }
+        } catch (error) {
+            // Don't fail sync if pack installation fails
+            logger.error('Failed to auto-install Universal Pack', error);
+        }
 
         // Create processing log
         const { data: log } = await this.supabase
@@ -812,56 +825,153 @@ export class EmailProcessorService {
         }
     }
 
-    private matchesCondition(email: Partial<Email>, analysis: EmailAnalysis, condition: Record<string, unknown>): boolean {
-        if (!analysis) return false;
+    /**
+     * Enhanced condition matching with support for AI-powered rules
+     * Supports logical operators (AND/OR/NOT) and new condition types
+     */
+    private matchesCondition(email: Partial<Email>, analysis: EmailAnalysis | null, condition: Record<string, unknown>): boolean {
+        // Logical operators (evaluated recursively)
+        if ('and' in condition) {
+            const subConditions = condition.and as Record<string, unknown>[];
+            return subConditions.every(subCond => this.matchesCondition(email, analysis, subCond));
+        }
 
+        if ('or' in condition) {
+            const subConditions = condition.or as Record<string, unknown>[];
+            return subConditions.some(subCond => this.matchesCondition(email, analysis, subCond));
+        }
+
+        if ('not' in condition) {
+            const subCondition = condition.not as Record<string, unknown>;
+            return !this.matchesCondition(email, analysis, subCondition);
+        }
+
+        // Standard condition matching
         for (const [key, value] of Object.entries(condition)) {
             const val = value as string;
 
             switch (key) {
+                // === Legacy field-based matching ===
                 case 'sender_email':
                     if (email.sender?.toLowerCase() !== val.toLowerCase()) return false;
                     break;
+
                 case 'sender_domain':
-                    // Check if sender ends with domain (e.g. @gmail.com)
+                    // Support both "gmail.com" and "@gmail.com" formats
                     const domain = val.startsWith('@') ? val : `@${val}`;
                     if (!email.sender?.toLowerCase().endsWith(domain.toLowerCase())) return false;
                     break;
+
                 case 'sender_contains':
                     if (!email.sender?.toLowerCase().includes(val.toLowerCase())) return false;
                     break;
+
                 case 'subject_contains':
                     if (!email.subject?.toLowerCase().includes(val.toLowerCase())) return false;
                     break;
+
                 case 'body_contains':
                     if (!email.body_snippet?.toLowerCase().includes(val.toLowerCase())) return false;
                     break;
+
                 case 'older_than_days':
                     if (!email.date) return false;
                     const ageInMs = Date.now() - new Date(email.date).getTime();
                     const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
                     if (ageInDays < (value as number)) return false;
                     break;
+
+                // === AI-powered conditions ===
                 case 'category':
-                    if (analysis.category !== value) return false;
+                    if (!analysis || analysis.category !== value) return false;
                     break;
+
                 case 'priority':
-                    if (analysis.priority !== value) return false;
+                    if (!analysis || analysis.priority !== value) return false;
                     break;
+
+                case 'ai_priority':  // Alias for priority
+                    if (!analysis || analysis.priority !== value) return false;
+                    break;
+
                 case 'sentiment':
-                    if (analysis.sentiment !== value) return false;
+                    if (!analysis || analysis.sentiment !== value) return false;
                     break;
+
                 case 'is_useless':
-                    if (analysis.is_useless !== value) return false;
+                    if (!analysis || analysis.is_useless !== value) return false;
                     break;
+
+                case 'confidence_gt':
+                    // Check if AI confidence is above threshold
+                    // Note: We'd need to store confidence in analysis, for now skip
+                    // TODO: Add confidence tracking to EmailAnalysis
+                    break;
+
                 case 'suggested_actions':
-                    // Handle array membership check (e.g. if condition expects "reply" to be in actions)
+                    if (!analysis) return false;
+                    // Handle array membership check
                     const requiredActions = Array.isArray(value) ? value : [value];
                     const actualActions = analysis.suggested_actions || [];
                     const hasAllActions = requiredActions.every(req =>
                         actualActions.includes(req as any)
                     );
                     if (!hasAllActions) return false;
+                    break;
+
+                // === Content matching ===
+                case 'contains_keywords':
+                    if (!Array.isArray(value)) return false;
+                    const keywords = value as string[];
+                    const searchText = `${email.subject || ''} ${email.body_snippet || ''}`.toLowerCase();
+                    // Match if ANY keyword is found
+                    const hasKeyword = keywords.some(kw => searchText.includes(kw.toLowerCase()));
+                    if (!hasKeyword) return false;
+                    break;
+
+                case 'matches_pattern':
+                    if (typeof value !== 'string') return false;
+                    try {
+                        const regex = new RegExp(value, 'i');
+                        const searchText = `${email.subject || ''} ${email.body_snippet || ''}`;
+                        if (!regex.test(searchText)) return false;
+                    } catch (e) {
+                        // Invalid regex, treat as no match
+                        return false;
+                    }
+                    break;
+
+                // === Recipient analysis ===
+                case 'recipient_type':
+                    // Check if user is in to/cc/bcc
+                    // Note: This requires parsing the recipient field
+                    // For now, simple heuristic: if recipient field exists and matches pattern
+                    // TODO: Implement proper recipient parsing
+                    break;
+
+                case 'recipient_count_gt':
+                    // Count number of recipients
+                    // Note: This requires parsing recipient lists
+                    // TODO: Implement recipient counting
+                    break;
+
+                case 'is_first_contact':
+                    // Check if no prior thread with sender
+                    // Note: This requires thread tracking
+                    // TODO: Implement thread tracking
+                    break;
+
+                // === Sender analysis ===
+                case 'sender_is_vip':
+                    // Check against VIP list
+                    // Note: This requires VIP management feature
+                    // TODO: Implement VIP list
+                    break;
+
+                case 'sender_in_contacts':
+                    // Check if sender is in contacts
+                    // Note: This requires contact list integration
+                    // TODO: Implement contact list
                     break;
                 default:
                     // Fallback for any other keys that might be in analysis
@@ -925,7 +1035,7 @@ export class EmailProcessorService {
     private async executeAction(
         account: EmailAccount,
         email: Email,
-        action: 'delete' | 'archive' | 'draft' | 'read' | 'star',
+        action: string,  // Changed to string to support 'label:*' and other future actions
         draftContent?: string,
         eventLogger?: EventLogger | null,
         reason?: string,
@@ -936,6 +1046,19 @@ export class EmailProcessorService {
                 await eventLogger.info('Acting', `Executing action: ${action}`, { reason, hasAttachments: !!attachments?.length }, email.id);
             }
 
+            // Parse label actions (e.g., "label:Finance/Receipts")
+            if (action.startsWith('label:')) {
+                const labelName = action.substring(6); // Remove "label:" prefix
+                if (account.provider === 'gmail') {
+                    await this.gmailService.applyLabelByName(account, email.external_id, labelName);
+                } else if (account.provider === 'outlook') {
+                    await this.microsoftService.moveToFolderByPath(account, email.external_id, labelName);
+                }
+                logger.debug('Label/folder action executed', { emailId: email.id, labelName });
+                return;
+            }
+
+            // Standard actions
             if (account.provider === 'gmail') {
                 if (action === 'delete') {
                     await this.gmailService.trashMessage(account, email.external_id);
@@ -953,6 +1076,10 @@ export class EmailProcessorService {
                     await this.gmailService.markAsRead(account, email.external_id);
                 } else if (action === 'star') {
                     await this.gmailService.starMessage(account, email.external_id);
+                } else if (action === 'important') {
+                    await this.gmailService.addLabel(account, email.external_id, ['IMPORTANT']);
+                } else if (action === 'unstar') {
+                    await this.gmailService.removeLabel(account, email.external_id, ['STARRED']);
                 }
             } else if (account.provider === 'outlook') {
                 if (action === 'delete') {
@@ -966,7 +1093,7 @@ export class EmailProcessorService {
                     await this.microsoftService.createDraft(account, email.external_id, draftContent);
                 } else if (action === 'read') {
                     await this.microsoftService.markAsRead(account, email.external_id);
-                } else if (action === 'star') {
+                } else if (action === 'star' || action === 'important') {
                     await this.microsoftService.flagMessage(account, email.external_id);
                 }
             }
