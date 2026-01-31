@@ -33,7 +33,7 @@ import {
     saveSupabaseConfig,
     validateSupabaseConnection,
 } from '../lib/supabase-config';
-import { checkMigrationStatus } from '../lib/migration-check';
+import { checkMigrationStatus, APP_VERSION } from '../lib/migration-check';
 import { Logo } from './Logo';
 
 type WizardStep = 'welcome' | 'type' | 'managed-token' | 'managed-org' | 'provisioning' | 'validating' | 'credentials' | 'migration';
@@ -118,6 +118,7 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const logEndRef = useRef<HTMLDivElement>(null);
     const [isMigrating, setIsMigrating] = useState(false);
+    const [migrationStatus, setMigrationStatus] = useState<any>(null);
 
     useEffect(() => {
         if (logEndRef.current) {
@@ -206,8 +207,21 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
                                     anonKey: newAnonKey.trim()
                                 });
 
+                                // Set migration status for fresh project
+                                setMigrationStatus({
+                                    needsMigration: true,
+                                    dbVersion: null,
+                                    appVersion: APP_VERSION,
+                                    isUnknown: true
+                                });
+
                                 // Proceed to migration automatically
-                                setTimeout(() => handleRunMigration(event.data.projectId, accessToken.trim()), 1500);
+                                setTimeout(() => handleRunMigration(
+                                    event.data.projectId,
+                                    accessToken.trim(),
+                                    newUrl,
+                                    newAnonKey
+                                ), 1500);
                             }
                             if (event.type === 'error') {
                                 setError(event.data);
@@ -225,9 +239,16 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
         }
     };
 
-    const handleRunMigration = async (overrideProjectId?: string, overrideToken?: string) => {
-        const targetProjectId = overrideProjectId || projectId || url.split('//')[1]?.split('.')[0];
+    const handleRunMigration = async (
+        overrideProjectId?: string,
+        overrideToken?: string,
+        overrideUrl?: string,
+        overrideAnonKey?: string
+    ) => {
+        const targetProjectId = overrideProjectId || projectId || (url.includes('//') ? url.split('//')[1]?.split('.')[0] : url.trim());
         const targetToken = (overrideToken || accessToken).trim();
+        const targetUrl = overrideUrl || url;
+        const targetKey = overrideAnonKey || anonKey;
 
         if (!targetProjectId || !targetToken) {
             setError('Project ID and Access Token are required for migration.');
@@ -273,11 +294,12 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
                             if (event.type === 'done' && event.data === 'success') {
                                 addLog('success', '✅ Database setup complete!');
 
-                                // Ensure config is saved
-                                saveSupabaseConfig({
-                                    url: normalizeSupabaseUrl(url),
-                                    anonKey: anonKey.trim()
-                                });
+                                if (targetUrl && targetKey) {
+                                    saveSupabaseConfig({
+                                        url: normalizeSupabaseUrl(targetUrl),
+                                        anonKey: targetKey.trim()
+                                    });
+                                }
 
                                 // Auto redirect immediately
                                 onComplete();
@@ -308,6 +330,10 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
         const result = await validateSupabaseConnection(normalizedUrl, trimmedKey);
 
         if (result.valid) {
+            setUrl(normalizedUrl);
+            const extractedId = normalizedUrl.split('//')[1]?.split('.')[0];
+            if (extractedId) setProjectId(extractedId);
+
             saveSupabaseConfig({ url: normalizedUrl, anonKey: trimmedKey });
 
             // Check if database actually needs migration before forcing that step
@@ -316,15 +342,18 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
                 const status = await checkMigrationStatus(tempClient);
 
                 if (status.needsMigration) {
+                    setMigrationStatus(status);
                     setStep('migration');
                 } else {
                     // Already migrated!
+                    setMigrationStatus(status);
                     addLog('success', '✨ Database is already up-to-date! Redirecting...');
                     onComplete();
                     window.location.reload();
                 }
             } catch (err) {
                 console.warn('[SetupWizard] Migration check failed during manual connect:', err);
+                setMigrationStatus({ needsMigration: true, isUnknown: true });
                 // Fallback: show migration step just in case
                 setStep('migration');
             }
@@ -722,13 +751,54 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
                                             animate={{ y: 0, opacity: 1 }}
                                             className="p-5 bg-primary/5 rounded-2xl space-y-4 border border-primary/20"
                                         >
-                                            <p className="text-[11px] text-muted-foreground leading-relaxed font-medium">
-                                                We must apply the database schema to normalize your project for AI operations.
-                                            </p>
+                                            <div className="space-y-2">
+                                                <p className="text-[11px] text-muted-foreground leading-relaxed font-medium">
+                                                    {migrationStatus?.dbVersion === null || migrationStatus?.isUnknown
+                                                        ? "Empty project detected. Initialization is mandatory to install core AI systems."
+                                                        : `Version mismatch detected (v${migrationStatus?.dbVersion || '?.?'} -> v${migrationStatus?.appVersion || APP_VERSION}). Normalization is recommended.`}
+                                                </p>
+
+                                                {/* Token Input for Manual Flow */}
+                                                {!accessToken && (
+                                                    <div className="space-y-2 pt-2 border-t border-primary/10">
+                                                        <Label className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Management Token Required</Label>
+                                                        <div className="relative">
+                                                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-primary/30" size={12} />
+                                                            <Input
+                                                                type="password"
+                                                                placeholder="sbp_xxxxxxxxxxxxxxxx"
+                                                                value={accessToken}
+                                                                onChange={(e) => setAccessToken(e.target.value)}
+                                                                className="pl-9 h-10 bg-background/50 border-primary/20 rounded-xl text-[11px]"
+                                                            />
+                                                        </div>
+                                                        <p className="text-[9px] text-muted-foreground/60 italic px-1">
+                                                            Used once to run <code className="text-primary/70">migrate.sh</code> on your backend.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+
                                             <div className="flex gap-3">
-                                                <Button variant="ghost" onClick={() => window.location.reload()} className="flex-1 h-11 text-[10px] font-bold uppercase tracking-widest">Bypass (Risk)</Button>
-                                                <Button onClick={() => handleRunMigration()} className="flex-1 h-11 bg-primary text-[10px] font-bold uppercase tracking-widest shadow-lg hover:shadow-primary/30">
-                                                    Prepare Schema
+                                                {/* Only allow bypass if DB is NOT fresh */}
+                                                {(migrationStatus?.dbVersion !== null && !migrationStatus?.isUnknown) && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            onComplete();
+                                                            window.location.reload();
+                                                        }}
+                                                        className="flex-1 h-11 text-[10px] font-bold uppercase tracking-widest opacity-60 hover:opacity-100"
+                                                    >
+                                                        Bypass (Risk)
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    onClick={() => handleRunMigration()}
+                                                    disabled={!accessToken}
+                                                    className="flex-1 h-11 bg-primary text-[10px] font-bold uppercase tracking-widest shadow-lg hover:shadow-primary/30"
+                                                >
+                                                    {migrationStatus?.dbVersion === null || migrationStatus?.isUnknown ? "Install Systems" : "Normalize System"}
                                                 </Button>
                                             </div>
                                         </motion.div>
