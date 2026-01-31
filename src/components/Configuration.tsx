@@ -1124,121 +1124,155 @@ export function Configuration() {
                 </DialogContent>
             </Dialog>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Email Accounts Section */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Database className="w-5 h-5 text-primary" />
-                            Connected Accounts
-                        </CardTitle>
-                        <CardDescription>Manage your email providers</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {state.accounts.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">
-                                No accounts connected yet
-                            </p>
-                        ) : (
-                            state.accounts.map((account: EmailAccount) => (
-                                <div
-                                    key={account.id}
-                                    className="flex items-center justify-between p-4 border rounded-lg bg-card"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        {getProviderIcon(account.provider)}
-                                        <div>
-                                            <h4 className="font-medium capitalize">{account.provider}</h4>
-                                            <p className="text-xs text-muted-foreground">
-                                                {account.email_address}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {account.is_active ? (
-                                            <span className="text-xs text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full">
-                                                Active
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-yellow-600 bg-yellow-500/10 px-2 py-1 rounded-full">
-                                                Inactive
-                                            </span>
-                                        )}
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-destructive hover:text-destructive"
-                                            onClick={() => handleDisconnect(account.id)}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-
-                        <div className="flex flex-col gap-2">
-                            <Button
-                                className="w-full border-dashed"
-                                variant="outline"
-                                onClick={handleConnectGmail}
-                                disabled={isConnecting || isOutlookConnecting}
-                            >
-                                {isConnecting ? (
-                                    <LoadingSpinner size="sm" className="mr-2" />
-                                ) : (
-                                    <Plus className="w-4 h-4 mr-2" />
-                                )}
-                                Connect Gmail Account
-                            </Button>
-
-                            <Button
-                                className="w-full border-dashed"
-                                variant="outline"
-                                onClick={handleConnectOutlook}
-                                disabled={isConnecting || isOutlookConnecting}
-                            >
-                                {isOutlookConnecting && !outlookDeviceCode ? (
-                                    <LoadingSpinner size="sm" className="mr-2" />
-                                ) : (
-                                    <Plus className="w-4 h-4 mr-2" />
-                                )}
-                                Connect Outlook Account
-                            </Button>
-                        </div>
-
-                        {outlookDeviceCode && (
-                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg animate-in slide-in-from-top-2">
-                                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                                    Microsoft Sign-In Required
-                                </h4>
-                                <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
-                                    {outlookDeviceCode.message}
-                                </p>
+            {/* Email Accounts Section - Full Width Split Layout */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Database className="w-5 h-5 text-primary" />
+                        Connected Accounts
+                    </CardTitle>
+                    <CardDescription>Manage your email providers</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Left Side - Connection Buttons */}
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="text-sm font-semibold mb-3">Add New Account</h3>
                                 <div className="flex flex-col gap-3">
-                                    <div className="flex items-center gap-2 bg-white dark:bg-black/20 p-2 rounded border border-blue-200 dark:border-blue-800">
-                                        <code className="text-lg font-mono font-bold flex-1 text-center select-all">
-                                            {outlookDeviceCode.userCode}
-                                        </code>
-                                    </div>
                                     <Button
-                                        variant="default"
-                                        className="w-full bg-blue-600 hover:bg-blue-700"
-                                        onClick={() => window.open(outlookDeviceCode.verificationUri, '_blank')}
+                                        className="w-full border-dashed justify-start h-auto py-4"
+                                        variant="outline"
+                                        onClick={handleConnectGmail}
+                                        disabled={isConnecting || isOutlookConnecting}
                                     >
-                                        Open Microsoft Login
-                                        <ExternalLink className="w-4 h-4 ml-2" />
+                                        <div className="flex items-center gap-3 w-full">
+                                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 font-bold shrink-0">
+                                                G
+                                            </div>
+                                            <div className="flex-1 text-left">
+                                                <div className="font-medium">Gmail</div>
+                                                <div className="text-xs text-muted-foreground">Connect your Google account</div>
+                                            </div>
+                                            {isConnecting ? (
+                                                <LoadingSpinner size="sm" />
+                                            ) : (
+                                                <Plus className="w-5 h-5 shrink-0" />
+                                            )}
+                                        </div>
                                     </Button>
-                                    <p className="text-xs text-center text-muted-foreground mt-2">
-                                        Waiting for you to sign in...
-                                    </p>
+
+                                    <Button
+                                        className="w-full border-dashed justify-start h-auto py-4"
+                                        variant="outline"
+                                        onClick={handleConnectOutlook}
+                                        disabled={isConnecting || isOutlookConnecting}
+                                    >
+                                        <div className="flex items-center gap-3 w-full">
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold shrink-0">
+                                                O
+                                            </div>
+                                            <div className="flex-1 text-left">
+                                                <div className="font-medium">Outlook</div>
+                                                <div className="text-xs text-muted-foreground">Connect your Microsoft account</div>
+                                            </div>
+                                            {isOutlookConnecting && !outlookDeviceCode ? (
+                                                <LoadingSpinner size="sm" />
+                                            ) : (
+                                                <Plus className="w-5 h-5 shrink-0" />
+                                            )}
+                                        </div>
+                                    </Button>
                                 </div>
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
 
-            </div>
+                            {outlookDeviceCode && (
+                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg animate-in slide-in-from-top-2">
+                                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                                        Microsoft Sign-In Required
+                                    </h4>
+                                    <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
+                                        {outlookDeviceCode.message}
+                                    </p>
+                                    <div className="flex flex-col gap-3">
+                                        <div className="flex items-center gap-2 bg-white dark:bg-black/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+                                            <code className="text-lg font-mono font-bold flex-1 text-center select-all">
+                                                {outlookDeviceCode.userCode}
+                                            </code>
+                                        </div>
+                                        <Button
+                                            variant="default"
+                                            className="w-full bg-blue-600 hover:bg-blue-700"
+                                            onClick={() => window.open(outlookDeviceCode.verificationUri, '_blank')}
+                                        >
+                                            Open Microsoft Login
+                                            <ExternalLink className="w-4 h-4 ml-2" />
+                                        </Button>
+                                        <p className="text-xs text-center text-muted-foreground mt-2">
+                                            Waiting for you to sign in...
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right Side - Connected Accounts */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-semibold mb-3">Your Accounts</h3>
+                            {state.accounts.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed rounded-lg">
+                                    <Database className="w-12 h-12 text-muted-foreground/40 mb-3" />
+                                    <p className="text-sm text-muted-foreground text-center">
+                                        No accounts connected yet
+                                    </p>
+                                    <p className="text-xs text-muted-foreground text-center mt-1">
+                                        Connect an account to get started
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {state.accounts.map((account: EmailAccount) => (
+                                        <div
+                                            key={account.id}
+                                            className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-secondary/30 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                {getProviderIcon(account.provider)}
+                                                <div>
+                                                    <h4 className="font-medium capitalize">{account.provider}</h4>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {account.email_address}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {account.is_active ? (
+                                                    <span className="text-xs text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full">
+                                                        Active
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-yellow-600 bg-yellow-500/10 px-2 py-1 rounded-full">
+                                                        Inactive
+                                                    </span>
+                                                )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                                    onClick={() => handleDisconnect(account.id)}
+                                                    title="Disconnect Account"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* LLM Settings Section */}
             <Card>
