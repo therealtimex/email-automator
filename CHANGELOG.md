@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.11.0] - 2026-01-30
+
+### Added
+- **Flexible LLM Configuration**: Integrated `@realtimex/sdk` for centralized LLM management, enabling support for a wider range of models and providers.
+- **Default Model Update**: Updated the default AI model to `google/gemini-2.0-flash-001` for improved performance and cost-efficiency.
+- **Setup Wizard Improvements**: Enhanced the initial setup experience with better conditional rendering and a dedicated close action for the wizard modal.
+- **Migration API**: Added a new API endpoint to expose and manage database migrations directly from the frontend, simplifying the update process.
+
+### Removed
+- **Legacy LLM Settings**: Removed obsolete direct configuration columns for OpenAI and Anthropic in favor of the unified SDK-based configuration.
+
 ## [2.10.10] - 2026-01-20
 
 ### Added
