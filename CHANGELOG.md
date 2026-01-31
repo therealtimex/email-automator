@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.14.0] - 2026-01-31
+
+### Added
+- **Update Notification**: Added a "New Version Available" banner that automatically detects when a newer version of the application is published to npm. This solves the issue where `npx` caches stale versions, ensuring users are always prompted to use the latest features.
+- **Version Check Utility**: Implemented a smart version checker that periodically polls the npm registry (throttled to every 5 minutes) to detect updates without impacting performance.
+
 ## [2.13.0] - 2026-01-31
 
 ### Added
