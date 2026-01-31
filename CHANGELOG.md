@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.13.0] - 2026-01-31
+
+### Added
+- **Context-Aware Smart Drafts**: The AI now generates draft replies with significantly deeper context. It understands your role, company, the sender's relationship, and the specific sentiment/priority of the incoming email.
+- **Multi-Language Support**: The drafting engine now automatically detects the language of the incoming email (e.g., Vietnamese, Japanese, Spanish) and ensures the draft reply is written in the same language with appropriate cultural nuances.
+- **Auto-Pilot Draft Instructions**: Updated standard rule packs (Sales, Operations, Executive, Developer) to include "Draft" actions by default for high-value signals.
+- **Rich Prompting**: Added specific, expert-written drafting instructions to system rules (e.g., "Draft an enthusiastic follow-up," "Draft a polite decline").
+
+### Changed
+- **Rule Engine**: Rules now support an `instructions` field, allowing users (and the system) to provide specific guidance on how the AI should write drafts for that specific rule.
+- **Processor**: Enhanced the background processing pipeline to extract and pass rich metadata (sender history, key points, language) to the drafting agent.
+
 ## [2.12.1] - 2026-01-31
 
 ### Fixed

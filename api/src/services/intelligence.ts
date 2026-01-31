@@ -25,6 +25,8 @@ export const EmailAnalysisSchema = z.object({
         .describe('Key points extracted from the email'),
     action_items: z.array(z.string()).optional()
         .describe('Action items mentioned in the email'),
+    language: z.string().optional()
+        .describe('The primary language of the email (e.g., "English", "Vietnamese", "Japanese", "Spanish")'),
 });
 
 export type EmailAnalysis = z.infer<typeof EmailAnalysisSchema>;
@@ -205,7 +207,26 @@ REQUIRED JSON STRUCTURE:
     async generateDraftReply(
         originalEmail: { subject: string; sender: string; body: string },
         instructions?: string,
-        llmSettings?: { llm_provider?: string; llm_model?: string }
+        llmSettings?: { llm_provider?: string; llm_model?: string },
+        richContext?: {
+            // User/Account metadata
+            myEmail?: string;
+            myName?: string;
+            myRole?: string;
+            myCompany?: string;
+
+            // Email analysis metadata
+            category?: string;
+            sentiment?: string;
+            priority?: string;
+            keyPoints?: string[];
+            language?: string;
+
+            // Sender metadata
+            senderEmail?: string;
+            senderName?: string;
+            receivedDate?: Date;
+        }
     ): Promise<string | null> {
         const sdk = SDKService.getSDK();
         if (!sdk) return null;
@@ -216,14 +237,73 @@ REQUIRED JSON STRUCTURE:
         });
 
         try {
+            // Build rich system prompt with context
+            let systemPrompt = 'You are an AI email assistant drafting a professional reply.';
+
+            if (richContext?.myEmail) {
+                systemPrompt += `\n\nYou are responding on behalf of ${richContext.myName || 'the user'} (${richContext.myEmail})`;
+                if (richContext.myRole) {
+                    systemPrompt += `, a ${richContext.myRole}`;
+                }
+                if (richContext.myCompany) {
+                    systemPrompt += ` at ${richContext.myCompany}`;
+                }
+                systemPrompt += '.';
+            }
+
+            if (richContext?.category) {
+                systemPrompt += `\n\nThis is a ${richContext.category} email`;
+                if (richContext.sentiment) {
+                    systemPrompt += ` with a ${richContext.sentiment.toLowerCase()} tone`;
+                }
+                if (richContext.priority) {
+                    systemPrompt += ` (priority: ${richContext.priority.toLowerCase()})`;
+                }
+                systemPrompt += '.';
+            }
+
+            if (instructions) {
+                systemPrompt += `\n\nYOUR SPECIFIC TASK: ${instructions}`;
+            }
+
+            // Language handling - CRITICAL for multi-language support
+            if (richContext?.language) {
+                systemPrompt += `\n\nIMPORTANT: The incoming email is written in ${richContext.language}. You MUST write your reply in ${richContext.language}. Maintain appropriate formality and cultural conventions for ${richContext.language}.`;
+            }
+
+            systemPrompt += '\n\nWrite ONLY the email body (no subject line). Be natural, concise, and professional. Match the tone of the incoming email.';
+
+            // Build user message with email context
+            let userMessage = '';
+
+            if (richContext?.senderEmail || richContext?.senderName) {
+                userMessage += `INCOMING EMAIL:\n`;
+                userMessage += `From: ${richContext.senderName || originalEmail.sender}`;
+                if (richContext.senderEmail && richContext.senderEmail !== originalEmail.sender) {
+                    userMessage += ` <${richContext.senderEmail}>`;
+                }
+                userMessage += '\n';
+                if (richContext.receivedDate) {
+                    userMessage += `Received: ${richContext.receivedDate.toLocaleString()}\n`;
+                }
+            }
+
+            userMessage += `Subject: ${originalEmail.subject}\n\n`;
+
+            if (richContext?.keyPoints && richContext.keyPoints.length > 0) {
+                userMessage += `KEY POINTS:\n${richContext.keyPoints.map(p => `• ${p}`).join('\n')}\n\n`;
+            }
+
+            userMessage += `FULL MESSAGE:\n${originalEmail.body}`;
+
             const response = await sdk.llm.chat([
                 {
                     role: 'system',
-                    content: `Generate a professional reply. ${instructions || ''}`,
+                    content: systemPrompt,
                 },
                 {
                     role: 'user',
-                    content: `From: ${originalEmail.sender}\nSubject: ${originalEmail.subject}\n\n${originalEmail.body}`,
+                    content: userMessage,
                 },
             ], { provider, model });
 

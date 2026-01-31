@@ -151,6 +151,7 @@ export interface EmailAnalysis {
     priority: Priority;
     key_points?: string[];
     action_items?: string[];
+    language?: string; // ISO 639-1 code (en, vi, ja, etc.) or language name
 }
 
 // Stats

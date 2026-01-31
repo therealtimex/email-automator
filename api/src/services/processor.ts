@@ -802,6 +802,23 @@ export class EmailProcessorService {
 
                         const intelligenceService = getIntelligenceService();
 
+                        // Build rich context for better drafts
+                        const emailDomain = account.email_address?.split('@')[1] || undefined;
+                        const richContext = {
+                            myEmail: account.email_address,
+                            myName: undefined, // Profile not available in this scope
+                            myRole: settings?.user_role || undefined,
+                            myCompany: emailDomain,
+                            category: analysis?.category,
+                            sentiment: analysis?.sentiment,
+                            priority: analysis?.priority,
+                            keyPoints: analysis?.key_points,
+                            language: analysis?.language, // Multi-language support
+                            senderEmail: email.sender || undefined,
+                            senderName: email.sender || undefined,
+                            receivedDate: email.date ? new Date(email.date) : undefined
+                        };
+
                         const customizedDraft = await intelligenceService.generateDraftReply({
                             subject: email.subject || '',
                             sender: email.sender || '',
@@ -809,7 +826,7 @@ export class EmailProcessorService {
                         }, rule.instructions, {
                             llm_provider: settings?.llm_provider,
                             llm_model: settings?.llm_model
-                        });
+                        }, richContext);
 
                         if (customizedDraft) {
                             draftContent = customizedDraft;
