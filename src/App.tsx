@@ -27,6 +27,12 @@ import {
 } from './lib/migration-check';
 import { MigrationBanner } from './components/migration/MigrationBanner';
 import { MigrationModal } from './components/migration/MigrationModal';
+import {
+    checkForUpdates,
+    isUpdatePromptDismissed,
+    type VersionInfo
+} from './lib/version-check';
+import { UpdateBanner } from './components/UpdateBanner';
 import { LiveTerminal } from './components/LiveTerminal';
 import { ProcessingEvent } from './lib/types';
 import {
@@ -53,6 +59,8 @@ function AppContent() {
     const [showMigrationBanner, setShowMigrationBanner] = useState(false);
     const [showMigrationModal, setShowMigrationModal] = useState(false);
     const [suppressMigrationBanner, setSuppressMigrationBanner] = useState(false);
+    const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+    const [showUpdateBanner, setShowUpdateBanner] = useState(false);
 
     // Handle OAuth Callback (e.g. Gmail)
     useEffect(() => {
@@ -136,6 +144,13 @@ function AppContent() {
                     if (status.needsMigration && !isMigrationReminderDismissed()) {
                         setShowMigrationBanner(true);
                     }
+                }
+
+                // 4. Version Check (Check for updates from npm)
+                const updateInfo = await checkForUpdates();
+                if (updateInfo && !isUpdatePromptDismissed()) {
+                    setVersionInfo(updateInfo);
+                    setShowUpdateBanner(true);
                 }
             } catch (err) {
                 console.error('[App] Status check failed:', err);
@@ -364,6 +379,14 @@ function AppContent() {
                         status={migrationStatus}
                         onDismiss={() => setShowMigrationBanner(false)}
                         onLearnMore={handleOpenMigrationModal}
+                    />
+                )}
+
+                {/* Update Banner */}
+                {versionInfo && showUpdateBanner && (
+                    <UpdateBanner
+                        versionInfo={versionInfo}
+                        onDismiss={() => setShowUpdateBanner(false)}
                     />
                 )}
 
