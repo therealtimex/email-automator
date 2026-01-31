@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.11.3] - 2026-01-31
+
+### Fixed
+- **LLM Settings Propagation**: Fixed a bug where configured LLM providers and models were not being correctly passed to the analysis engine during background processing. The system now correctly respects the user's selected model for all AI operations.
+- **Robust JSON Parsing**: Enhanced the resilience of AI response parsing. The system now automatically strips markdown code blocks, cleans up local LLM artifacts (like `<|...|>`), and normalizes data types (e.g., converting single-string actions to arrays) to prevent "Malformed Response" errors.
+- **Error Logging**: Improved granularity of error logs for SDK failures and malformed AI responses to aid in troubleshooting.
+
 ## [2.11.2] - 2026-01-31
 
 ### Refactored

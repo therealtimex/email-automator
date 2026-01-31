@@ -91,7 +91,7 @@ export class IntelligenceService {
         return this.isConfigured && !!SDKService.getSDK();
     }
 
-    async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger, emailId?: string): Promise<(EmailAnalysis & { _metadata?: any }) | null> {
+    async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger, emailId?: string, llmSettings?: { llm_provider?: string; llm_model?: string }): Promise<(EmailAnalysis & { _metadata?: any }) | null> {
         const sdk = SDKService.getSDK();
         if (!sdk) {
             logger.warn('Intelligence service not ready, skipping analysis');
@@ -101,7 +101,10 @@ export class IntelligenceService {
             return null;
         }
 
-        const { provider, model, isDefaultFallback } = await SDKService.resolveChatProvider({});
+        const { provider, model, isDefaultFallback } = await SDKService.resolveChatProvider({
+            llm_provider: llmSettings?.llm_provider,
+            llm_model: llmSettings?.llm_model
+        });
 
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
 
@@ -134,10 +137,10 @@ REQUIRED JSON STRUCTURE:
 
         if (eventLogger) {
             await eventLogger.info('Thinking', `Analyzing email: ${context.subject}`, {
-                model,
-                provider,
+                provider: `${provider}/${model}`,
                 is_fallback: isDefaultFallback,
-                content_preview: cleanedContent
+                signals: metadataSignals,
+                content_preview: cleanedContent.substring(0, 100) + '...'
             }, emailId);
         }
 
@@ -147,8 +150,27 @@ REQUIRED JSON STRUCTURE:
                 { role: 'user', content: cleanedContent || '[Empty body]' }
             ], { provider, model });
 
+            // Check if SDK call failed
+            if (!response.success || response.error) {
+                const errorMsg = response.error || 'Unknown SDK error';
+                logger.error('SDK chat failed for email analysis', {
+                    provider,
+                    model,
+                    error: errorMsg,
+                    code: response.code
+                });
+                if (eventLogger) await eventLogger.error('SDK Error', `${errorMsg} (${provider}/${model})`, emailId);
+                return null;
+            }
+
             const rawResponse = response.response?.content || '';
-            const validated = this.parseRobustJSON<EmailAnalysis>(rawResponse, EmailAnalysisSchema);
+            if (!rawResponse) {
+                logger.warn('SDK returned empty response for analysis', { provider, model });
+                if (eventLogger) await eventLogger.error('Empty Response', `LLM (${provider}/${model}) returned no content`, emailId);
+                return null;
+            }
+
+            const validated = this.parseRobustJSON<EmailAnalysis>(rawResponse, EmailAnalysisSchema, eventLogger, emailId);
 
             const result = validated ? {
                 ...validated,
@@ -165,6 +187,11 @@ REQUIRED JSON STRUCTURE:
                     ...result,
                     _raw_response: rawResponse
                 });
+            } else if (eventLogger && !result) {
+                await eventLogger.error('Malformed Response', {
+                    message: 'AI returned data that did not match the required schema',
+                    raw_response: rawResponse.substring(0, 500)
+                }, emailId);
             }
 
             return result;
@@ -177,12 +204,16 @@ REQUIRED JSON STRUCTURE:
 
     async generateDraftReply(
         originalEmail: { subject: string; sender: string; body: string },
-        instructions?: string
+        instructions?: string,
+        llmSettings?: { llm_provider?: string; llm_model?: string }
     ): Promise<string | null> {
         const sdk = SDKService.getSDK();
         if (!sdk) return null;
 
-        const { provider, model } = await SDKService.resolveChatProvider({});
+        const { provider, model } = await SDKService.resolveChatProvider({
+            llm_provider: llmSettings?.llm_provider,
+            llm_model: llmSettings?.llm_model
+        });
 
         try {
             const response = await sdk.llm.chat([
@@ -196,6 +227,17 @@ REQUIRED JSON STRUCTURE:
                 },
             ], { provider, model });
 
+            // Check if SDK call failed
+            if (!response.success || response.error) {
+                logger.error('SDK chat failed for draft generation', {
+                    provider,
+                    model,
+                    error: response.error,
+                    code: response.code
+                });
+                return null;
+            }
+
             return response.response?.content || null;
         } catch (error) {
             logger.error('Draft generation failed', error);
@@ -208,12 +250,16 @@ REQUIRED JSON STRUCTURE:
         context: EmailContext,
         compiledRulesContext: string | RuleContext[],
         eventLogger?: EventLogger,
-        emailId?: string
+        emailId?: string,
+        llmSettings?: { llm_provider?: string; llm_model?: string }
     ): Promise<(ContextAwareAnalysis & { _metadata?: any }) | null> {
         const sdk = SDKService.getSDK();
         if (!sdk) return null;
 
-        const { provider, model, isDefaultFallback } = await SDKService.resolveChatProvider({});
+        const { provider, model, isDefaultFallback } = await SDKService.resolveChatProvider({
+            llm_provider: llmSettings?.llm_provider,
+            llm_model: llmSettings?.llm_model
+        });
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
 
         let rulesContext: string;
@@ -223,24 +269,71 @@ REQUIRED JSON STRUCTURE:
             rulesContext = compiledRulesContext.map(r => `- ${r.name}: ${r.intent}`).join('\n');
         }
 
-        const systemPrompt = `You are an AI Automation Agent. Match email against these rules:\n${rulesContext}\n\nReturn JSON with matched_rule, actions_to_execute, and draft_content.`;
+        const systemPrompt = `You are an AI Automation Agent. Analyze the email and match it against the user's rules.
+
+Rules Context:
+${rulesContext}
+
+REQUIRED JSON STRUCTURE:
+{
+  "summary": "A brief summary of the email content",
+  "category": "spam|newsletter|promotional|transactional|social|support|client|internal|personal|other",
+  "priority": "High|Medium|Low",
+  "matched_rule": {
+    "rule_id": "string or null",
+    "rule_name": "string or null",
+    "confidence": 0.0 to 1.0,
+    "reasoning": "Brief explanation"
+  },
+  "actions_to_execute": ["none"|"delete"|"archive"|"draft"|"read"|"star"],
+  "draft_content": "Suggested reply if drafting, otherwise null"
+}
+
+IMPORTANT:
+- Use "draft" action only if a rule explicitly requests it or if it's very clear a reply is needed.
+- Categorize accurately.
+- Confidence 0.7+ is required for automatic execution.`;
 
         if (eventLogger) {
             await eventLogger.info('Thinking', `Context-aware analysis: ${context.subject}`, {
-                model,
-                provider,
-                is_fallback: isDefaultFallback
+                provider: `${provider}/${model}`,
+                is_fallback: isDefaultFallback,
+                rules_count: Array.isArray(compiledRulesContext) ? compiledRulesContext.length : 'compiled'
             }, emailId);
         }
 
         try {
+            logger.debug('Calling SDK chat for rule analysis', { provider, model, promptLength: systemPrompt.length });
             const response = await sdk.llm.chat([
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: cleanedContent || '[Empty body]' }
             ], { provider, model });
 
+            // Check if SDK call failed
+            if (!response.success || response.error) {
+                const errorMsg = response.error || 'Unknown SDK error';
+                logger.error('SDK chat failed for rule analysis', {
+                    provider,
+                    model,
+                    error: errorMsg,
+                    code: response.code
+                });
+                if (eventLogger) await eventLogger.error('SDK Error', `${errorMsg} (${provider}/${model})`, emailId);
+                return null;
+            }
+
             const rawResponse = response.response?.content || '';
-            const validated = this.parseRobustJSON<ContextAwareAnalysis>(rawResponse, ContextAwareAnalysisSchema);
+            if (!rawResponse) {
+                logger.warn('SDK returned empty response for rule analysis', {
+                    provider,
+                    model,
+                    success: response.success
+                });
+                if (eventLogger) await eventLogger.error('Empty Response', `LLM (${provider}/${model}) returned no content`, emailId);
+                return null;
+            }
+
+            const validated = this.parseRobustJSON<ContextAwareAnalysis>(rawResponse, ContextAwareAnalysisSchema, eventLogger, emailId);
 
             const result = validated ? {
                 ...validated,
@@ -257,12 +350,23 @@ REQUIRED JSON STRUCTURE:
                     ...result,
                     _raw_response: rawResponse
                 });
+            } else if (eventLogger && !result) {
+                await eventLogger.error('Malformed Response', {
+                    message: 'AI returned rule analysis that did not match the required schema',
+                    raw_response: rawResponse.substring(0, 500)
+                }, emailId);
             }
 
             return result;
         } catch (error: any) {
-            logger.error('Rule analysis failed', error);
-            if (eventLogger) await eventLogger.error('Error', error.message, emailId);
+            logger.error('Rule analysis failed', {
+                error: error.message,
+                stack: error.stack,
+                provider,
+                model,
+                errorType: error.constructor.name
+            });
+            if (eventLogger) await eventLogger.error('Error', `${error.message} (${provider}/${model})`, emailId);
             return null;
         }
     }
@@ -283,14 +387,48 @@ REQUIRED JSON STRUCTURE:
         }
     }
 
-    private parseRobustJSON<T>(input: string, schema: z.ZodSchema<T>): T | null {
+    private parseRobustJSON<T>(input: string, schema: z.ZodSchema<T>, eventLogger?: EventLogger, emailId?: string): T | null {
         try {
-            const jsonMatch = input.match(/\{[\s\S]*\}/);
-            const jsonStr = jsonMatch ? jsonMatch[0] : input;
-            const cleaned = jsonStr.replace(/<\|[\s\S]*?\|>/g, '').replace(/```json/g, '').replace(/```/g, '').trim();
+            // 1. Remove common LLM artifacts and markdown blocks
+            let cleaned = input.trim();
+
+            // Handle markdown blocks
+            if (cleaned.includes('```json')) {
+                cleaned = cleaned.split('```json')[1].split('```')[0].trim();
+            } else if (cleaned.includes('```')) {
+                cleaned = cleaned.split('```')[1].split('```')[0].trim();
+            }
+
+            // 2. Extract the first { ... } block if visible
+            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                cleaned = jsonMatch[0];
+            }
+
+            // 3. Strip aggressive local LLM tokens
+            cleaned = cleaned.replace(/<\|[\s\S]*?\|>/g, '').trim();
+
+            // 4. Parse and Normalize
             const parsed = JSON.parse(cleaned);
+
+            // Normalize actions_to_execute: convert string to array if needed
+            if (parsed && typeof parsed === 'object' && 'actions_to_execute' in parsed) {
+                if (typeof parsed.actions_to_execute === 'string') {
+                    parsed.actions_to_execute = [parsed.actions_to_execute];
+                    logger.debug('Normalized actions_to_execute from string to array', { original: parsed.actions_to_execute[0] });
+                }
+            }
+
+            // 5. Validate with Zod
             return schema.parse(parsed);
-        } catch (e) {
+        } catch (e: any) {
+            logger.error('JSON Robust Parsing failed', { error: e.message, input: input.substring(0, 200) });
+            if (eventLogger && emailId) {
+                eventLogger.error('JSON Parse Error', {
+                    error: e.message,
+                    raw_input_preview: input.substring(0, 500)
+                }, emailId).catch(() => { });
+            }
             return null;
         }
     }

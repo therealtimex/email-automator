@@ -651,7 +651,11 @@ export class EmailProcessorService {
                 },
                 compiledContext || '',  // Pre-compiled context (fast path)
                 eventLogger || undefined,
-                email.id
+                email.id,
+                {
+                    llm_provider: settings?.llm_provider,
+                    llm_model: settings?.llm_model
+                }
             );
 
             if (!analysis) {
@@ -789,7 +793,10 @@ export class EmailProcessorService {
                             subject: email.subject || '',
                             sender: email.sender || '',
                             body: email.body_snippet || ''
-                        }, rule.instructions);
+                        }, rule.instructions, {
+                            llm_provider: settings?.llm_provider,
+                            llm_model: settings?.llm_model
+                        });
 
                         if (customizedDraft) {
                             draftContent = customizedDraft;

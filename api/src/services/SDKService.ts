@@ -161,9 +161,10 @@ export class SDKService {
 
                 this.defaultChatProvider = {
                     provider: preferredProvider.provider,
-                    model: preferredModel.id
+                    model: preferredModel.id,
+                    isDefaultFallback: false
                 };
-                logger.info(`Using preferred default chat provider: ${this.defaultChatProvider.provider}/${this.defaultChatProvider.model}`);
+                logger.info(`Using preferred chat provider: ${this.defaultChatProvider.provider}/${this.defaultChatProvider.model}`);
                 return this.defaultChatProvider;
             }
 
@@ -172,7 +173,8 @@ export class SDKService {
                 if (p.models && p.models.length > 0) {
                     this.defaultChatProvider = {
                         provider: p.provider,
-                        model: p.models[0].id
+                        model: p.models[0].id,
+                        isDefaultFallback: true
                     };
                     logger.info(`Defaulting to first available chat provider: ${this.defaultChatProvider.provider}/${this.defaultChatProvider.model}`);
                     return this.defaultChatProvider;
@@ -221,9 +223,10 @@ export class SDKService {
                 if (p.models && p.models.length > 0) {
                     this.defaultEmbedProvider = {
                         provider: p.provider,
-                        model: p.models[0].id
+                        model: p.models[0].id,
+                        isDefaultFallback: true
                     };
-                    logger.info(`Default embed provider: ${this.defaultEmbedProvider.provider}/${this.defaultEmbedProvider.model}`);
+                    logger.info(`Selected embed provider: ${this.defaultEmbedProvider.provider}/${this.defaultEmbedProvider.model}`);
                     return this.defaultEmbedProvider;
                 }
             }
@@ -245,7 +248,11 @@ export class SDKService {
     static async resolveChatProvider(settings: { llm_provider?: string; llm_model?: string }): Promise<ProviderResult> {
         // If both provider and model are set in settings, use them
         if (settings.llm_provider && settings.llm_model) {
-            return { provider: settings.llm_provider, model: settings.llm_model };
+            return {
+                provider: settings.llm_provider,
+                model: settings.llm_model,
+                isDefaultFallback: false
+            };
         }
 
         // Try to get from SDK discovery first
@@ -258,7 +265,11 @@ export class SDKService {
     static async resolveEmbedProvider(settings: { embedding_provider?: string; embedding_model?: string }): Promise<ProviderResult> {
         // If both provider and model are set in settings, use them
         if (settings.embedding_provider && settings.embedding_model) {
-            return { provider: settings.embedding_provider, model: settings.embedding_model };
+            return {
+                provider: settings.embedding_provider,
+                model: settings.embedding_model,
+                isDefaultFallback: false
+            };
         }
 
         // Try to get from SDK discovery first
