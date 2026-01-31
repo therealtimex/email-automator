@@ -320,15 +320,6 @@ function AppContent() {
                                     <UserCircle className="w-5 h-5" />
                                 )}
                             </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleLogout}
-                                className="text-muted-foreground hover:text-foreground w-8 px-0"
-                                title="Sign out"
-                            >
-                                <LogOut className="w-4 h-4" />
-                            </Button>
                         </div>
                     </div>
                 </header>

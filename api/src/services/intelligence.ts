@@ -91,9 +91,7 @@ export class IntelligenceService {
         return this.isConfigured && !!SDKService.getSDK();
     }
 
-    async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger, emailId?: string): Promise<EmailAnalysis | null> {
-        console.log('[Intelligence] analyzeEmail called for:', context.subject);
-
+    async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger, emailId?: string): Promise<(EmailAnalysis & { _metadata?: any }) | null> {
         const sdk = SDKService.getSDK();
         if (!sdk) {
             logger.warn('Intelligence service not ready, skipping analysis');
@@ -103,7 +101,7 @@ export class IntelligenceService {
             return null;
         }
 
-        const { provider, model } = await SDKService.resolveChatProvider({});
+        const { provider, model, isDefaultFallback } = await SDKService.resolveChatProvider({});
 
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
 
@@ -138,6 +136,7 @@ REQUIRED JSON STRUCTURE:
             await eventLogger.info('Thinking', `Analyzing email: ${context.subject}`, {
                 model,
                 provider,
+                is_fallback: isDefaultFallback,
                 content_preview: cleanedContent
             }, emailId);
         }
@@ -151,14 +150,24 @@ REQUIRED JSON STRUCTURE:
             const rawResponse = response.response?.content || '';
             const validated = this.parseRobustJSON<EmailAnalysis>(rawResponse, EmailAnalysisSchema);
 
-            if (eventLogger && emailId && validated) {
+            const result = validated ? {
+                ...validated,
+                _metadata: {
+                    provider,
+                    model,
+                    is_fallback: isDefaultFallback,
+                    timestamp: new Date().toISOString()
+                }
+            } : null;
+
+            if (eventLogger && emailId && result) {
                 await eventLogger.analysis('Decided', emailId, {
-                    ...validated,
+                    ...result,
                     _raw_response: rawResponse
                 });
             }
 
-            return validated;
+            return result;
         } catch (error: any) {
             logger.error('Analysis failed', error);
             if (eventLogger) await eventLogger.error('Error', error.message, emailId);
@@ -200,11 +209,11 @@ REQUIRED JSON STRUCTURE:
         compiledRulesContext: string | RuleContext[],
         eventLogger?: EventLogger,
         emailId?: string
-    ): Promise<ContextAwareAnalysis | null> {
+    ): Promise<(ContextAwareAnalysis & { _metadata?: any }) | null> {
         const sdk = SDKService.getSDK();
         if (!sdk) return null;
 
-        const { provider, model } = await SDKService.resolveChatProvider({});
+        const { provider, model, isDefaultFallback } = await SDKService.resolveChatProvider({});
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
 
         let rulesContext: string;
@@ -217,7 +226,11 @@ REQUIRED JSON STRUCTURE:
         const systemPrompt = `You are an AI Automation Agent. Match email against these rules:\n${rulesContext}\n\nReturn JSON with matched_rule, actions_to_execute, and draft_content.`;
 
         if (eventLogger) {
-            await eventLogger.info('Thinking', `Context-aware analysis: ${context.subject}`, { model, provider }, emailId);
+            await eventLogger.info('Thinking', `Context-aware analysis: ${context.subject}`, {
+                model,
+                provider,
+                is_fallback: isDefaultFallback
+            }, emailId);
         }
 
         try {
@@ -229,14 +242,24 @@ REQUIRED JSON STRUCTURE:
             const rawResponse = response.response?.content || '';
             const validated = this.parseRobustJSON<ContextAwareAnalysis>(rawResponse, ContextAwareAnalysisSchema);
 
-            if (eventLogger && emailId && validated) {
+            const result = validated ? {
+                ...validated,
+                _metadata: {
+                    provider,
+                    model,
+                    is_fallback: isDefaultFallback,
+                    timestamp: new Date().toISOString()
+                }
+            } : null;
+
+            if (eventLogger && emailId && result) {
                 await eventLogger.analysis('Decided', emailId, {
-                    ...validated,
+                    ...result,
                     _raw_response: rawResponse
                 });
             }
 
-            return validated;
+            return result;
         } catch (error: any) {
             logger.error('Rule analysis failed', error);
             if (eventLogger) await eventLogger.error('Error', error.message, emailId);
@@ -244,12 +267,15 @@ REQUIRED JSON STRUCTURE:
         }
     }
 
-    async testConnection(): Promise<{ success: boolean; message: string }> {
+    async testConnection(overrides?: { provider?: string; model?: string }): Promise<{ success: boolean; message: string }> {
         const sdk = SDKService.getSDK();
         if (!sdk) return { success: false, message: 'SDK not linked' };
 
         try {
-            const { provider, model } = await SDKService.resolveChatProvider({});
+            const { provider, model } = await SDKService.resolveChatProvider({
+                llm_provider: overrides?.provider,
+                llm_model: overrides?.model
+            });
             await sdk.llm.chat([{ role: 'user', content: 'Say OK' }], { provider, model });
             return { success: true, message: `Connected to ${provider}/${model}` };
         } catch (error: any) {
@@ -272,7 +298,7 @@ REQUIRED JSON STRUCTURE:
 
 let defaultInstance: IntelligenceService | null = null;
 
-export function getIntelligenceService(overrides?: any): IntelligenceService {
+export function getIntelligenceService(): IntelligenceService {
     if (!defaultInstance) {
         defaultInstance = new IntelligenceService();
     }

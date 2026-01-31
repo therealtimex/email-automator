@@ -313,9 +313,10 @@ class HybridApiClient {
         return this.edgeRequest<{ stats: any }>('/api-v1-settings/stats');
     }
 
-    async testLlm() {
+    async testLlm(params?: { llm_provider?: string; llm_model?: string }) {
         return this.expressRequest<{ success: boolean; message: string }>('/api/settings/test-llm', {
             method: 'POST',
+            body: JSON.stringify(params || {}),
         });
     }
 

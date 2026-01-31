@@ -48,11 +48,10 @@ export function AccountSettingsPage() {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id as SettingsTab)}
-                                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                        isActive 
-                                            ? 'bg-primary text-primary-foreground' 
+                                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${isActive
+                                            ? 'bg-primary text-primary-foreground'
                                             : 'hover:bg-secondary text-muted-foreground'
-                                    }`}
+                                        }`}
                                 >
                                     <Icon className="w-4 h-4" />
                                     {tab.label}
@@ -61,9 +60,23 @@ export function AccountSettingsPage() {
                         })}
                     </nav>
 
-                    <div className="mt-8 px-4 py-4 border-t border-border/40 text-center md:text-left">
-                        <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">Version</p>
-                        <p className="text-xs font-mono text-muted-foreground/70">v{import.meta.env.VITE_APP_VERSION}</p>
+                    <div className="mt-auto space-y-1">
+                        <button
+                            onClick={async () => {
+                                await supabase.auth.signOut();
+                                toast.success('Logged out successfully');
+                                window.location.reload();
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-destructive/10 text-destructive"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Sign Out
+                        </button>
+
+                        <div className="px-4 py-4 border-t border-border/40 text-center md:text-left">
+                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">Version</p>
+                            <p className="text-xs font-mono text-muted-foreground/70">v{import.meta.env.VITE_APP_VERSION}</p>
+                        </div>
                     </div>
                 </aside>
 
@@ -125,7 +138,7 @@ function ProfileSection() {
         try {
             const fileExt = file.name.split('.').pop();
             const fileName = `${state.user.id}/avatar.${fileExt}`;
-            
+
             // Upload to Supabase Storage
             const { data, error: uploadError } = await supabase.storage
                 .from('avatars')
@@ -175,34 +188,34 @@ function ProfileSection() {
                             </div>
                         )}
                     </div>
-                    
+
                     <div className="flex-1 space-y-4 w-full">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="first-name">First Name</Label>
-                                <Input 
-                                    id="first-name" 
-                                    value={firstName} 
-                                    onChange={(e) => setFirstName(e.target.value)} 
+                                <Input
+                                    id="first-name"
+                                    value={firstName}
+                                    onChange={(e) => setFirstName(e.target.value)}
                                     placeholder="John"
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="last-name">Last Name</Label>
-                                <Input 
-                                    id="last-name" 
-                                    value={lastName} 
-                                    onChange={(e) => setLastName(e.target.value)} 
+                                <Input
+                                    id="last-name"
+                                    value={lastName}
+                                    onChange={(e) => setLastName(e.target.value)}
                                     placeholder="Doe"
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email Address</Label>
-                            <Input 
-                                id="email" 
-                                value={state.profile?.email || ''} 
-                                disabled 
+                            <Input
+                                id="email"
+                                value={state.profile?.email || ''}
+                                disabled
                                 className="bg-secondary/50"
                             />
                             <p className="text-[10px] text-muted-foreground">Email cannot be changed directly.</p>
@@ -215,7 +228,7 @@ function ProfileSection() {
                         <label className="text-sm font-medium">Sound & Haptics</label>
                         <p className="text-xs text-muted-foreground">Audio feedback when processing emails and completing tasks.</p>
                     </div>
-                    <Button 
+                    <Button
                         variant={soundsEnabled ? 'default' : 'outline'}
                         size="sm"
                         onClick={toggleSounds}
@@ -283,25 +296,25 @@ function SecuritySection() {
             <CardContent className="space-y-4">
                 <div className="space-y-2">
                     <Label htmlFor="new-password">New Password</Label>
-                    <Input 
-                        id="new-password" 
-                        type="password" 
-                        value={password} 
-                        onChange={(e) => setPassword(e.target.value)} 
+                    <Input
+                        id="new-password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
                     />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="confirm-password">Confirm New Password</Label>
-                    <Input 
-                        id="confirm-password" 
-                        type="password" 
-                        value={confirmPassword} 
-                        onChange={(e) => setConfirmPassword(e.target.value)} 
+                    <Input
+                        id="confirm-password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="••••••••"
                     />
                 </div>
-                
+
                 <div className="flex justify-end pt-4 border-t">
                     <Button onClick={handlePasswordChange} disabled={isSaving}>
                         {isSaving ? <LoadingSpinner size="sm" className="mr-2" /> : <Key className="w-4 h-4 mr-2" />}

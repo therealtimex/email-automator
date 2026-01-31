@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload, Paperclip, X, Clock, Edit2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
@@ -25,6 +25,19 @@ interface ExtendedUserSettings extends UserSettings {
     microsoft_client_secret?: string;
     microsoft_tenant_id?: string;
 }
+
+interface LLMModel {
+    id: string;
+    name?: string;
+}
+
+interface LLMProvider {
+    provider: string;
+    name?: string;
+    models: LLMModel[];
+}
+
+const DEFAULT_PROVIDER = 'realtimexai';
 
 export function Configuration() {
     const { state, actions } = useApp();
@@ -70,36 +83,24 @@ export function Configuration() {
     const [newRuleAttachments, setNewRuleAttachments] = useState<RuleAttachment[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [savingRule, setSavingRule] = useState(false);
-    // LLM Provider Discovery state
-    const [chatProviders, setChatProviders] = useState<any[]>([]);
+    const [chatProviders, setChatProviders] = useState<LLMProvider[]>([]);
     const [isLoadingProviders, setIsLoadingProviders] = useState(false);
+    const [providerError, setProviderError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchProviders = async () => {
             setIsLoadingProviders(true);
+            setProviderError(null);
             try {
                 const response = await api.getChatProviders();
                 if (response.data?.success) {
                     setChatProviders(response.data.providers || []);
-
-                    // If no provider set, or old default, auto-select gpt-4o-mini
-                    const isOldDefault = localSettings.llm_model === 'gpt-4.1-mini';
-                    if ((!localSettings.llm_provider || isOldDefault) && response.data.providers.length > 0) {
-                        const firstProvider = response.data.providers.find((p: any) => p.models && p.models.some((m: any) => m.id === 'gpt-4o-mini'))
-                            || response.data.providers.find((p: any) => p.models && p.models.length > 0);
-
-                        if (firstProvider) {
-                            const targetModel = firstProvider.models.find((m: any) => m.id === 'gpt-4o-mini')?.id || firstProvider.models[0].id;
-                            setLocalSettings(s => ({
-                                ...s,
-                                llm_provider: firstProvider.provider,
-                                llm_model: targetModel
-                            }));
-                        }
-                    }
+                } else {
+                    setProviderError(response.data?.message || 'Failed to load providers');
                 }
             } catch (error) {
                 console.error('Failed to fetch providers:', error);
+                setProviderError('Failed to load providers. Using defaults.');
             } finally {
                 setIsLoadingProviders(false);
             }
@@ -107,8 +108,38 @@ export function Configuration() {
         fetchProviders();
     }, []);
 
-    const selectedProvider = chatProviders.find(p => p.provider === (localSettings.llm_provider || 'realtimexai'));
+    const selectedProvider = chatProviders.find(p => p.provider === (localSettings.llm_provider || DEFAULT_PROVIDER));
     const availableModels = selectedProvider?.models || [];
+
+    // Ensure saved model is always in the list (even if not fetched yet)
+    const modelsWithSaved = useMemo(() => {
+        if (!localSettings.llm_model) return availableModels;
+
+        const hasModel = availableModels.some(m => m.id === localSettings.llm_model);
+        if (hasModel) return availableModels;
+
+        // Add saved model to the list so it shows in dropdown
+        return [
+            { id: localSettings.llm_model, name: `${localSettings.llm_model} (saved)` },
+            ...availableModels
+        ];
+    }, [availableModels, localSettings.llm_model]);
+
+    // Ensure saved provider is shown even if not in fetched list yet
+    const providersWithSaved = useMemo(() => {
+        if (!localSettings.llm_provider || localSettings.llm_provider === DEFAULT_PROVIDER) {
+            return chatProviders;
+        }
+
+        const hasProvider = chatProviders.some(p => p.provider === localSettings.llm_provider);
+        if (hasProvider) return chatProviders;
+
+        // Add saved provider so it shows in dropdown
+        return [
+            { provider: localSettings.llm_provider, name: `${localSettings.llm_provider} (saved)`, models: [] },
+            ...chatProviders
+        ];
+    }, [chatProviders, localSettings.llm_provider]);
 
     const handleProviderChange = (providerId: string) => {
         const provider = chatProviders.find(p => p.provider === providerId);
@@ -117,6 +148,25 @@ export function Configuration() {
             llm_provider: providerId,
             llm_model: provider?.models?.[0]?.id || ''
         }));
+    };
+
+    const handleTestConnection = async () => {
+        setTestingLlm(true);
+        try {
+            const response = await api.testLlm({
+                llm_provider: localSettings.llm_provider || undefined,
+                llm_model: localSettings.llm_model || undefined
+            });
+            if (response.data?.success) {
+                toast.success(response.data.message);
+            } else {
+                toast.error(response.data?.message || 'Connection failed');
+            }
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Connection failed');
+        } finally {
+            setTestingLlm(false);
+        }
     };
 
     const [loadingSetting, setLoadingSetting] = useState<string | null>(null);
@@ -503,22 +553,6 @@ export function Configuration() {
         }
     };
 
-    const handleTestConnection = async () => {
-        setTestingLlm(true);
-        try {
-            const result = await api.testLlm();
-
-            if (result.data?.success) {
-                toast.success(result.data.message);
-            } else {
-                toast.error(result.data?.message || 'Connection test failed');
-            }
-        } catch (error) {
-            toast.error('Failed to test connection');
-        } finally {
-            setTestingLlm(false);
-        }
-    };
 
     const handleToggleRule = async (ruleId: string) => {
         await actions.toggleRule(ruleId);
@@ -1396,32 +1430,46 @@ export function Configuration() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">LLM Provider</label>
-                            <select
-                                className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-                                value={localSettings.llm_provider || 'realtimexai'}
-                                onChange={(e) => handleProviderChange(e.target.value)}
-                                disabled={isLoadingProviders}
-                            >
-                                {chatProviders.length > 0 ? (
-                                    chatProviders.map((p: any) => (
-                                        <option key={p.provider} value={p.provider}>
-                                            {p.name || p.provider}
-                                        </option>
-                                    ))
-                                ) : (
-                                    <option value="realtimexai">RealTimeX (Local)</option>
-                                )}
-                            </select>
+                            {isLoadingProviders ? (
+                                <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
+                                    <LoadingSpinner size="sm" className="mr-2" />
+                                    <span className="text-xs text-muted-foreground italic">Discovering...</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <select
+                                        className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                        value={localSettings.llm_provider || DEFAULT_PROVIDER}
+                                        onChange={(e) => handleProviderChange(e.target.value)}
+                                        disabled={isLoadingProviders}
+                                    >
+                                        <option value={DEFAULT_PROVIDER}>RealTimeX AI (Default)</option>
+                                        {providersWithSaved.filter(p => p.provider !== DEFAULT_PROVIDER).map(p => (
+                                            <option key={p.provider} value={p.provider}>
+                                                {p.name || p.provider}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {providerError && (
+                                        <div className="text-[10px] text-amber-500 mt-1 px-1 bg-amber-50/50 rounded">
+                                            ⚠️ {providerError}
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
+
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Model Name</label>
-                            {availableModels.length > 0 ? (
+                            {modelsWithSaved.length > 0 || isLoadingProviders ? (
                                 <select
                                     className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                     value={localSettings.llm_model || ''}
                                     onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
+                                    disabled={isLoadingProviders}
                                 >
-                                    {availableModels.map((m: any) => (
+                                    {!localSettings.llm_model && <option value="">Select a model...</option>}
+                                    {modelsWithSaved.map((m: LLMModel) => (
                                         <option key={m.id} value={m.id}>
                                             {m.name || m.id}
                                         </option>

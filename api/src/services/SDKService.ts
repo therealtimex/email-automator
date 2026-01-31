@@ -1,6 +1,15 @@
 import { RealtimeXSDK, ProvidersResponse } from '@realtimex/sdk';
 import os from 'os';
 import path from 'path';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('SDKService');
+
+export interface ProviderResult {
+    provider: string;
+    model: string;
+    isDefaultFallback?: boolean;
+}
 
 /**
  * Centralized SDK Service
@@ -9,6 +18,13 @@ import path from 'path';
 export class SDKService {
     private static instance: RealtimeXSDK | null = null;
     private static initAttempted = false;
+
+    // Default provider/model configuration
+    // realtimexai routes through RealTimeX Desktop to user's configured providers
+    static readonly DEFAULT_LLM_PROVIDER = 'realtimexai';
+    static readonly DEFAULT_LLM_MODEL = 'gpt-4o-mini';
+    static readonly DEFAULT_EMBED_PROVIDER = 'realtimexai';
+    static readonly DEFAULT_EMBED_MODEL = 'text-embedding-3-small';
 
     /**
      * Initialize SDK with required permissions
@@ -39,16 +55,16 @@ export class SDKService {
                     ],
                 });
 
-                console.log('[SDKService] RealTimeX SDK initialized successfully');
+                logger.info('RealTimeX SDK initialized successfully');
 
                 // Verify connection with Desktop App
                 // @ts-ignore - Dev Mode feature
                 this.instance.ping()
-                    .then((status: any) => console.log('[SDKService] Desktop App Connection:', status))
-                    .catch((err: any) => console.warn('[SDKService] Desktop App Connection failed:', err.message));
+                    .then((status: any) => logger.debug('Desktop App Connection:', { status }))
+                    .catch((err: any) => logger.warn('Desktop App Connection failed', { error: err.message }));
 
             } catch (error: any) {
-                console.warn('[SDKService] Failed to initialize SDK:', error.message);
+                logger.error('Failed to initialize SDK', error);
                 this.instance = null;
             }
         }
@@ -84,8 +100,8 @@ export class SDKService {
                 await sdk.llm.chatProviders();
                 return true;
             }
-        } catch (error) {
-            console.warn('[SDKService] SDK not available:', error);
+        } catch (error: any) {
+            logger.warn('SDK not available', { error: error.message });
             return false;
         }
     }
@@ -108,14 +124,14 @@ export class SDKService {
     }
 
     // Cache for default providers (avoid repeated SDK calls)
-    private static defaultChatProvider: { provider: string; model: string } | null = null;
-    private static defaultEmbedProvider: { provider: string; model: string } | null = null;
+    private static defaultChatProvider: ProviderResult | null = null;
+    private static defaultEmbedProvider: ProviderResult | null = null;
 
     /**
      * Get default chat provider/model from SDK dynamically
      * Caches result to avoid repeated SDK calls
      */
-    static async getDefaultChatProvider(): Promise<{ provider: string; model: string }> {
+    static async getDefaultChatProvider(): Promise<ProviderResult> {
         // Return cached if available
         if (this.defaultChatProvider) {
             return this.defaultChatProvider;
@@ -137,22 +153,40 @@ export class SDKService {
                 throw new Error('No LLM providers available. Please configure a provider in RealTimeX Desktop.');
             }
 
-            // Find first provider with available models
+            // 1. Try to find the preferred default provider (realtimexai)
+            const preferredProvider = providers.find(p => p.provider === this.DEFAULT_LLM_PROVIDER);
+            if (preferredProvider && preferredProvider.models && preferredProvider.models.length > 0) {
+                // Try to find the preferred default model (gpt-4o-mini) within it
+                const preferredModel = preferredProvider.models.find(m => m.id === this.DEFAULT_LLM_MODEL) || preferredProvider.models[0];
+
+                this.defaultChatProvider = {
+                    provider: preferredProvider.provider,
+                    model: preferredModel.id
+                };
+                logger.info(`Using preferred default chat provider: ${this.defaultChatProvider.provider}/${this.defaultChatProvider.model}`);
+                return this.defaultChatProvider;
+            }
+
+            // 2. Fallback to the first provider with available models
             for (const p of providers) {
                 if (p.models && p.models.length > 0) {
                     this.defaultChatProvider = {
                         provider: p.provider,
                         model: p.models[0].id
                     };
-                    console.log(`[SDKService] Default chat provider: ${this.defaultChatProvider.provider}/${this.defaultChatProvider.model}`);
+                    logger.info(`Defaulting to first available chat provider: ${this.defaultChatProvider.provider}/${this.defaultChatProvider.model}`);
                     return this.defaultChatProvider;
                 }
             }
 
             throw new Error('No LLM models available. Please configure a model in RealTimeX Desktop.');
         } catch (error: any) {
-            console.error('[SDKService] Failed to get default chat provider:', error.message);
-            throw error;
+            logger.warn('Failed to get default chat provider from SDK. Using hardcoded fallback.', error);
+            return {
+                provider: this.DEFAULT_LLM_PROVIDER,
+                model: this.DEFAULT_LLM_MODEL,
+                isDefaultFallback: true
+            };
         }
     }
 
@@ -160,7 +194,7 @@ export class SDKService {
      * Get default embedding provider/model from SDK dynamically
      * Caches result to avoid repeated SDK calls
      */
-    static async getDefaultEmbedProvider(): Promise<{ provider: string; model: string }> {
+    static async getDefaultEmbedProvider(): Promise<ProviderResult> {
         // Return cached if available
         if (this.defaultEmbedProvider) {
             return this.defaultEmbedProvider;
@@ -189,61 +223,46 @@ export class SDKService {
                         provider: p.provider,
                         model: p.models[0].id
                     };
-                    console.log(`[SDKService] Default embed provider: ${this.defaultEmbedProvider.provider}/${this.defaultEmbedProvider.model}`);
+                    logger.info(`Default embed provider: ${this.defaultEmbedProvider.provider}/${this.defaultEmbedProvider.model}`);
                     return this.defaultEmbedProvider;
                 }
             }
 
             throw new Error('No embedding models available. Please configure a model in RealTimeX Desktop.');
         } catch (error: any) {
-            console.error('[SDKService] Failed to get default embed provider:', error.message);
-            throw error;
+            logger.warn('Failed to get default embed provider from SDK. Using hardcoded fallback.', error);
+            return {
+                provider: this.DEFAULT_EMBED_PROVIDER,
+                model: this.DEFAULT_EMBED_MODEL,
+                isDefaultFallback: true
+            };
         }
     }
-
-    // Default provider/model configuration
-    // realtimexai routes through RealTimeX Desktop to user's configured providers
-    static readonly DEFAULT_LLM_PROVIDER = 'realtimexai';
-    static readonly DEFAULT_LLM_MODEL = 'gpt-4o-mini';
-    static readonly DEFAULT_EMBED_PROVIDER = 'realtimexai';
-    static readonly DEFAULT_EMBED_MODEL = 'text-embedding-3-small';
 
     /**
      * Resolve LLM provider/model - use settings if available, otherwise use defaults
      */
-    static async resolveChatProvider(settings: { llm_provider?: string; llm_model?: string }): Promise<{ provider: string; model: string }> {
+    static async resolveChatProvider(settings: { llm_provider?: string; llm_model?: string }): Promise<ProviderResult> {
         // If both provider and model are set in settings, use them
         if (settings.llm_provider && settings.llm_model) {
             return { provider: settings.llm_provider, model: settings.llm_model };
         }
 
         // Try to get from SDK discovery first
-        try {
-            return await this.getDefaultChatProvider();
-        } catch (error) {
-            // Fallback to hardcoded defaults if SDK discovery fails
-            console.log(`[SDKService] Using default LLM: ${this.DEFAULT_LLM_PROVIDER}/${this.DEFAULT_LLM_MODEL}`);
-            return { provider: this.DEFAULT_LLM_PROVIDER, model: this.DEFAULT_LLM_MODEL };
-        }
+        return await this.getDefaultChatProvider();
     }
 
     /**
      * Resolve embedding provider/model - use settings if available, otherwise use defaults
      */
-    static async resolveEmbedProvider(settings: { embedding_provider?: string; embedding_model?: string }): Promise<{ provider: string; model: string }> {
+    static async resolveEmbedProvider(settings: { embedding_provider?: string; embedding_model?: string }): Promise<ProviderResult> {
         // If both provider and model are set in settings, use them
         if (settings.embedding_provider && settings.embedding_model) {
             return { provider: settings.embedding_provider, model: settings.embedding_model };
         }
 
         // Try to get from SDK discovery first
-        try {
-            return await this.getDefaultEmbedProvider();
-        } catch (error) {
-            // Fallback to hardcoded defaults if SDK discovery fails
-            console.log(`[SDKService] Using default embedding: ${this.DEFAULT_EMBED_PROVIDER}/${this.DEFAULT_EMBED_MODEL}`);
-            return { provider: this.DEFAULT_EMBED_PROVIDER, model: this.DEFAULT_EMBED_MODEL };
-        }
+        return await this.getDefaultEmbedProvider();
     }
 
     /**

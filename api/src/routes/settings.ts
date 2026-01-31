@@ -165,10 +165,14 @@ router.post('/test-llm',
     apiRateLimit,
     authMiddleware,
     asyncHandler(async (req, res) => {
+        const { llm_provider, llm_model } = req.body;
         const { getIntelligenceService } = await import('../services/intelligence.js');
         const intelligence = getIntelligenceService();
 
-        const result = await intelligence.testConnection();
+        const result = await intelligence.testConnection({
+            provider: llm_provider,
+            model: llm_model
+        });
         res.json(result);
     })
 );
