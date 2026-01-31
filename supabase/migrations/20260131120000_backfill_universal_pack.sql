@@ -44,7 +44,7 @@ BEGIN
     true, -- is_system_managed
     NOW()
   FROM public.rule_templates rt
-  ORDER BY rt.category, rt.sort_order;
+  ORDER BY rt.pack_id, rt.sort_order;
 
   RAISE NOTICE 'All rules installed for user %', target_user_id;
 END;

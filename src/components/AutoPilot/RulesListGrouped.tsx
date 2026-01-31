@@ -1,12 +1,12 @@
 /**
  * Grouped Rules List Component
  *
- * Displays all rules organized by category with simple toggle switches
+ * Displays all rules organized by category with power buttons and edit controls
  */
 
 import React from 'react';
-import { Switch } from '../ui/switch';
-import { Mail, AlertCircle, Code, Briefcase, Settings } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Mail, AlertCircle, Code, Briefcase, Settings as SettingsIcon, Power, Edit2, Trash2 } from 'lucide-react';
 
 interface Rule {
   id: string;
@@ -21,6 +21,8 @@ interface Rule {
 interface RulesListGroupedProps {
   rules: Rule[];
   onToggleRule: (ruleId: string, enabled: boolean) => void;
+  onEditRule: (ruleId: string) => void;
+  onDeleteRule?: (ruleId: string) => void;
 }
 
 const CATEGORY_CONFIG = {
@@ -50,13 +52,13 @@ const CATEGORY_CONFIG = {
   },
   operations: {
     label: 'Operations',
-    icon: Settings,
+    icon: SettingsIcon,
     emoji: '⚙️',
     description: 'Support, internal requests, and system alerts'
   }
 };
 
-export function RulesListGrouped({ rules, onToggleRule }: RulesListGroupedProps) {
+export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule }: RulesListGroupedProps) {
   // Group rules by category
   const groupedRules = rules.reduce((acc, rule) => {
     const category = rule.category || 'email_organization';
@@ -94,7 +96,6 @@ export function RulesListGrouped({ rules, onToggleRule }: RulesListGroupedProps)
         if (categoryRules.length === 0) return null;
 
         const stats = getCategoryStats(categoryRules);
-        const IconComponent = config.icon;
 
         return (
           <div key={categoryKey} className="space-y-3">
@@ -148,11 +149,42 @@ export function RulesListGrouped({ rules, onToggleRule }: RulesListGroupedProps)
                     </div>
                   </div>
 
-                  <div className="ml-4 shrink-0">
-                    <Switch
-                      checked={rule.is_enabled}
-                      onCheckedChange={(checked) => onToggleRule(rule.id, checked)}
-                    />
+                  {/* Controls */}
+                  <div className="flex items-center gap-2 ml-4 shrink-0">
+                    {/* Edit Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => onEditRule(rule.id)}
+                      title="Edit Rule"
+                    >
+                      <Edit2 className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+
+                    {/* Power Button (On/Off) */}
+                    <Button
+                      variant={rule.is_enabled ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => onToggleRule(rule.id, !rule.is_enabled)}
+                      className="h-8 px-3"
+                    >
+                      <Power className="w-4 h-4 mr-1" />
+                      {rule.is_enabled ? 'On' : 'Off'}
+                    </Button>
+
+                    {/* Delete Button (only for custom rules) */}
+                    {!rule.is_system_managed && onDeleteRule && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        onClick={() => onDeleteRule(rule.id)}
+                        title="Delete Rule"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

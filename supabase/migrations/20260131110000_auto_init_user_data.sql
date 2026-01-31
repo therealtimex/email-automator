@@ -6,8 +6,18 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
   pack_install_id UUID;
+  user_exists BOOLEAN;
 BEGIN
-  -- 1. Create user_settings record with defaults
+  -- Check if user exists in auth.users to avoid foreign key violation
+  SELECT EXISTS (
+    SELECT 1 FROM auth.users WHERE id = NEW.id
+  ) INTO user_exists;
+
+  IF NOT user_exists THEN
+    RAISE NOTICE 'User % does not exist in auth.users yet, skipping initialization', NEW.id;
+    RETURN NEW;
+  END IF;
+  -- 1. Create user_settings record with defaults (with conflict handling)
   INSERT INTO public.user_settings (
     user_id,
     llm_provider,
@@ -24,7 +34,8 @@ BEGIN
     FALSE,
     NOW(),
     NOW()
-  );
+  )
+  ON CONFLICT (user_id) DO NOTHING;
 
   -- 2. Install ALL rules from templates
   -- First, check if rule_templates table exists (for backwards compatibility)
@@ -57,7 +68,7 @@ BEGIN
       true, -- is_system_managed
       NOW()
     FROM public.rule_templates rt
-    ORDER BY rt.category, rt.sort_order;
+    ORDER BY rt.pack_id, rt.sort_order;
 
   END IF;
 

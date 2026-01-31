@@ -7,24 +7,42 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Button } from '../ui/button';
-import { RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
+import { RefreshCw, AlertCircle, Sparkles, Plus } from 'lucide-react';
 import { RulesListGrouped } from './RulesListGrouped';
+import { RuleEditDialog } from './RuleEditDialog';
 import { api } from '../../lib/api';
+import { toast } from '../Toast';
+import { supabase } from '../../lib/supabase';
+import { useApp } from '../../context/AppContext';
 
 interface Rule {
   id: string;
   name: string;
+  description?: string;
   intent?: string;
+  condition?: any;
+  actions?: string[];
+  instructions?: string;
+  attachments?: RuleAttachment[];
   is_enabled: boolean;
   is_system_managed?: boolean;
   category?: string;
-  actions?: string[];
+}
+
+interface RuleAttachment {
+  name: string;
+  path: string;
+  type: string;
+  size: number;
 }
 
 export function AutoPilotDashboard() {
+  const { state, actions } = useApp();
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showRuleModal, setShowRuleModal] = useState(false);
+  const [editingRule, setEditingRule] = useState<Rule | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -71,6 +89,91 @@ export function AutoPilotDashboard() {
       // Revert optimistic update
       await fetchData();
     }
+  };
+
+  const handleEditRule = (ruleId: string) => {
+    const rule = rules.find(r => r.id === ruleId);
+    if (rule) {
+      setEditingRule(rule);
+      setShowRuleModal(true);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    if (!confirm('Are you sure you want to delete this rule?')) return;
+
+    try {
+      const success = await actions.deleteRule(ruleId);
+      if (success) {
+        toast.success('Rule deleted');
+        setRules(prev => prev.filter(r => r.id !== ruleId));
+      } else {
+        toast.error('Failed to delete rule');
+      }
+    } catch (err) {
+      console.error('Error deleting rule:', err);
+      toast.error('An error occurred while deleting the rule');
+    }
+  };
+
+  const handleAddRule = () => {
+    setEditingRule(null);
+    setShowRuleModal(true);
+  };
+
+  const handleSaveRule = async (ruleData: any) => {
+    try {
+      let success = false;
+      if (editingRule) {
+        success = await actions.updateRule(editingRule.id, ruleData);
+      } else {
+        success = await actions.createRule(ruleData);
+      }
+
+      if (success) {
+        toast.success(editingRule ? 'Rule updated' : 'Rule created');
+        await fetchData();
+        return true;
+      } else {
+        toast.error(`Failed to ${editingRule ? 'update' : 'create'} rule`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error saving rule:', error);
+      toast.error('An error occurred while saving the rule');
+      return false;
+    }
+  };
+
+  const handleFileUpload = async (file: File): Promise<RuleAttachment | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `${state.user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('rule-attachments')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      toast.success('File uploaded');
+      return {
+        name: file.name,
+        path: filePath,
+        type: file.type,
+        size: file.size
+      };
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload file');
+      return null;
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowRuleModal(false);
+    setEditingRule(null);
   };
 
   if (loading) {
@@ -121,28 +224,39 @@ export function AutoPilotDashboard() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-blue-500" />
-            Auto-Pilot Rules
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {enabledCount} of {systemRules.length} rules enabled
-          </p>
+    <>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-blue-500" />
+              Auto-Pilot Rules
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {enabledCount} of {systemRules.length} rules enabled
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleAddRule}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Custom Rule
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchData}
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchData}
-          disabled={loading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
 
       {/* Info Alert */}
       {systemRules.length > 0 && (
@@ -160,6 +274,8 @@ export function AutoPilotDashboard() {
         <RulesListGrouped
           rules={systemRules}
           onToggleRule={handleToggleRule}
+          onEditRule={handleEditRule}
+          onDeleteRule={handleDeleteRule}
         />
       )}
 
@@ -172,32 +288,24 @@ export function AutoPilotDashboard() {
               Rules you've created manually
             </p>
           </div>
-          <div className="space-y-2">
-            {customRules.map(rule => (
-              <div
-                key={rule.id}
-                className="flex items-center justify-between py-3 px-4 rounded-lg bg-secondary/30"
-              >
-                <div className="flex-1">
-                  <h4 className="font-medium text-sm">{rule.name}</h4>
-                  {rule.intent && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {rule.intent}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleToggleRule(rule.id, !rule.is_enabled)}
-                >
-                  {rule.is_enabled ? 'Disable' : 'Enable'}
-                </Button>
-              </div>
-            ))}
-          </div>
+          <RulesListGrouped
+            rules={customRules}
+            onToggleRule={handleToggleRule}
+            onEditRule={handleEditRule}
+            onDeleteRule={handleDeleteRule}
+          />
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Rule Edit/Create Dialog */}
+      <RuleEditDialog
+        open={showRuleModal}
+        rule={editingRule}
+        onClose={handleCloseModal}
+        onSave={handleSaveRule}
+        onFileUpload={handleFileUpload}
+      />
+    </>
   );
 }
