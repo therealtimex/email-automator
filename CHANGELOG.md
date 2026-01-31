@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.11.2] - 2026-01-31
+
+### Refactored
+- **Setup Wizard**: Complete rewrite of the `SetupWizard` component into a modular architecture. This improves code maintainability, testability, and separation of concerns (`api`, `reducer`, `steps`).
+
+### Fixed
+- **Onboarding Flow**: Fixed an issue where newly provisioned projects might not correctly initialize their migration status.
+- **Migration Credentials**: Ensure Supabase credentials are correctly passed to the migration handler during the setup process, preventing authentication errors during schema initialization.
+
 ## [2.11.1] - 2026-01-30
 
 ### Fixed
