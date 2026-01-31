@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.11.1] - 2026-01-30
+
+### Fixed
+- **LLM Configuration UI**: Improved the reliability of the provider/model dropdowns. selections now persist correctly during loading states, and saved values are always preserved even if discovery fails.
+- **Connection Testing**: The "Test Connection" button now uses the currently selected (unsaved) provider/model values, allowing users to verify settings before saving.
+- **SDK Fallbacks**: Implemented robust fallback strategies for when the SDK is unavailable or returns empty provider lists, ensuring the app always has a working default configuration (`realtimexai` / `gpt-4o-mini`).
+- **UI Polish**: Cleaned up the Account Settings page layout and Logout button placement.
+
 ## [2.11.0] - 2026-01-30
 
 ### Added
