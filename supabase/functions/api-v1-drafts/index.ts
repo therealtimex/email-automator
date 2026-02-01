@@ -150,23 +150,44 @@ Deno.serve(async (req) => {
             try {
                 // Send draft via provider API
                 if (account.provider === 'gmail') {
-                    const { getGmailService } = await import('../_shared/gmail-service.ts');
-                    const gmailService = getGmailService();
+                    // Gmail: Send draft using Gmail API
+                    const { google } = await import('npm:googleapis@140');
 
-                    // Refresh token if needed
-                    const refreshedAccount = await gmailService.refreshTokenIfNeeded(supabaseAdmin, account);
+                    const oauth2Client = new google.auth.OAuth2();
+                    oauth2Client.setCredentials({
+                        access_token: account.access_token,
+                        refresh_token: account.refresh_token,
+                    });
 
-                    // Send the draft
-                    await gmailService.sendDraft(refreshedAccount, draftId);
+                    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+                    await gmail.users.drafts.send({
+                        userId: 'me',
+                        requestBody: {
+                            id: draftId,
+                        },
+                    });
+
+                    console.log('Gmail draft sent successfully', { draftId });
                 } else if (account.provider === 'outlook') {
-                    const { getMicrosoftService } = await import('../_shared/microsoft-service.ts');
-                    const microsoftService = getMicrosoftService();
+                    // Outlook: Send draft using Microsoft Graph API
+                    const response = await fetch(
+                        `https://graph.microsoft.com/v1.0/me/messages/${draftId}/send`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${account.access_token}`,
+                            },
+                        }
+                    );
 
-                    // Refresh token if needed
-                    const refreshedAccount = await microsoftService.refreshTokenIfNeeded(supabaseAdmin, account);
+                    if (!response.ok) {
+                        const error = await response.text();
+                        console.error('Failed to send Outlook draft:', error);
+                        throw new Error('Failed to send Outlook draft');
+                    }
 
-                    // Send the draft
-                    await microsoftService.sendDraft(refreshedAccount, draftId);
+                    console.log('Outlook draft sent successfully', { draftId });
                 } else {
                     return createErrorResponse(400, `Unsupported provider: ${account.provider}`);
                 }

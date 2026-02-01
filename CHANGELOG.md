@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.20.1] - 2026-02-01
+
+### Fixed
+- **Edge Function Build**: Fixed a critical build failure in the `api-v1-drafts` function.
+  - Removed dependency on local service files (`_shared/gmail-service.ts`, `_shared/microsoft-service.ts`) which were causing module resolution errors in the Deno Edge environment.
+  - Implemented direct API calls for Gmail (via `googleapis` npm package) and Outlook (via direct `fetch`) within the Edge Function itself to ensure reliable deployment.
+
 ## [2.20.0] - 2026-02-01
 
 ### Added
