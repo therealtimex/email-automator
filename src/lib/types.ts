@@ -59,8 +59,8 @@ export interface Rule {
     intent?: string;       // The intent behind the rule (e.g., "Politely decline sales pitches")
     priority?: number;     // Higher = evaluated first by AI
     condition: RuleCondition; // Legacy - kept for backwards compatibility
-    action?: 'delete' | 'archive' | 'draft' | 'read' | 'star'; // Legacy single action
-    actions?: ('delete' | 'archive' | 'draft' | 'read' | 'star')[]; // New multi-action array
+    action?: 'delete' | 'archive' | 'draft' | 'star'; // Legacy single action
+    actions?: ('delete' | 'archive' | 'draft' | 'star')[]; // New multi-action array
     instructions?: string; // Draft generation instructions
     attachments?: RuleAttachment[];
     is_enabled: boolean;

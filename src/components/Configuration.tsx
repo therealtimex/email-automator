@@ -1018,7 +1018,6 @@ export function Configuration() {
                                     { value: 'archive', label: 'Archive Email' },
                                     { value: 'delete', label: 'Delete Email' },
                                     { value: 'draft', label: 'Draft Reply' },
-                                    { value: 'read', label: 'Mark as Read' },
                                     { value: 'star', label: 'Star / Flag' },
                                 ].map((option) => (
                                     <label

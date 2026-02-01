@@ -24,7 +24,7 @@ export const UNIVERSAL_PACK: RulePack = {
         category: 'newsletter',
         confidence_gt: 0.7
       },
-      actions: ['archive', 'read'],
+      actions: ['archive'],
       priority: 10,
       is_enabled_by_default: true
     },

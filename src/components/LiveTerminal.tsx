@@ -242,9 +242,8 @@ export function LiveTerminal() {
                                         {event.details.action === 'delete' && 'Moved to Trash'}
                                         {event.details.action === 'archive' && 'Archived Email'}
                                         {event.details.action === 'draft' && 'Drafted Reply'}
-                                        {event.details.action === 'read' && 'Marked as Read'}
                                         {event.details.action === 'star' && 'Starred Email'}
-                                        {!['delete', 'archive', 'draft', 'read', 'star'].includes(event.details.action) && event.details.action}
+                                        {!['delete', 'archive', 'draft', 'star'].includes(event.details.action) && event.details.action}
                                     </p>
                                     {event.details.reason && (
                                         <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">

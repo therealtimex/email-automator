@@ -1089,8 +1089,6 @@ export class EmailProcessorService {
                     if (eventLogger) {
                         await eventLogger.info('Drafted', `Draft created successfully. ID: ${draftId}`, { draftId }, email.id);
                     }
-                } else if (action === 'read') {
-                    await this.gmailService.markAsRead(account, email.external_id);
                 } else if (action === 'star') {
                     await this.gmailService.starMessage(account, email.external_id);
                 } else if (action === 'important') {
@@ -1108,8 +1106,6 @@ export class EmailProcessorService {
                     await this.microsoftService.archiveMessage(account, email.external_id);
                 } else if (action === 'draft' && draftContent) {
                     await this.microsoftService.createDraft(account, email.external_id, draftContent);
-                } else if (action === 'read') {
-                    await this.microsoftService.markAsRead(account, email.external_id);
                 } else if (action === 'star' || action === 'important') {
                     await this.microsoftService.flagMessage(account, email.external_id);
                 }

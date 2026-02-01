@@ -69,8 +69,6 @@ router.post('/execute',
                         }
                     } else if (currentAction === 'flag') {
                         await gmailService.addLabel(account, email.external_id, ['STARRED']);
-                    } else if (currentAction === 'read') {
-                        await gmailService.markAsRead(account, email.external_id);
                     } else if (currentAction === 'star') {
                         await gmailService.starMessage(account, email.external_id);
                     }
@@ -87,8 +85,6 @@ router.post('/execute',
                             const draftId = await microsoftService.createDraft(account, email.external_id, content);
                             details = `Draft created: ${draftId}`;
                         }
-                    } else if (currentAction === 'read') {
-                        await microsoftService.markAsRead(account, email.external_id);
                     } else if (currentAction === 'star' || currentAction === 'flag') {
                         await microsoftService.flagMessage(account, email.external_id);
                     }

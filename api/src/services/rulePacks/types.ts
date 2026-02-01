@@ -21,7 +21,6 @@ export type EmailAction =
   | 'delete'
   | 'archive'
   | 'draft'
-  | 'read'
   | 'star'
   | 'unstar'
   | 'important'

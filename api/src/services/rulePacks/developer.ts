@@ -73,7 +73,7 @@ export const DEVELOPER_PACK: RulePack = {
           }
         ]
       },
-      actions: ['label:Logs', 'archive', 'read'],
+      actions: ['label:Logs', 'archive'],
       priority: 20,
       is_enabled_by_default: true
     },

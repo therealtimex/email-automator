@@ -8,4 +8,4 @@ ALTER TABLE rules DROP CONSTRAINT IF EXISTS rules_action_check;
 ALTER TABLE rules ALTER COLUMN action DROP NOT NULL;
 
 -- Add comment
-COMMENT ON COLUMN rules.action IS 'Legacy single action field - kept for backwards compatibility. Use actions array instead. Can be: delete, archive, draft, read, star, trash, label:*, folder:*, or any custom action.';
+COMMENT ON COLUMN rules.action IS 'Legacy single action field - kept for backwards compatibility. Use actions array instead. Can be: delete, archive, draft, star, trash, label:*, folder:*, or any custom action.';

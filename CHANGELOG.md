@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.15.0] - 2026-01-31
+
+### Removed
+- **"Mark as Read" Action**: Removed the `read` action from the automation engine. This action was redundant in most workflows (as archiving/deleting is the primary goal) and often conflicted with other state changes. Existing rules will have this action automatically removed via migration.
+
+### Fixed
+- **Action Constraints**: Relaxed database constraints on the legacy `action` column to support a wider range of action types (labels, folders, stars) without validation errors during rule creation.
+
 ## [2.14.1] - 2026-01-31
 
 ### Fixed

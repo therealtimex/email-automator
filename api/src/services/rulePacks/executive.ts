@@ -120,7 +120,7 @@ export const EXECUTIVE_PACK: RulePack = {
         category: 'social',
         confidence_gt: 0.8
       },
-      actions: ['archive', 'read'],
+      actions: ['archive'],
       priority: 5,
       is_enabled_by_default: true
     },
