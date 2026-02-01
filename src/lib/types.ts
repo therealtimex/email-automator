@@ -135,7 +135,7 @@ export interface ProcessingEvent {
 }
 
 // Enums
-export type EmailCategory = 'spam' | 'newsletter' | 'support' | 'client' | 'internal' | 'personal' | 'other';
+export type EmailCategory = 'spam' | 'newsletter' | 'news' | 'promotional' | 'transactional' | 'social' | 'support' | 'client' | 'internal' | 'personal' | 'other';
 export type EmailAction = 'none' | 'delete' | 'archive' | 'reply' | 'flag' | 'draft';
 export type Sentiment = 'Positive' | 'Neutral' | 'Negative';
 export type Priority = 'High' | 'Medium' | 'Low';

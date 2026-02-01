@@ -9,7 +9,7 @@ const logger = createLogger('Intelligence');
 // Define the schema for email analysis
 export const EmailAnalysisSchema = z.object({
     summary: z.string().describe('A brief summary of the email content'),
-    category: z.enum(['spam', 'newsletter', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'other'])
+    category: z.enum(['spam', 'newsletter', 'news', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'other'])
         .describe('The category of the email'),
     sentiment: z.enum(['Positive', 'Neutral', 'Negative'])
         .describe('The emotional tone of the email'),
@@ -34,7 +34,7 @@ export type EmailAnalysis = z.infer<typeof EmailAnalysisSchema>;
 // Context-Aware Analysis Schema - AI evaluates email against user's rules
 export const ContextAwareAnalysisSchema = z.object({
     summary: z.string().describe('A brief summary of the email content'),
-    category: z.enum(['spam', 'newsletter', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'other'])
+    category: z.enum(['spam', 'newsletter', 'news', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'other'])
         .describe('The category of the email'),
     sentiment: z.enum(['Positive', 'Neutral', 'Negative']).optional()
         .describe('The emotional tone of the email'),
@@ -363,7 +363,7 @@ ${rulesContext}
 REQUIRED JSON STRUCTURE:
 {
   "summary": "A brief summary of the email content",
-  "category": "spam|newsletter|promotional|transactional|social|support|client|internal|personal|other",
+  "category": "spam|newsletter|news|promotional|transactional|social|support|client|internal|personal|other",
   "priority": "High|Medium|Low",
   "matched_rules": [
     {
@@ -376,6 +376,19 @@ REQUIRED JSON STRUCTURE:
   "actions_to_execute": ["none"|"delete"|"archive"|"draft"|"star"],
   "draft_content": "Suggested reply if drafting, otherwise null"
 }
+
+CATEGORY DEFINITIONS (choose the most specific):
+- spam: Unwanted/unsolicited bulk email, phishing attempts
+- newsletter: Recurring subscription content (weekly digests, company updates)
+- news: Breaking news alerts, timely notifications, one-off news items (Google Alerts, news feeds)
+- promotional: Marketing emails, sales offers, advertisements
+- transactional: Receipts, confirmations, order updates, account notifications
+- social: Social media notifications (LinkedIn, Twitter, Facebook)
+- support: Customer service, help desk, support tickets
+- client: Business correspondence from clients/customers
+- internal: Company-internal communications (colleagues, HR, IT)
+- personal: Personal correspondence from friends/family
+- other: Anything that doesn't fit above categories
 
 CRITICAL INSTRUCTIONS:
 - Identify ALL rules that apply to this email (not just the best one)

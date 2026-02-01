@@ -6,9 +6,10 @@
  */
 
 export type EmailCategory =
-  | 'newsletter'
-  | 'promotional'
   | 'spam'
+  | 'newsletter'
+  | 'news'
+  | 'promotional'
   | 'transactional'
   | 'social'
   | 'support'

@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.17.0] - 2026-01-31
+
+### Added
+- **"News" Category**: Introduced a distinct `news` category for email classification. This separates recurring subscription content (`newsletter`) from breaking news alerts and one-off notifications (`news`), allowing for more precise automation rules (e.g., "Archive Newsletters after 7 days" vs "Flag News about Competitors").
+- **Enhanced AI Definitions**: Updated the AI system prompt with explicit definitions for all email categories to improve classification accuracy and reduce overlap between similar types (like promotional vs. transactional).
+
 ## [2.16.0] - 2026-01-31
 
 ### Added
