@@ -334,7 +334,7 @@ function AppContent() {
                                 </Button>
                             </nav>
                             <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block" />
-                            <LanguageSwitcher variant="minimal" />
+                            <LanguageSwitcher />
                             <ModeToggle />
                             <Button
                                 variant={activeTab === 'account' ? 'secondary' : 'ghost'}

@@ -1,4 +1,8 @@
 import { Label } from '../../ui/label';
+import { Input } from '../../ui/input';
+import { Button } from '../../ui/button';
+import { AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useLanguage } from '../../../context/LanguageContext';
 
 interface CredentialsStepProps {

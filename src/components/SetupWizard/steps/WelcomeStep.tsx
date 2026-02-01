@@ -1,4 +1,5 @@
 import { Button } from '../../ui/button';
+import { Shield, Zap, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
 
 interface WelcomeStepProps {

@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.19.1] - 2026-02-01
+
+### Fixed
+- **Setup Wizard**: Resolved missing component imports in the Credentials and Welcome steps that could cause rendering issues during onboarding.
+- **i18n Integration**: Connected translation hooks to Dashboard components (Sync Settings, Email Cards) to ensure consistent localization throughout the application.
+
+### Changed
+- **UI Polish**: Updated the global Language Switcher to use the standard display variant for better accessibility in the main navigation bar.
+
 ## [2.19.0] - 2026-02-01
 
 ### Added

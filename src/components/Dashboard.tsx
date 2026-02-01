@@ -737,6 +737,7 @@ interface SyncSettingsProps {
 }
 
 function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, openTerminal }: SyncSettingsProps) {
+    const { t } = useLanguage();
     if (accounts.length === 0) return null;
 
     return (
@@ -772,6 +773,7 @@ function AccountSyncRow({
     onSync: (id: string) => void,
     openTerminal: () => void
 }) {
+    const { t } = useLanguage();
     const [updating, setUpdating] = useState(false);
 
     // Local state for inputs to prevent aggressive updates while typing
@@ -923,6 +925,7 @@ interface EmailCardProps {
 }
 
 function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
+    const { t } = useLanguage();
     if (!email) return null;
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
     const isLoading = !!loadingAction;
