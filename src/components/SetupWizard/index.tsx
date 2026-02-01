@@ -2,6 +2,8 @@ import { useReducer, useCallback, useRef, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
+import { LanguageSwitcher } from '../LanguageSwitcher';
 
 import { checkMigrationStatus, APP_VERSION } from '../../lib/migration-check';
 import {
@@ -37,6 +39,7 @@ import { Logo } from '../Logo';
 
 export function SetupWizard({ onComplete, open = true, canClose = false }: SetupWizardProps) {
     const [state, dispatch] = useReducer(wizardReducer, initialState);
+    const { t } = useLanguage();
 
     // Secure refs for sensitive data (not exposed in DevTools)
     const accessTokenRef = useRef<string>('');
@@ -338,18 +341,18 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
                                 Assembly Phase
                             </p>
                             <div className="space-y-4 px-1">
-                                <StatusBadge step="welcome" currentStep={state.step} label="Initiation" />
+                                <StatusBadge step="welcome" currentStep={state.step} label={t('setup.initiation')} />
                                 <StatusBadge
                                     step={['type', 'managed-token', 'credentials']}
                                     currentStep={state.step}
-                                    label="Coordinates"
+                                    label={t('setup.coordinates')}
                                 />
                                 <StatusBadge
                                     step={['managed-org', 'provisioning', 'validating']}
                                     currentStep={state.step}
-                                    label="Foundation"
+                                    label={t('setup.foundation')}
                                 />
-                                <StatusBadge step="migration" currentStep={state.step} label="Sync" />
+                                <StatusBadge step="migration" currentStep={state.step} label={t('setup.ignition')} />
                             </div>
                         </div>
                     </div>
@@ -372,6 +375,10 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
                             <X className="w-5 h-5 text-muted-foreground opacity-40 hover:opacity-100 transition-opacity" />
                         </button>
                     )}
+
+                    <div className="absolute top-6 right-6 flex items-center gap-4 z-50">
+                        <LanguageSwitcher />
+                    </div>
 
                     <AnimatePresence mode="wait">
                         <motion.div

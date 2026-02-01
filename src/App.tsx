@@ -46,9 +46,12 @@ import {
 type TabType = 'dashboard' | 'autopilot' | 'config' | 'analytics' | 'account';
 
 import { sounds } from './lib/sounds';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
 
 function AppContent() {
     const { state, isSubscribed, actions } = useApp();
+    const { t } = useLanguage();
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [needsSetup, setNeedsSetup] = useState(false);
@@ -103,7 +106,7 @@ function AppContent() {
     }, []);
 
     if (processingAuth) {
-        return <PageLoader text="Connecting account..." />;
+        return <PageLoader text={t('app.connecting')} />;
     }
 
     // Initial App Status Check
@@ -233,7 +236,7 @@ function AppContent() {
     };
 
     if (loading) {
-        return <PageLoader text="Loading your workspace..." />;
+        return <PageLoader text={t('app.loadingWorkspace')} />;
     }
 
     if (needsSetup) {
@@ -252,7 +255,7 @@ function AppContent() {
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        toast.success('Logged out successfully');
+        toast.success(t('app.loggedOut'));
     };
 
     return (
@@ -267,7 +270,7 @@ function AppContent() {
                                 className="text-xl font-bold flex items-center gap-2 hover:opacity-80 transition-opacity"
                             >
                                 <Logo className="w-8 h-8" />
-                                <span className="hidden sm:inline">Email Automator</span>
+                                <span className="hidden sm:inline">{t('app.name')}</span>
                                 <span className="sm:hidden">Email AI</span>
                             </button>
 
@@ -287,7 +290,7 @@ function AppContent() {
                                         isSubscribed ? "bg-emerald-500" : "bg-yellow-500"
                                     )} />
                                 </div>
-                                <span className="hidden xs:inline leading-none">{isSubscribed ? "LIVE" : "OFFLINE"}</span>
+                                <span className="hidden xs:inline leading-none">{isSubscribed ? t('app.statusLive') : t('app.statusOffline')}</span>
                             </div>
                         </div>
 
@@ -300,7 +303,7 @@ function AppContent() {
                                     className="gap-2"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Dashboard</span>
+                                    <span className="hidden sm:inline">{t('nav.dashboard')}</span>
                                 </Button>
                                 <Button
                                     variant={activeTab === 'autopilot' ? 'secondary' : 'ghost'}
@@ -309,7 +312,7 @@ function AppContent() {
                                     className="gap-2"
                                 >
                                     <Sparkles className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Auto-Pilot</span>
+                                    <span className="hidden sm:inline">{t('nav.autopilot')}</span>
                                 </Button>
                                 <Button
                                     variant={activeTab === 'analytics' ? 'secondary' : 'ghost'}
@@ -318,7 +321,7 @@ function AppContent() {
                                     className="gap-2"
                                 >
                                     <BarChart3 className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Analytics</span>
+                                    <span className="hidden sm:inline">{t('nav.analytics')}</span>
                                 </Button>
                                 <Button
                                     variant={activeTab === 'config' ? 'secondary' : 'ghost'}
@@ -327,17 +330,18 @@ function AppContent() {
                                     className="gap-2"
                                 >
                                     <Settings className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Configuration</span>
+                                    <span className="hidden sm:inline">{t('nav.configuration')}</span>
                                 </Button>
                             </nav>
                             <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block" />
+                            <LanguageSwitcher variant="minimal" />
                             <ModeToggle />
                             <Button
                                 variant={activeTab === 'account' ? 'secondary' : 'ghost'}
                                 size="sm"
                                 onClick={() => setActiveTab('account')}
                                 className="text-muted-foreground hover:text-foreground p-0 w-8 h-8 rounded-full overflow-hidden border"
-                                title="Account Settings"
+                                title={t('nav.accountSettings')}
                             >
                                 {state.profile?.avatar_url ? (
                                     <img src={state.profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
@@ -415,6 +419,7 @@ function RunTraceModal({
     isOpen: boolean,
     onOpenChange: (open: boolean) => void
 }) {
+    const { t } = useLanguage();
     const [events, setEvents] = useState<ProcessingEvent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -454,19 +459,19 @@ function RunTraceModal({
                 <DialogHeader className="p-6 border-b">
                     <div className="flex items-center gap-2">
                         <Cpu className="w-5 h-5 text-primary" />
-                        <DialogTitle>Sync Run Trace</DialogTitle>
+                        <DialogTitle>{t('trace.runTrace')}</DialogTitle>
                     </div>
                     <DialogDescription>
-                        {accountEmail ? `Full log for account: ${accountEmail}` : 'Historical log for this synchronization run.'}
+                        {accountEmail ? t('trace.fullLogFor').replace('{email}', accountEmail) : t('trace.historicalLog')}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-secondary/5">
                     {isLoading ? (
-                        <div className="py-20 flex justify-center"><PageLoader text="Loading trace..." /></div>
+                        <div className="py-20 flex justify-center"><PageLoader text={t('trace.loadingTrace')} /></div>
                     ) : events.length === 0 ? (
                         <div className="py-20 text-center text-muted-foreground italic font-mono text-sm">
-                            No granular trace events found for this run.
+                            {t('trace.noTraceEvents')}
                         </div>
                     ) : (
                         events.map((event, i) => (
@@ -534,7 +539,7 @@ function RunTraceModal({
                                         {event.event_type === 'action' && (
                                             <div className="flex items-center justify-between">
                                                 <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 capitalize">
-                                                    Executed: {event.details?.action}
+                                                    {t('dashboard.done')} {event.details?.action}
                                                 </p>
                                                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                                             </div>
@@ -558,6 +563,7 @@ function RunTraceModal({
 
 function AnalyticsPage() {
     const { state, actions } = useApp();
+    const { t } = useLanguage();
     const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
     const [selectedAccountEmail, setSelectedAccountEmail] = useState<string | undefined>(undefined);
     const [isRunTraceOpen, setIsRunTraceOpen] = useState(false);
@@ -567,7 +573,7 @@ function AnalyticsPage() {
     }, []);
 
     if (!state.stats) {
-        return <PageLoader text="Loading analytics..." />;
+        return <PageLoader text={t('common.loading')} />;
     }
 
     const handleViewRunTrace = (runId: string, email?: string) => {
@@ -582,28 +588,28 @@ function AnalyticsPage() {
         <div className="space-y-8 animate-in fade-in duration-500">
             <h2 className="text-2xl font-bold flex items-center gap-2">
                 <BarChart3 className="w-6 h-6 text-primary" />
-                Analytics Dashboard
+                {t('analytics.title')}
             </h2>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard
-                    title="Total Emails"
+                    title={t('analytics.totalEmails')}
                     value={stats.totalEmails}
                     color="primary"
                 />
                 <StatCard
-                    title="Spam Caught"
+                    title={t('analytics.spamCaught')}
                     value={stats.categoryCounts['spam'] || 0}
                     color="destructive"
                 />
                 <StatCard
-                    title="Actions Taken"
+                    title={t('analytics.actionsTaken')}
                     value={Object.values(stats.actionCounts).reduce((a, b) => a + b, 0) - (stats.actionCounts['none'] || 0)}
                     color="emerald"
                 />
                 <StatCard
-                    title="Accounts"
+                    title={t('analytics.accounts')}
                     value={stats.accountCount}
                     color="blue"
                 />
@@ -612,7 +618,7 @@ function AnalyticsPage() {
             {/* Category Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-card border rounded-xl p-6">
-                    <h3 className="font-semibold mb-4">Email Categories</h3>
+                    <h3 className="font-semibold mb-4">{t('analytics.categories')}</h3>
                     <div className="space-y-3">
                         {Object.entries(stats.categoryCounts).map(([category, count]) => (
                             <div key={category} className="flex items-center gap-3">
@@ -634,7 +640,7 @@ function AnalyticsPage() {
                 </div>
 
                 <div className="bg-card border rounded-xl p-6">
-                    <h3 className="font-semibold mb-4">Actions Taken</h3>
+                    <h3 className="font-semibold mb-4">{t('analytics.actionsTaken')}</h3>
                     <div className="space-y-3">
                         {Object.entries(stats.actionCounts).map(([action, count]) => (
                             <div key={action} className="flex items-center justify-between py-2 border-b last:border-0">
@@ -648,9 +654,9 @@ function AnalyticsPage() {
 
             {/* Recent Syncs */}
             <div className="bg-card border rounded-xl p-6">
-                <h3 className="font-semibold mb-4">Recent Sync Activity</h3>
+                <h3 className="font-semibold mb-4">{t('analytics.recentActivity')}</h3>
                 {stats.recentSyncs.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No sync activity yet</p>
+                    <p className="text-muted-foreground text-sm">{t('analytics.noActivity')}</p>
                 ) : (
                     <div className="space-y-3">
                         {stats.recentSyncs.map((log: any) => {
@@ -672,7 +678,7 @@ function AnalyticsPage() {
                                         )} />
                                         <div className="flex flex-col">
                                             <span className="text-sm font-medium group-hover:text-primary transition-colors">
-                                                {log.email_accounts?.email_address || 'System Sync'}
+                                                {log.email_accounts?.email_address || t('common.systemSync')}
                                             </span>
                                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                                 <Clock className="w-3 h-3" />
@@ -687,9 +693,9 @@ function AnalyticsPage() {
                                     </div>
                                     <div className="flex items-center gap-4 text-xs">
                                         <div className="flex flex-col items-end">
-                                            <span className="font-bold text-primary">{log.emails_processed} emails</span>
+                                            <span className="font-bold text-primary">{t('analytics.emails').replace('{count}', log.emails_processed.toString())}</span>
                                             <span className="text-[10px] text-muted-foreground">
-                                                {log.emails_deleted} deleted, {log.emails_drafted} drafted
+                                                {t('analytics.deleted').replace('{count}', log.emails_deleted.toString())}, {t('analytics.drafted').replace('{count}', log.emails_drafted.toString())}
                                             </span>
                                         </div>
                                     </div>
@@ -728,16 +734,18 @@ function StatCard({ title, value, color }: { title: string; value: number; color
 
 function App() {
     return (
-        <ThemeProvider defaultTheme="system" storageKey="email-automator-theme">
-            <ErrorBoundary>
-                <TerminalProvider>
-                    <AppProvider>
-                        <AppContent />
-                        <ToastContainer />
-                    </AppProvider>
-                </TerminalProvider>
-            </ErrorBoundary>
-        </ThemeProvider>
+        <LanguageProvider>
+            <ThemeProvider defaultTheme="system" storageKey="email-automator-theme">
+                <ErrorBoundary>
+                    <TerminalProvider>
+                        <AppProvider>
+                            <AppContent />
+                            <ToastContainer />
+                        </AppProvider>
+                    </TerminalProvider>
+                </ErrorBoundary>
+            </ThemeProvider>
+        </LanguageProvider>
     );
 }
 

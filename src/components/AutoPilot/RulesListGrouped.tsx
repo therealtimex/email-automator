@@ -7,6 +7,7 @@
 import React from 'react';
 import { Button } from '../ui/button';
 import { Mail, AlertCircle, Code, Briefcase, Settings as SettingsIcon, Power, Edit2, Trash2 } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface Rule {
   id: string;
@@ -25,40 +26,42 @@ interface RulesListGroupedProps {
   onDeleteRule?: (ruleId: string) => void;
 }
 
-const CATEGORY_CONFIG = {
-  email_organization: {
-    label: 'Email Organization',
-    icon: Mail,
-    emoji: '📧',
-    description: 'Automatically organize common email types'
-  },
-  priority_alerts: {
-    label: 'Priority & Alerts',
-    icon: AlertCircle,
-    emoji: '🚨',
-    description: 'Surface urgent and important messages'
-  },
-  development: {
-    label: 'Development',
-    icon: Code,
-    emoji: '💻',
-    description: 'GitHub, CI/CD, and dev tool notifications'
-  },
-  sales_business: {
-    label: 'Sales & Business',
-    icon: Briefcase,
-    emoji: '💼',
-    description: 'Lead management and business communications'
-  },
-  operations: {
-    label: 'Operations',
-    icon: SettingsIcon,
-    emoji: '⚙️',
-    description: 'Support, internal requests, and system alerts'
-  }
-};
-
 export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule }: RulesListGroupedProps) {
+  const { t } = useLanguage();
+
+  const CATEGORY_CONFIG = {
+    email_organization: {
+      label: t('autopilot.category.email_organization.label'),
+      icon: Mail,
+      emoji: '📧',
+      description: t('autopilot.category.email_organization.desc')
+    },
+    priority_alerts: {
+      label: t('autopilot.category.priority_alerts.label'),
+      icon: AlertCircle,
+      emoji: '🚨',
+      description: t('autopilot.category.priority_alerts.desc')
+    },
+    development: {
+      label: t('autopilot.category.development.label'),
+      icon: Code,
+      emoji: '💻',
+      description: t('autopilot.category.development.desc')
+    },
+    sales_business: {
+      label: t('autopilot.category.sales_business.label'),
+      icon: Briefcase,
+      emoji: '💼',
+      description: t('autopilot.category.sales_business.desc')
+    },
+    operations: {
+      label: t('autopilot.category.operations.label'),
+      icon: SettingsIcon,
+      emoji: '⚙️',
+      description: t('autopilot.category.operations.desc')
+    }
+  };
+
   // Group rules by category
   const groupedRules = rules.reduce((acc, rule) => {
     const category = rule.category || 'email_organization';
@@ -109,7 +112,7 @@ export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule
                   <h3 className="font-semibold text-base flex items-center gap-2">
                     {config.label}
                     <span className="text-xs font-normal text-muted-foreground">
-                      ({stats.enabled}/{stats.total} enabled)
+                      {t('autopilot.enabledCount').replace('{enabled}', stats.enabled.toString()).replace('{total}', stats.total.toString())}
                     </span>
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -131,7 +134,7 @@ export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule
                       <h4 className="font-medium text-sm truncate">{rule.name}</h4>
                       {rule.is_system_managed && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 shrink-0">
-                          Auto-Pilot
+                          {t('autopilot.badge')}
                         </span>
                       )}
                     </div>
@@ -157,7 +160,7 @@ export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule
                       size="sm"
                       className="h-8 w-8 p-0"
                       onClick={() => onEditRule(rule.id)}
-                      title="Edit Rule"
+                      title={t('autopilot.editRuleTooltip')}
                     >
                       <Edit2 className="w-4 h-4 text-muted-foreground" />
                     </Button>
@@ -170,7 +173,7 @@ export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule
                       className="h-8 px-3"
                     >
                       <Power className="w-4 h-4 mr-1" />
-                      {rule.is_enabled ? 'On' : 'Off'}
+                      {rule.is_enabled ? t('common.on') : t('common.off')}
                     </Button>
 
                     {/* Delete Button (only for custom rules) */}
@@ -180,7 +183,7 @@ export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule
                         size="sm"
                         className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                         onClick={() => onDeleteRule(rule.id)}
-                        title="Delete Rule"
+                        title={t('autopilot.deleteRuleTooltip')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

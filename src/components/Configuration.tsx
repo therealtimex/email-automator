@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload, Paperclip, X, Clock, Edit2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
@@ -41,6 +42,7 @@ const DEFAULT_PROVIDER = 'realtimexai';
 
 export function Configuration() {
     const { state, actions } = useApp();
+    const { t } = useLanguage();
     const [isConnecting, setIsConnecting] = useState(false);
     const [isOutlookConnecting, setIsOutlookConnecting] = useState(false);
     const [outlookDeviceCode, setOutlookDeviceCode] = useState<{
@@ -623,12 +625,12 @@ export function Configuration() {
                             <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-sm">
                                 G
                             </div>
-                            Connect Gmail Account
+                            {t('config.gmail.connect')}
                         </DialogTitle>
                         <DialogDescription>
                             {gmailModalStep === 'credentials'
-                                ? 'Enter your Google OAuth credentials to connect your Gmail account.'
-                                : 'Paste the authorization code from Google to complete the connection.'}
+                                ? t('config.gmail.credentialsDesc')
+                                : t('config.gmail.authCodeDesc')}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -639,7 +641,7 @@ export function Configuration() {
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium flex items-center gap-2">
                                         <Upload className="w-4 h-4" />
-                                        Paste credentials.json
+                                        {t('config.gmail.pasteJson')}
                                     </label>
                                     <textarea
                                         className="w-full h-24 p-3 text-xs font-mono border rounded-lg bg-secondary/30 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
@@ -648,7 +650,7 @@ export function Configuration() {
                                         onChange={(e) => handleCredentialsJsonChange(e.target.value)}
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                        Download from Google Cloud Console → APIs & Services → Credentials
+                                        {t('config.gmail.downloadHelp')}
                                     </p>
                                 </div>
 
@@ -657,7 +659,7 @@ export function Configuration() {
                                         <span className="w-full border-t" />
                                     </div>
                                     <div className="relative flex justify-center text-xs uppercase">
-                                        <span className="bg-background px-2 text-muted-foreground">or enter manually</span>
+                                        <span className="bg-background px-2 text-muted-foreground">{t('config.gmail.orEnterManually')}</span>
                                     </div>
                                 </div>
 
@@ -685,7 +687,7 @@ export function Configuration() {
 
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setShowGmailModal(false)}>
-                                    Cancel
+                                    {t('common.cancel')}
                                 </Button>
                                 <Button
                                     onClick={handleSaveAndConnect}
@@ -696,7 +698,7 @@ export function Configuration() {
                                     ) : (
                                         <Check className="w-4 h-4 mr-2" />
                                     )}
-                                    Save & Connect
+                                    {t('common.save')} & {t('setup.engage')}
                                 </Button>
                             </DialogFooter>
                         </>
@@ -726,7 +728,7 @@ export function Configuration() {
 
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setGmailModalStep('credentials')}>
-                                    Back
+                                    {t('setup.back')}
                                 </Button>
                                 <Button
                                     onClick={handleSubmitAuthCode}
@@ -737,7 +739,7 @@ export function Configuration() {
                                     ) : (
                                         <Check className="w-4 h-4 mr-2" />
                                     )}
-                                    Connect
+                                    {t('setup.engage')}
                                 </Button>
                             </DialogFooter>
                         </>
@@ -753,12 +755,12 @@ export function Configuration() {
                             <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
                                 O
                             </div>
-                            Connect Outlook Account
+                            {t('config.outlook.connect')}
                         </DialogTitle>
                         <DialogDescription>
                             {outlookModalStep === 'credentials'
-                                ? 'Enter your Microsoft Azure App credentials to connect your Outlook account.'
-                                : 'Follow the instructions to authorize the application.'}
+                                ? t('config.outlook.credentialsDesc')
+                                : t('config.outlook.instructions')}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -864,50 +866,50 @@ export function Configuration() {
             }}>
                 <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 border-b">
-                        <DialogTitle>{editingRule ? 'Edit Auto-Pilot Rule' : 'Create Auto-Pilot Rule'}</DialogTitle>
+                        <DialogTitle>{editingRule ? t('config.rules.edit') : t('config.rules.create')}</DialogTitle>
                         <DialogDescription>
-                            Define a condition based on AI analysis to trigger an action.
+                            {t('config.rules.desc')}
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Rule Name</label>
+                            <label className="text-sm font-medium">{t('config.rules.name')}</label>
                             <Input
-                                placeholder="e.g. Archive Newsletters"
+                                placeholder={t('config.rules.namePlaceholder')}
                                 value={newRuleName}
                                 onChange={(e) => setNewRuleName(e.target.value)}
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Description</label>
+                            <label className="text-sm font-medium">{t('config.rules.description')}</label>
                             <textarea
                                 className="w-full p-2 border rounded-md bg-background min-h-[60px] text-sm"
-                                placeholder="e.g. Handle all marketing newsletters and promotional content from subscription services"
+                                placeholder={t('config.rules.descriptionPlaceholder')}
                                 value={newRuleDescription}
                                 onChange={(e) => setNewRuleDescription(e.target.value)}
                             />
                             <p className="text-[10px] text-muted-foreground">
-                                Describe what this rule is for. The AI uses this to semantically match emails.
+                                {t('config.rules.semanticHelp')}
                             </p>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Intent</label>
+                            <label className="text-sm font-medium">{t('config.rules.intent')}</label>
                             <Input
-                                placeholder="e.g. Politely decline all sales pitches"
+                                placeholder={t('config.rules.intentPlaceholder')}
                                 value={newRuleIntent}
                                 onChange={(e) => setNewRuleIntent(e.target.value)}
                             />
                             <p className="text-[10px] text-muted-foreground">
-                                The goal of this rule. Used to generate appropriate draft replies.
+                                {t('config.rules.intentHelp')}
                             </p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">If Condition Field</label>
+                                <label className="text-sm font-medium">{t('config.rules.conditionField')}</label>
                                 <select
                                     className="w-full p-2 border rounded-md bg-background text-sm"
                                     value={newRuleKey}
@@ -920,22 +922,22 @@ export function Configuration() {
                                         else setNewRuleValue('');
                                     }}
                                 >
-                                    <optgroup label="AI Analysis">
-                                        <option value="category">Category</option>
-                                        <option value="sentiment">Sentiment</option>
-                                        <option value="priority">Priority</option>
+                                    <optgroup label={t('config.rules.aiAnalysis')}>
+                                        <option value="category">{t('config.rules.category')}</option>
+                                        <option value="sentiment">{t('config.rules.sentiment')}</option>
+                                        <option value="priority">{t('config.rules.priority')}</option>
                                     </optgroup>
-                                    <optgroup label="Metadata">
-                                        <option value="sender_email">Specific Email (Exact)</option>
-                                        <option value="sender_domain">Email Domain (@...)</option>
-                                        <option value="sender_contains">Sender contains...</option>
-                                        <option value="subject_contains">Subject contains...</option>
-                                        <option value="body_contains">Body contains...</option>
+                                    <optgroup label={t('config.rules.metadata')}>
+                                        <option value="sender_email">{t('config.rules.senderEmail')}</option>
+                                        <option value="sender_domain">{t('config.rules.senderDomain')}</option>
+                                        <option value="sender_contains">{t('config.rules.senderContains')}</option>
+                                        <option value="subject_contains">{t('config.rules.subjectContains')}</option>
+                                        <option value="body_contains">{t('config.rules.bodyContains')}</option>
                                     </optgroup>
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Equals Value</label>
+                                <label className="text-sm font-medium">{t('config.rules.equalsValue')}</label>
                                 {newRuleKey === 'category' ? (
                                     <select
                                         className="w-full p-2 border rounded-md bg-background text-sm"
@@ -978,7 +980,7 @@ export function Configuration() {
                                         placeholder={
                                             newRuleKey === 'sender_domain' ? 'rta.vn' :
                                                 newRuleKey === 'sender_email' ? 'john@example.com' :
-                                                    'Keywords...'
+                                                    t('config.rules.keywordsPlaceholder')
                                         }
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
@@ -990,7 +992,7 @@ export function Configuration() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium flex items-center gap-2">
                                 <Clock className="w-4 h-4" />
-                                Only if email is older than... (Optional)
+                                {t('config.rules.olderThan')}
                             </label>
                             <div className="flex items-center gap-2">
                                 <Input
@@ -1004,21 +1006,21 @@ export function Configuration() {
                                 <span className="text-sm text-muted-foreground">days</span>
                             </div>
                             <p className="text-[10px] text-muted-foreground">
-                                Leave empty or 0 to apply rule immediately upon receipt.
+                                {t('config.rules.olderThanHelp')}
                             </p>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Then Perform Action(s)</label>
+                            <label className="text-sm font-medium">{t('config.rules.performActions')}</label>
                             <p className="text-xs text-muted-foreground mb-2">
                                 Select one or more actions to execute when the rule matches
                             </p>
                             <div className="grid grid-cols-2 gap-2">
                                 {[
-                                    { value: 'archive', label: 'Archive Email' },
-                                    { value: 'delete', label: 'Delete Email' },
-                                    { value: 'draft', label: 'Draft Reply' },
-                                    { value: 'star', label: 'Star / Flag' },
+                                    { value: 'archive', label: t('common.archive') },
+                                    { value: 'delete', label: t('common.delete') },
+                                    { value: 'draft', label: t('common.draft') },
+                                    { value: 'star', label: t('common.star') },
                                 ].map((option) => (
                                     <label
                                         key={option.value}
@@ -1048,7 +1050,7 @@ export function Configuration() {
                         {newRuleActions.includes('draft') && (
                             <>
                                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                                    <label className="text-sm font-medium">Draft Instructions (Context)</label>
+                                    <label className="text-sm font-medium">{t('config.rules.draftInstructions')}</label>
                                     <textarea
                                         className="w-full p-2 border rounded-md bg-background min-h-[80px] text-sm"
                                         placeholder="e.g. Tell them I'm busy until Friday, but interested in the proposal."
@@ -1056,7 +1058,7 @@ export function Configuration() {
                                         onChange={(e) => setNewRuleInstructions(e.target.value)}
                                     />
                                     <p className="text-[10px] text-muted-foreground">
-                                        Specific context for the AI ghostwriter.
+                                        {t('config.rules.contextHelp')}
                                     </p>
                                 </div>
 
@@ -1099,12 +1101,12 @@ export function Configuration() {
                                                 ) : (
                                                     <Plus className="w-3 h-3 mr-2" />
                                                 )}
-                                                {isUploading ? 'Uploading...' : 'Add Attachment'}
+                                                {isUploading ? t('config.rules.uploading') : t('config.rules.addAttachment')}
                                             </Button>
                                         </div>
                                     </div>
                                     <p className="text-[10px] text-muted-foreground">
-                                        Files will be attached to every draft generated by this rule.
+                                        {t('config.rules.attachmentHelp')}
                                     </p>
                                 </div>
                             </>
@@ -1113,11 +1115,11 @@ export function Configuration() {
 
                     <DialogFooter className="p-6 border-t bg-secondary/5">
                         <Button variant="outline" onClick={() => setShowRuleModal(false)}>
-                            Cancel
+                            {t('common.cancel')}
                         </Button>
                         <Button onClick={handleSaveRule} disabled={savingRule}>
                             {savingRule ? <LoadingSpinner size="sm" className="mr-2" /> : (editingRule ? <Check className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />)}
-                            {editingRule ? 'Save Changes' : 'Create Rule'}
+                            {editingRule ? t('config.rules.saveChanges') : t('config.rules.createRule')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1128,16 +1130,16 @@ export function Configuration() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Database className="w-5 h-5 text-primary" />
-                        Connected Accounts
+                        {t('config.accounts.title')}
                     </CardTitle>
-                    <CardDescription>Manage your email providers</CardDescription>
+                    <CardDescription>{t('config.accounts.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {/* Left Side - Connection Buttons */}
                         <div className="space-y-4">
                             <div>
-                                <h3 className="text-sm font-semibold mb-3">Add New Account</h3>
+                                <h3 className="text-sm font-semibold mb-3">{t('config.accounts.addNew')}</h3>
                                 <div className="flex flex-col gap-3">
                                     <Button
                                         className="w-full border-dashed justify-start h-auto py-4"
@@ -1151,7 +1153,7 @@ export function Configuration() {
                                             </div>
                                             <div className="flex-1 text-left">
                                                 <div className="font-medium">Gmail</div>
-                                                <div className="text-xs text-muted-foreground">Connect your Google account</div>
+                                                <div className="text-xs text-muted-foreground">{t('config.gmail.connectDesc')}</div>
                                             </div>
                                             {isConnecting ? (
                                                 <LoadingSpinner size="sm" />
@@ -1173,7 +1175,7 @@ export function Configuration() {
                                             </div>
                                             <div className="flex-1 text-left">
                                                 <div className="font-medium">Outlook</div>
-                                                <div className="text-xs text-muted-foreground">Connect your Microsoft account</div>
+                                                <div className="text-xs text-muted-foreground">{t('config.outlook.connectDesc')}</div>
                                             </div>
                                             {isOutlookConnecting && !outlookDeviceCode ? (
                                                 <LoadingSpinner size="sm" />
@@ -1188,7 +1190,7 @@ export function Configuration() {
                             {outlookDeviceCode && (
                                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg animate-in slide-in-from-top-2">
                                     <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                                        Microsoft Sign-In Required
+                                        {t('config.outlook.signinRequired')}
                                     </h4>
                                     <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
                                         {outlookDeviceCode.message}
@@ -1208,7 +1210,7 @@ export function Configuration() {
                                             <ExternalLink className="w-4 h-4 ml-2" />
                                         </Button>
                                         <p className="text-xs text-center text-muted-foreground mt-2">
-                                            Waiting for you to sign in...
+                                            {t('config.outlook.waitingSignin')}
                                         </p>
                                     </div>
                                 </div>
@@ -1217,15 +1219,15 @@ export function Configuration() {
 
                         {/* Right Side - Connected Accounts */}
                         <div className="space-y-4">
-                            <h3 className="text-sm font-semibold mb-3">Your Accounts</h3>
+                            <h3 className="text-sm font-semibold mb-3">{t('config.accounts.yourAccounts')}</h3>
                             {state.accounts.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed rounded-lg">
                                     <Database className="w-12 h-12 text-muted-foreground/40 mb-3" />
                                     <p className="text-sm text-muted-foreground text-center">
-                                        No accounts connected yet
+                                        {t('config.accounts.noAccounts')}
                                     </p>
                                     <p className="text-xs text-muted-foreground text-center mt-1">
-                                        Connect an account to get started
+                                        {t('config.accounts.connectHelp')}
                                     </p>
                                 </div>
                             ) : (
@@ -1247,11 +1249,11 @@ export function Configuration() {
                                             <div className="flex items-center gap-2">
                                                 {account.is_active ? (
                                                     <span className="text-xs text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full">
-                                                        Active
+                                                        {t('common.active')}
                                                     </span>
                                                 ) : (
                                                     <span className="text-xs text-yellow-600 bg-yellow-500/10 px-2 py-1 rounded-full">
-                                                        Inactive
+                                                        {t('common.inactive')}
                                                     </span>
                                                 )}
                                                 <Button
@@ -1259,7 +1261,7 @@ export function Configuration() {
                                                     size="sm"
                                                     className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                                                     onClick={() => handleDisconnect(account.id)}
-                                                    title="Disconnect Account"
+                                                    title={t('config.accounts.disconnect')}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
@@ -1278,14 +1280,14 @@ export function Configuration() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <RefreshCw className="w-5 h-5 text-indigo-500" />
-                        Model Configuration
+                        {t('config.model.title')}
                     </CardTitle>
-                    <CardDescription>Configure Local LLM or API settings</CardDescription>
+                    <CardDescription>{t('config.model.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">LLM Provider</label>
+                            <label className="text-sm font-medium">{t('config.model.provider')}</label>
                             {isLoadingProviders ? (
                                 <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
                                     <LoadingSpinner size="sm" className="mr-2" />
@@ -1316,7 +1318,7 @@ export function Configuration() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Model Name</label>
+                            <label className="text-sm font-medium">{t('config.model.name')}</label>
                             {modelsWithSaved.length > 0 || isLoadingProviders ? (
                                 <select
                                     className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1324,7 +1326,7 @@ export function Configuration() {
                                     onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
                                     disabled={isLoadingProviders}
                                 >
-                                    {!localSettings.llm_model && <option value="">Select a model...</option>}
+                                    {!localSettings.llm_model && <option value="">{t('config.model.selectModel')}</option>}
                                     {modelsWithSaved.map((m: LLMModel) => (
                                         <option key={m.id} value={m.id}>
                                             {m.name || m.id}
@@ -1344,23 +1346,23 @@ export function Configuration() {
                     <div className="space-y-2 pt-2 border-t border-border/50">
                         <label className="text-sm font-medium flex items-center gap-2">
                             <Database className="w-4 h-4" />
-                            Local Storage Path (.eml)
+                            {t('config.model.storagePath')}
                         </label>
                         <Input
-                            placeholder="e.g. ./data/emails or ~/.email-automator/emails"
+                            placeholder={t('config.model.storagePlaceholder')}
                             value={localSettings.storage_path || ''}
                             onChange={(e) => setLocalSettings(s => ({ ...s, storage_path: e.target.value }))}
                         />
                         <p className="text-[10px] text-muted-foreground italic">
-                            Directory where raw emails (.eml) are saved. Default: ./data/emails (falls back to ~/.email-automator/emails if restricted).
+                            {t('config.model.storageHelp')}
                         </p>
                     </div>
 
                     <div className="flex justify-between items-center py-3 border-t border-border/50">
                         <div>
-                            <h4 className="font-medium text-sm">Intelligent Rename</h4>
+                            <h4 className="font-medium text-sm">{t('config.model.intelligentRename')}</h4>
                             <p className="text-xs text-muted-foreground">
-                                Use slugified-hyphenated filenames (e.g. 20240119-1430-subject-id.eml)
+                                {t('config.model.renameHelp')}
                             </p>
                         </div>
                         <Button
@@ -1369,14 +1371,14 @@ export function Configuration() {
                             onClick={() => setLocalSettings(s => ({ ...s, intelligent_rename: !s.intelligent_rename }))}
                         >
                             <Power className="w-4 h-4 mr-1" />
-                            {localSettings.intelligent_rename ? 'On' : 'Off'}
+                            {localSettings.intelligent_rename ? t('common.enabled') : t('common.disabled')}
                         </Button>
                     </div>
 
                     <div className="space-y-2 pt-2 border-t border-border/50">
                         <label className="text-sm font-medium flex items-center gap-2">
                             <Clock className="w-4 h-4" />
-                            Background Sync Interval (minutes)
+                            {t('config.model.syncInterval')}
                         </label>
                         <Input
                             type="number"
@@ -1386,7 +1388,7 @@ export function Configuration() {
                             onChange={(e) => setLocalSettings(s => ({ ...s, sync_interval_minutes: parseInt(e.target.value, 10) || 5 }))}
                         />
                         <p className="text-[10px] text-muted-foreground italic">
-                            How often the system checks for new emails in the background.
+                            {t('config.model.syncHelp')}
                         </p>
                     </div>
 
@@ -1401,7 +1403,7 @@ export function Configuration() {
                             ) : (
                                 <RefreshCw className="w-4 h-4 mr-2" />
                             )}
-                            Check Connection
+                            {t('config.model.checkConnection')}
                         </Button>
                         <Button onClick={handleSaveSettings} disabled={savingSettings}>
                             {savingSettings ? (
@@ -1409,7 +1411,7 @@ export function Configuration() {
                             ) : (
                                 <Check className="w-4 h-4 mr-2" />
                             )}
-                            Save Configuration
+                            {t('config.model.saveConfig')}
                         </Button>
                     </div>
                 </CardContent>
@@ -1421,11 +1423,11 @@ export function Configuration() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <ShieldCheck className="w-5 h-5 text-orange-500" />
-                            Provider Credentials (Advanced)
+                            {t('config.byok.title')}
                         </CardTitle>
                         <CardDescription>
-                            Bring Your Own Keys (BYOK). Configure your own OAuth credentials here.
-                            Leave empty to use system defaults.
+                            {t('config.byok.desc')}
+                            {t('config.byok.systemDefault')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -1496,7 +1498,7 @@ export function Configuration() {
                                 ) : (
                                     <Check className="w-4 h-4 mr-2" />
                                 )}
-                                Save Credentials
+                                {t('config.byok.save')}
                             </Button>
                         </div>
                     </CardContent>

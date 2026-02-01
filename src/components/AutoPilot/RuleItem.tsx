@@ -8,6 +8,7 @@ import React from 'react';
 import { Switch } from '../ui/switch';
 import { Button } from '../ui/button';
 import { Settings, TrendingUp } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface RuleItemProps {
   rule: {
@@ -26,6 +27,7 @@ interface RuleItemProps {
 }
 
 export function RuleItem({ rule, stats, onToggle, onConfigure }: RuleItemProps) {
+  const { t } = useLanguage();
   return (
     <div className="flex items-center justify-between py-3 px-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
       <div className="flex-1">
@@ -33,7 +35,7 @@ export function RuleItem({ rule, stats, onToggle, onConfigure }: RuleItemProps) 
           <h4 className="font-medium text-sm">{rule.name}</h4>
           {rule.is_system_managed && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-              Auto-Pilot
+              {t('autopilot.badge')}
             </span>
           )}
         </div>
@@ -47,7 +49,7 @@ export function RuleItem({ rule, stats, onToggle, onConfigure }: RuleItemProps) 
       {stats && stats.triggeredToday > 0 && (
         <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 mr-4">
           <TrendingUp className="w-4 h-4" />
-          <span>{stats.triggeredToday} today</span>
+          <span>{t('autopilot.triggeredToday').replace('{count}', stats.triggeredToday.toString())}</span>
         </div>
       )}
 

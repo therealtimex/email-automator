@@ -1,8 +1,5 @@
-import { motion } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
-import { Button } from '../../ui/button';
-import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
+import { useLanguage } from '../../../context/LanguageContext';
 
 interface CredentialsStepProps {
     url: string;
@@ -23,14 +20,15 @@ export function CredentialsStep({
     onSave,
     onBack,
 }: CredentialsStepProps) {
+    const { t } = useLanguage();
     const canSubmit = url.trim().length > 0 && anonKey.trim().length > 0;
 
     return (
         <div className="flex-1 flex flex-col justify-center space-y-6">
             <div className="space-y-1">
-                <h3 className="text-2xl font-black uppercase italic tracking-tighter">Manual Sync</h3>
+                <h3 className="text-2xl font-black uppercase italic tracking-tighter">{t('setup.manualSync')}</h3>
                 <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">
-                    Inject existing coordinates
+                    {t('setup.injectCoordinates')}
                 </p>
             </div>
 
@@ -40,7 +38,7 @@ export function CredentialsStep({
                         htmlFor="platform-url"
                         className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1"
                     >
-                        Platform URL
+                        {t('setup.platformUrl')}
                     </Label>
                     <Input
                         id="platform-url"
@@ -52,7 +50,7 @@ export function CredentialsStep({
                         aria-invalid={error ? 'true' : 'false'}
                     />
                     <p id="url-help" className="text-[9px] text-muted-foreground/60 px-1 italic">
-                        Enter full URL or just the project ID
+                        {t('setup.urlHelp')}
                     </p>
                 </div>
                 <div className="space-y-1.5">
@@ -60,7 +58,7 @@ export function CredentialsStep({
                         htmlFor="anon-key"
                         className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1"
                     >
-                        Anon Matrix Key
+                        {t('setup.anonMatrixKey')}
                     </Label>
                     <Input
                         id="anon-key"
@@ -73,7 +71,7 @@ export function CredentialsStep({
                         aria-invalid={error ? 'true' : 'false'}
                     />
                     <p id="key-help" className="text-[9px] text-muted-foreground/60 px-1 italic">
-                        Found in your Supabase project settings
+                        {t('setup.keyHelp')}
                     </p>
                 </div>
             </div>
@@ -96,14 +94,14 @@ export function CredentialsStep({
                     onClick={onBack}
                     className="h-12 rounded-xl text-[10px] font-bold uppercase tracking-widest"
                 >
-                    Back
+                    {t('setup.back')}
                 </Button>
                 <Button
                     onClick={onSave}
                     disabled={!canSubmit}
                     className="h-12 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-primary shadow-lg hover:shadow-primary/20"
                 >
-                    Engage
+                    {t('setup.engage')}
                 </Button>
             </div>
         </div>

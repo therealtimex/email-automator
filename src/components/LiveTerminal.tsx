@@ -19,9 +19,11 @@ import { Button } from './ui/button';
 import { cn } from '../lib/utils';
 import { useTerminal } from '../context/TerminalContext';
 import { useApp } from '../context/AppContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Square } from 'lucide-react';
 
 export function LiveTerminal() {
+    const { t } = useLanguage();
     const [events, setEvents] = useState<ProcessingEvent[]>([]);
     const { isExpanded, setIsExpanded } = useTerminal();
     const { state, actions } = useApp();
@@ -112,7 +114,7 @@ export function LiveTerminal() {
                     className="shadow-lg bg-primary text-primary-foreground hover:opacity-90 border border-border"
                 >
                     <Terminal className="w-4 h-4 mr-2" />
-                    Live Activity
+                    {t('terminal.liveActivity')}
                     {(events.length > 0 || isSyncing) && (
                         <span className="ml-2 flex h-2 w-2 relative">
                             <span className={cn(
@@ -135,7 +137,7 @@ export function LiveTerminal() {
             <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between sticky top-0 bg-background/95 z-20">
                 <div className="flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-primary" />
-                    <CardTitle className="text-sm font-mono font-bold">Agent Terminal</CardTitle>
+                    <CardTitle className="text-sm font-mono font-bold">{t('terminal.title')}</CardTitle>
                     <div className={cn(
                         "flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-bold animate-pulse transition-colors duration-500",
                         isSyncing
@@ -143,7 +145,7 @@ export function LiveTerminal() {
                             : "text-green-600 dark:text-green-400 bg-green-500/10 border-green-500/20"
                     )}>
                         <Activity className="w-3 h-3" />
-                        {isSyncing ? 'SYNCING' : 'LIVE'}
+                        {isSyncing ? t('terminal.syncing') : t('terminal.live')}
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -155,7 +157,7 @@ export function LiveTerminal() {
                             onClick={() => actions.stopSync()}
                         >
                             <Square className="w-3 h-3 mr-1 fill-current" />
-                            STOP SYNC
+                            {t('terminal.stopSync')}
                         </Button>
                     )}
                     <Button
@@ -164,7 +166,7 @@ export function LiveTerminal() {
                         className="h-7 text-[10px] font-mono hover:bg-secondary"
                         onClick={() => setEvents([])}
                     >
-                        Clear
+                        {t('terminal.clear')}
                     </Button>
                     <Button
                         variant="ghost"
@@ -179,7 +181,7 @@ export function LiveTerminal() {
             <CardContent className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-6 custom-scrollbar">
                 {events.length === 0 && (
                     <div className="text-center text-muted-foreground py-20 italic">
-                        Waiting for agent activity...
+                        {t('terminal.waiting')}
                     </div>
                 )}
 
@@ -223,7 +225,7 @@ export function LiveTerminal() {
                                         onClick={() => toggleExpand(event.id)}
                                     >
                                         {expandedEvents[event.id] ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
-                                        Details
+                                        {t('terminal.details')}
                                     </Button>
                                 )}
                             </div>
@@ -236,7 +238,7 @@ export function LiveTerminal() {
                                             "px-1.5 py-0.5 rounded text-[9px] font-bold border",
                                             event.details.is_useless ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20" : "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
                                         )}>
-                                            {event.details.is_useless ? 'USELESS' : 'RELEVANT'}
+                                            {event.details.is_useless ? t('terminal.useless') : t('terminal.relevant')}
                                         </span>
                                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 uppercase">
                                             {event.details.category}
@@ -263,12 +265,12 @@ export function LiveTerminal() {
                                 </div>
                             ) : event.event_type === 'action' && event.details ? (
                                 <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">
-                                    <p className="text-emerald-600 dark:text-emerald-400 font-bold mb-1 uppercase text-[9px] tracking-widest">Execution Complete</p>
+                                    <p className="text-emerald-600 dark:text-emerald-400 font-bold mb-1 uppercase text-[9px] tracking-widest">{t('terminal.executionComplete')}</p>
                                     <p className="text-foreground font-medium">
-                                        {event.details.action === 'delete' && 'Moved to Trash'}
-                                        {event.details.action === 'archive' && 'Archived Email'}
-                                        {event.details.action === 'draft' && 'Drafted Reply'}
-                                        {event.details.action === 'star' && 'Starred Email'}
+                                        {event.details.action === 'delete' && t('terminal.action.delete')}
+                                        {event.details.action === 'archive' && t('terminal.action.archive')}
+                                        {event.details.action === 'draft' && t('terminal.action.draft')}
+                                        {event.details.action === 'star' && t('terminal.action.star')}
                                         {!['delete', 'archive', 'draft', 'star'].includes(event.details.action) && event.details.action}
                                     </p>
                                     {event.details.reason && (
@@ -288,15 +290,15 @@ export function LiveTerminal() {
                                 <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-2">
                                     <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold uppercase text-[9px] tracking-[0.2em]">
                                         <CheckCircle className="w-3.5 h-3.5" />
-                                        Batch Sync Finished
+                                        {t('terminal.batchFinished')}
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 pt-1">
                                         <div className="space-y-0.5">
-                                            <p className="text-[10px] text-muted-foreground uppercase">Processed</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase">{t('terminal.processed')}</p>
                                             <p className="text-sm font-bold">{event.details.total_processed || 0}</p>
                                         </div>
                                         <div className="space-y-0.5">
-                                            <p className="text-[10px] text-muted-foreground uppercase">Actions</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase">{t('terminal.actions')}</p>
                                             <p className="text-sm font-bold text-emerald-500">{(event.details.deleted || 0) + (event.details.drafted || 0)}</p>
                                         </div>
                                     </div>

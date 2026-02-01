@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -30,6 +31,7 @@ export function AITraceModal({
     onOpenChange: (open: boolean) => void,
     onRetry?: (email: Email) => void
 }) {
+    const { t } = useLanguage();
     const [events, setEvents] = useState<ProcessingEvent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -70,10 +72,10 @@ export function AITraceModal({
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
                             <Cpu className="w-5 h-5 text-primary" />
-                            <DialogTitle>AI Processing Trace</DialogTitle>
+                            <DialogTitle>{t('dashboard.aiTrace')}</DialogTitle>
                         </div>
                         <DialogDescription>
-                            Step-by-step log of how the AI analyzed and acted on this email.
+                            {t('dashboard.aiTraceDesc')}
                         </DialogDescription>
                     </div>
                     {email?.processing_status === 'failed' && onRetry && (
@@ -87,7 +89,7 @@ export function AITraceModal({
                             className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10"
                         >
                             <RefreshCw className="w-3.5 h-3.5" />
-                            Retry Job
+                            {t('dashboard.retryProcessing')}
                         </Button>
                     )}
                 </DialogHeader>
@@ -97,7 +99,7 @@ export function AITraceModal({
                         <div className="py-20 flex justify-center"><LoadingSpinner /></div>
                     ) : events.length === 0 ? (
                         <div className="py-20 text-center text-muted-foreground italic font-mono text-sm">
-                            No granular trace events found for this email.
+                            {t('dashboard.noTrace')}
                         </div>
                     ) : (
                         events.map((event, i) => (
@@ -143,7 +145,7 @@ export function AITraceModal({
                                                 {event.details?.content_preview && (
                                                     <div className="space-y-1">
                                                         <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                                                            <Code className="w-3 h-3" /> Email Content (sent to LLM)
+                                                            <Code className="w-3 h-3" /> {t('dashboard.emailContent')}
                                                         </div>
                                                         <pre className="text-[10px] bg-blue-500/5 p-2 rounded border border-blue-500/10 overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
                                                             {event.details.content_preview}
@@ -157,12 +159,12 @@ export function AITraceModal({
                                             <div className="space-y-4">
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div className="text-[10px] bg-secondary px-2 py-1 rounded">
-                                                        <span className="text-muted-foreground mr-1">Category:</span>
-                                                        <span className="font-bold uppercase">{event.details?.category || 'Analyzing...'}</span>
+                                                        <span className="text-muted-foreground mr-1">{t('config.rules.category')}:</span>
+                                                        <span className="font-bold uppercase">{event.details?.category || t('dashboard.analyzing')}</span>
                                                     </div>
                                                     <div className="text-[10px] bg-secondary px-2 py-1 rounded">
-                                                        <span className="text-muted-foreground mr-1">Sentiment:</span>
-                                                        <span className="font-bold uppercase">{event.details?.sentiment || 'Analyzing...'}</span>
+                                                        <span className="text-muted-foreground mr-1">{t('config.rules.sentiment')}:</span>
+                                                        <span className="font-bold uppercase">{event.details?.sentiment || t('dashboard.analyzing')}</span>
                                                     </div>
                                                 </div>
 
@@ -211,7 +213,7 @@ export function AITraceModal({
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 capitalize">
-                                                        Executed: {event.details?.action}
+                                                        {t('dashboard.done')} {event.details?.action}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground italic">
                                                         "{event.details?.reason}"
@@ -267,7 +269,8 @@ const ACTION_ICONS = {
 };
 
 export function Dashboard() {
-    const { state, actions, dispatch } = useApp();
+    const { state, actions } = useApp();
+    const { t } = useLanguage();
     const { openTerminal } = useTerminal();
     const [isLoading, setIsLoading] = useState(true);
     const { isSyncing } = state;
@@ -323,7 +326,7 @@ export function Dashboard() {
 
     const handleSync = async () => {
         if (state.accounts.length === 0) {
-            toast.warning('Please connect an email account first');
+            toast.warning(t('dashboard.noEmailsConnected'));
             return;
         }
         sounds.playStart();
@@ -331,9 +334,9 @@ export function Dashboard() {
         const success = await actions.triggerSync();
         if (success) {
             sounds.playSuccess();
-            toast.success('Sync completed! Check your emails.');
+            toast.success(t('dashboard.syncSuccess'));
         } else {
-            toast.error('Sync failed. Check account status for details.');
+            toast.error(t('dashboard.syncFailed'));
         }
     };
 
@@ -404,7 +407,7 @@ export function Dashboard() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
                         <Mail className="w-5 h-5 text-primary" />
-                        Recent Analysis
+                        {t('dashboard.recentAnalysis')}
                     </h2>
                     <div className="flex gap-2 w-full sm:w-auto">
                         <Button
@@ -415,10 +418,10 @@ export function Dashboard() {
                             disabled={isSyncing}
                         >
                             <RefreshCw className={cn("w-3.5 h-3.5 mr-2", isSyncing && "animate-spin")} />
-                            {isSyncing ? 'Syncing...' : 'Sync Now'}
+                            {isSyncing ? t('dashboard.syncing') : t('dashboard.syncNow')}
                         </Button>
                         <span className="h-9 text-xs font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-md border border-border flex items-center">
-                            {state.emailsTotal} emails
+                            {state.emailsTotal} {t('dashboard.emails')}
                         </span>
                     </div>
                 </div>
@@ -431,15 +434,15 @@ export function Dashboard() {
                                 <Loader2 className="w-5 h-5 text-primary animate-spin" />
                             </div>
                             <div>
-                                <h4 className="font-semibold text-sm">Sync in progress...</h4>
+                                <h4 className="font-semibold text-sm">{t('dashboard.syncInProgress')}</h4>
                                 <p className="text-xs text-muted-foreground">
-                                    Fetching and analyzing emails. New emails will appear below automatically.
+                                    {t('dashboard.syncInProgressDesc')}
                                 </p>
                             </div>
                         </div>
                         <Button variant="outline" size="sm" onClick={openTerminal} className="h-8 text-xs">
                             <Cpu className="w-3.5 h-3.5 mr-2" />
-                            View Logs
+                            {t('common.viewLogs')}
                         </Button>
                     </div>
                 )}
@@ -450,13 +453,13 @@ export function Dashboard() {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search emails..."
+                                placeholder={t('dashboard.searchPlaceholder')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="pl-9 h-9"
                             />
                         </div>
-                        <Button type="submit" size="sm" className="h-9 px-4">Search</Button>
+                        <Button type="submit" size="sm" className="h-9 px-4">{t('dashboard.search')}</Button>
                     </form>
 
                     {/* Sort Controls */}
@@ -466,15 +469,15 @@ export function Dashboard() {
                             value={state.sortBy}
                             onChange={(e) => handleSortChange(e.target.value as 'date' | 'created_at')}
                         >
-                            <option value="date">Received Time</option>
-                            <option value="created_at">Processed Time</option>
+                            <option value="date">{t('dashboard.receivedTime')}</option>
+                            <option value="created_at">{t('dashboard.processedTime')}</option>
                         </select>
                         <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-primary"
                             onClick={toggleSortOrder}
-                            title={state.sortOrder === 'asc' ? "Sorting: Oldest First" : "Sorting: Newest First"}
+                            title={state.sortOrder === 'asc' ? t('dashboard.sortOldest') : t('dashboard.sortNewest')}
                         >
                             {state.sortOrder === 'asc' ? (
                                 <ArrowUp className="w-3.5 h-3.5" />
@@ -492,7 +495,7 @@ export function Dashboard() {
                         variant={state.activeCategory === null ? 'secondary' : 'ghost'}
                         onClick={() => setSelectedCategory(null)}
                     >
-                        All
+                        {t('dashboard.category.all')}
                     </Button>
                     {['spam', 'client', 'newsletter', 'support'].map(cat => (
                         <Button
@@ -515,11 +518,11 @@ export function Dashboard() {
                         <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-6">
                             <Mail className="w-8 h-8" />
                         </div>
-                        <h3 className="text-lg font-medium">No emails found</h3>
+                        <h3 className="text-lg font-medium">{t('dashboard.noEmails')}</h3>
                         <p className="text-muted-foreground mt-2 mb-6">
                             {state.accounts.length === 0
-                                ? 'Connect your email account to get started.'
-                                : 'Try syncing or adjusting your filters.'}
+                                ? t('dashboard.noEmailsConnected')
+                                : t('dashboard.noEmailsFilters')}
                         </p>
                         {state.accounts.length > 0 && (
                             <Button onClick={() => {
@@ -527,7 +530,7 @@ export function Dashboard() {
                                 handleSync();
                             }} disabled={isSyncing}>
                                 <RefreshCw className={cn("w-4 h-4 mr-2", isSyncing && "animate-spin")} />
-                                Sync Now
+                                {t('dashboard.syncNow')}
                             </Button>
                         )}
                     </Card>
@@ -565,10 +568,10 @@ export function Dashboard() {
                                     disabled={state.emailsOffset === 0}
                                 >
                                     <ChevronLeft className="w-4 h-4 mr-1" />
-                                    Previous
+                                    {t('common.previous')}
                                 </Button>
                                 <span className="text-sm text-muted-foreground">
-                                    {state.emailsOffset + 1} - {Math.min(state.emailsOffset + 20, state.emailsTotal)} of {state.emailsTotal}
+                                    {state.emailsOffset + 1} - {Math.min(state.emailsOffset + 20, state.emailsTotal)} {t('common.of')} {state.emailsTotal}
                                 </span>
                                 <Button
                                     variant="outline"
@@ -576,7 +579,7 @@ export function Dashboard() {
                                     onClick={() => handlePageChange('next')}
                                     disabled={state.emailsOffset + 20 >= state.emailsTotal}
                                 >
-                                    Next
+                                    {t('common.next')}
                                     <ChevronRight className="w-4 h-4 ml-1" />
                                 </Button>
                             </div>
@@ -591,7 +594,7 @@ export function Dashboard() {
                 {selectedEmail && (
                     <Card className="p-6 border-primary/20 bg-primary/5 animate-in slide-in-from-right-5">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold">Email Details</h3>
+                            <h3 className="font-semibold">{t('dashboard.emailDetails')}</h3>
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -603,22 +606,22 @@ export function Dashboard() {
                         </div>
                         <div className="space-y-3 text-sm">
                             <div>
-                                <span className="text-muted-foreground">From:</span>
+                                <span className="text-muted-foreground">{t('dashboard.from')}</span>
                                 <p className="font-medium truncate">{selectedEmail.sender}</p>
                             </div>
                             <div>
-                                <span className="text-muted-foreground">Subject:</span>
+                                <span className="text-muted-foreground">{t('dashboard.subject')}</span>
                                 <p className="font-medium">{selectedEmail.subject}</p>
                             </div>
                             {selectedEmail.ai_analysis && (
                                 <>
                                     <div>
-                                        <span className="text-muted-foreground">Summary:</span>
+                                        <span className="text-muted-foreground">{t('dashboard.summary')}</span>
                                         <p className="text-xs mt-1">{selectedEmail.ai_analysis.summary}</p>
                                     </div>
                                     {selectedEmail.ai_analysis.key_points && (
                                         <div>
-                                            <span className="text-muted-foreground">Key Points:</span>
+                                            <span className="text-muted-foreground">{t('dashboard.keyPoints')}</span>
                                             <ul className="text-xs mt-1 list-disc list-inside">
                                                 {selectedEmail.ai_analysis.key_points.map((point, i) => (
                                                     <li key={i}>{point}</li>
@@ -630,13 +633,13 @@ export function Dashboard() {
                                         <div className="mt-4 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
                                             <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400">
                                                 <Send className="w-3.5 h-3.5" />
-                                                <span className="text-xs font-bold uppercase">AI Draft Reply</span>
+                                                <span className="text-xs font-bold uppercase">{t('dashboard.aiDraftReply')}</span>
                                             </div>
                                             <p className="text-xs leading-relaxed whitespace-pre-wrap italic text-foreground/80">
                                                 {selectedEmail.ai_analysis.draft_response}
                                             </p>
                                             <p className="mt-2 text-[9px] text-muted-foreground">
-                                                * This draft is already saved in your {selectedEmail.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook'} Drafts folder.
+                                                {t('dashboard.draftSavedHelp').replace('{provider}', selectedEmail.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook')}
                                             </p>
                                         </div>
                                     )}
@@ -660,11 +663,11 @@ export function Dashboard() {
                 <Card className="p-6">
                     <h3 className="font-semibold mb-4 flex items-center gap-2">
                         <RotateCcw className="w-4 h-4 text-primary" />
-                        Sync History
+                        {t('dashboard.syncHistory')}
                     </h3>
                     <div className="space-y-4">
                         {!state.stats?.recentSyncs || state.stats.recentSyncs.length === 0 ? (
-                            <p className="text-xs text-muted-foreground italic">No sync history available.</p>
+                            <p className="text-xs text-muted-foreground italic">{t('dashboard.noSyncHistory')}</p>
                         ) : (
                             state.stats.recentSyncs.slice(0, 5).map((log) => (
                                 <div key={log.id} className="flex justify-between items-start text-sm border-b last:border-0 pb-3 last:pb-0">
@@ -680,17 +683,17 @@ export function Dashboard() {
                                             </p>
                                         </div>
                                         <p className="text-[10px] text-muted-foreground pl-3.5">
-                                            Processed: <span className="font-medium text-foreground">{log.emails_processed}</span> •
-                                            Actioned: <span className="font-medium text-foreground">{log.emails_deleted + log.emails_drafted}</span>
+                                            {t('dashboard.processed')} <span className="font-medium text-foreground">{log.emails_processed}</span> •
+                                            {t('dashboard.actioned')} <span className="font-medium text-foreground">{log.emails_deleted + log.emails_drafted}</span>
                                         </p>
                                         {log.error_message && (
                                             <p className="text-[10px] text-destructive pl-3.5 line-clamp-1" title={log.error_message}>
-                                                {log.error_message}
+                                                {t('dashboard.error')} {log.error_message}
                                             </p>
                                         )}
                                     </div>
                                     <div className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-                                        {log.status === 'running' ? 'Running' :
+                                        {log.status === 'running' ? t('dashboard.running') :
                                             log.completed_at ?
                                                 `${Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)}s`
                                                 : '...'}
@@ -703,18 +706,18 @@ export function Dashboard() {
 
                 {/* Quick Stats */}
                 <Card className="p-6">
-                    <h3 className="font-semibold mb-4">Quick Stats</h3>
+                    <h3 className="font-semibold mb-4">{t('dashboard.quickStats')}</h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">Total Processed</span>
+                            <span className="text-sm text-muted-foreground">{t('dashboard.totalProcessed')}</span>
                             <span className="font-medium">{state.emailsTotal}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">Connected Accounts</span>
+                            <span className="text-sm text-muted-foreground">{t('dashboard.connectedAccounts')}</span>
                             <span className="font-medium">{state.accounts.length}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">Active Rules</span>
+                            <span className="text-sm text-muted-foreground">{t('dashboard.activeRules')}</span>
                             <span className="font-medium">{state.rules.filter(r => r.is_enabled).length}</span>
                         </div>
                     </div>
@@ -740,7 +743,7 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, 
         <Card className="p-6">
             <h3 className="font-semibold mb-4 flex items-center gap-2">
                 <Settings2 className="w-4 h-4 text-primary" />
-                Sync Scope
+                {t('dashboard.syncScope')}
             </h3>
 
             <div className="space-y-6">
@@ -868,7 +871,7 @@ function AccountSyncRow({
             <div className="grid grid-cols-[1.5fr_1fr] gap-2">
                 <div className="space-y-1">
                     <label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-2.5 h-2.5" /> Sync From
+                        <Calendar className="w-2.5 h-2.5" /> {t('dashboard.syncFrom')}
                     </label>
                     <Input
                         type="datetime-local"
@@ -881,7 +884,7 @@ function AccountSyncRow({
                 </div>
                 <div className="space-y-1">
                     <label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Hash className="w-2.5 h-2.5" /> Max Emails
+                        <Hash className="w-2.5 h-2.5" /> {t('dashboard.maxEmails')}
                     </label>
                     <Input
                         type="number"
@@ -895,12 +898,12 @@ function AccountSyncRow({
             </div>
             {account.last_sync_at && (
                 <p className="text-[9px] text-muted-foreground">
-                    Last sync: {new Date(account.last_sync_at).toLocaleString()}
+                    {t('dashboard.lastSync')} {new Date(account.last_sync_at).toLocaleString()}
                 </p>
             )}
             {account.last_sync_error && (
                 <p className="text-[9px] text-destructive italic line-clamp-1" title={account.last_sync_error}>
-                    Error: {account.last_sync_error}
+                    {t('dashboard.error')} {account.last_sync_error}
                 </p>
             )}
         </div>
@@ -956,7 +959,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                         </div>
                         <div className="min-w-0 flex-1">
                             <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
-                                {email.subject || 'No Subject'}
+                                {email.subject || t('dashboard.noSubject')}
                             </h3>
                             <p className="text-xs text-muted-foreground truncate" title={email.sender || ''}>
                                 {email.sender}
@@ -970,30 +973,30 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                         <div className="flex items-center justify-end gap-1">
                             {email.processing_status === 'pending' && (
                                 <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded flex items-center gap-1">
-                                    <Clock className="w-2.5 h-2.5" /> Queued
+                                    <Clock className="w-2.5 h-2.5" /> {t('dashboard.queued')}
                                 </span>
                             )}
                             {email.processing_status === 'processing' && (
                                 <span className="text-[9px] text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> Analyzing
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> {t('dashboard.analyzing')}
                                 </span>
                             )}
                             {email.processing_status === 'completed' && (
                                 <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                    <Brain className="w-2.5 h-2.5" /> Analyzed
+                                    <Brain className="w-2.5 h-2.5" /> {t('dashboard.analyzed')}
                                 </span>
                             )}
                             {email.processing_status === 'failed' && (
                                 <div className="flex items-center gap-1">
-                                    <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1" title={email.processing_error || 'Unknown error'}>
-                                        <AlertCircle className="w-2.5 h-2.5" /> Failed
+                                    <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1" title={email.processing_error || t('common.error')}>
+                                        <AlertCircle className="w-2.5 h-2.5" /> {t('dashboard.failed')}
                                     </span>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         className="h-5 w-5 text-red-600 hover:bg-red-500/10"
                                         onClick={(e) => { e.stopPropagation(); onRetry(email); }}
-                                        title="Retry Processing"
+                                        title={t('dashboard.retryProcessing')}
                                     >
                                         <RefreshCw className="w-2.5 h-2.5" />
                                     </Button>
@@ -1001,22 +1004,22 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                             )}
                             {!email.processing_status && !email.ai_analysis && (
                                 <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded flex items-center gap-1">
-                                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> Pending
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> {t('dashboard.queued')}
                                 </span>
                             )}
                             {!email.processing_status && email.ai_analysis && (
                                 <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                    <Brain className="w-2.5 h-2.5" /> Analyzed
+                                    <Brain className="w-2.5 h-2.5" /> {t('dashboard.analyzed')}
                                 </span>
                             )}
                         </div>
                         <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground/80 leading-tight">
                             <span title={email.date ? new Date(email.date).toLocaleString() : ''} className="whitespace-nowrap">
-                                <span className="opacity-70 text-[9px]">REC:</span> {email.date ? new Date(email.date).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                <span className="opacity-70 text-[9px]">{t('dashboard.receivedAbbr')}:</span> {email.date ? new Date(email.date).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
                             </span>
                             <span className="opacity-30">•</span>
                             <span title={new Date(email.created_at).toLocaleString()} className="whitespace-nowrap">
-                                <span className="opacity-70 text-[9px]">PROC:</span> {new Date(email.created_at).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                <span className="opacity-70 text-[9px]">{t('dashboard.processedAbbr')}:</span> {new Date(email.created_at).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
                     </div>
@@ -1029,7 +1032,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                 <div className="bg-secondary/30 p-3 rounded-lg border border-border/50 flex justify-between items-center">
                     <div className="flex items-center gap-2 text-xs font-medium">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        Suggested:
+                        {t('dashboard.suggested')}
                         {(email.suggested_actions && email.suggested_actions.length > 0) ? (
                             <div className="flex gap-1 flex-wrap">
                                 {email.suggested_actions.map(action => (
@@ -1039,16 +1042,16 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                 ))}
                             </div>
                         ) : (
-                            <span className="text-foreground">{email.suggested_action || 'none'}</span>
+                            <span className="text-foreground">{email.suggested_action || t('dashboard.category.none')}</span>
                         )}
 
                         {(email.actions_taken && email.actions_taken.length > 0) ? (
                             <span className="text-muted-foreground ml-2 truncate max-w-[100px]" title={email.actions_taken.join(', ')}>
-                                (Done: {email.actions_taken.join(', ')})
+                                ({t('dashboard.done')} {email.actions_taken.join(', ')})
                             </span>
                         ) : email.action_taken ? (
                             <span className="text-muted-foreground ml-2">
-                                (Done: {email.action_taken})
+                                ({t('dashboard.done')} {email.action_taken})
                             </span>
                         ) : null}
                     </div>
@@ -1056,7 +1059,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                         {isDeletePending ? (
                             // Delete confirmation UI
                             <div className="flex items-center gap-1 animate-in fade-in duration-200">
-                                <span className="text-xs text-destructive mr-1">Delete?</span>
+                                <span className="text-xs text-destructive mr-1">{t('dashboard.deleteConfirm')}</span>
                                 <Button
                                     variant="destructive"
                                     size="sm"
@@ -1067,7 +1070,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                     {loadingAction === 'delete' ? (
                                         <Loader2 className="w-3 h-3 animate-spin" />
                                     ) : (
-                                        'Yes'
+                                        t('common.yes')
                                     )}
                                 </Button>
                                 <Button
@@ -1077,7 +1080,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                     onClick={onCancelDelete}
                                     disabled={isLoading}
                                 >
-                                    No
+                                    {t('common.no')}
                                 </Button>
                             </div>
                         ) : (
@@ -1088,7 +1091,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                     target="_blank"
                                     rel="noreferrer"
                                     className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                                    title={`Open in ${email.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook'}`}
+                                    title={t('dashboard.openIn').replace('{provider}', email.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook')}
                                 >
                                     <ExternalLink className="w-3.5 h-3.5" />
                                 </a>
@@ -1097,7 +1100,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                     size="icon"
                                     className="h-7 w-7 text-muted-foreground hover:text-primary"
                                     onClick={() => onViewTrace(email)}
-                                    title="View AI Trace (Prompt/Response)"
+                                    title={t('dashboard.viewTraceTooltip')}
                                 >
                                     <Eye className="w-3.5 h-3.5" />
                                 </Button>
@@ -1107,7 +1110,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                     className="h-7 w-7 hover:text-destructive"
                                     onClick={() => onAction(email, 'delete')}
                                     disabled={isLoading}
-                                    title="Delete"
+                                    title={t('common.delete')}
                                 >
                                     {loadingAction === 'delete' ? (
                                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1121,7 +1124,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                     className="h-7 w-7 hover:text-blue-500"
                                     onClick={() => onAction(email, 'archive')}
                                     disabled={isLoading}
-                                    title="Archive"
+                                    title={t('common.archive')}
                                 >
                                     {loadingAction === 'archive' ? (
                                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1135,7 +1138,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                     className="h-7 w-7 hover:text-primary"
                                     onClick={() => onAction(email, 'flag')}
                                     disabled={isLoading}
-                                    title="Flag"
+                                    title={t('common.flag')}
                                 >
                                     {loadingAction === 'flag' ? (
                                         <Loader2 className="w-3.5 h-3.5 animate-spin" />

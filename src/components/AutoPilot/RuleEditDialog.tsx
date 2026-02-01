@@ -10,6 +10,7 @@ import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Clock, Plus, Check, Paperclip, X } from 'lucide-react';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface RuleAttachment {
   name: string;
@@ -35,6 +36,7 @@ export function RuleEditDialog({
   onFileUpload,
   onRemoveAttachment
 }: RuleEditDialogProps) {
+  const { t } = useLanguage();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -150,50 +152,50 @@ export function RuleEditDialog({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-6 border-b">
-          <DialogTitle>{rule ? 'Edit Rule' : 'Create Custom Rule'}</DialogTitle>
+          <DialogTitle>{rule ? t('autopilot.editDialog.editTitle') : t('autopilot.editDialog.createTitle')}</DialogTitle>
           <DialogDescription>
-            Define a condition based on AI analysis to trigger an action.
+            {t('autopilot.editDialog.desc')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Rule Name</label>
+            <label className="text-sm font-medium">{t('autopilot.editDialog.ruleName')}</label>
             <Input
-              placeholder="e.g. Archive Newsletters"
+              placeholder={t('autopilot.editDialog.namePlaceholder')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Description</label>
+            <label className="text-sm font-medium">{t('autopilot.editDialog.description')}</label>
             <textarea
               className="w-full p-2 border rounded-md bg-background min-h-[60px] text-sm"
-              placeholder="e.g. Handle all marketing newsletters and promotional content from subscription services"
+              placeholder={t('autopilot.editDialog.descPlaceholder')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
             <p className="text-[10px] text-muted-foreground">
-              Describe what this rule is for. The AI uses this to semantically match emails.
+              {t('autopilot.editDialog.descriptionHelp')}
             </p>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Intent</label>
+            <label className="text-sm font-medium">{t('autopilot.editDialog.intent')}</label>
             <Input
-              placeholder="e.g. Politely decline all sales pitches"
+              placeholder={t('autopilot.editDialog.intentPlaceholder')}
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
             />
             <p className="text-[10px] text-muted-foreground">
-              The goal of this rule. Used to generate appropriate draft replies.
+              {t('autopilot.editDialog.intentHelp')}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">If Condition Field</label>
+              <label className="text-sm font-medium">{t('autopilot.editDialog.conditionField')}</label>
               <select
                 className="w-full p-2 border rounded-md bg-background text-sm"
                 value={conditionKey}
@@ -205,38 +207,38 @@ export function RuleEditDialog({
                   else setConditionValue('');
                 }}
               >
-                <optgroup label="AI Analysis">
-                  <option value="category">Category</option>
-                  <option value="sentiment">Sentiment</option>
-                  <option value="priority">Priority</option>
+                <optgroup label={t('autopilot.editDialog.aiAnalysisGroup')}>
+                  <option value="category">{t('autopilot.editDialog.category')}</option>
+                  <option value="sentiment">{t('autopilot.editDialog.sentiment')}</option>
+                  <option value="priority">{t('autopilot.editDialog.priority')}</option>
                 </optgroup>
-                <optgroup label="Metadata">
-                  <option value="sender_email">Specific Email (Exact)</option>
-                  <option value="sender_domain">Email Domain (@...)</option>
-                  <option value="sender_contains">Sender contains...</option>
-                  <option value="subject_contains">Subject contains...</option>
-                  <option value="body_contains">Body contains...</option>
+                <optgroup label={t('autopilot.editDialog.metadataGroup')}>
+                  <option value="sender_email">{t('autopilot.editDialog.senderEmail')}</option>
+                  <option value="sender_domain">{t('autopilot.editDialog.senderDomain')}</option>
+                  <option value="sender_contains">{t('autopilot.editDialog.senderContains')}</option>
+                  <option value="subject_contains">{t('autopilot.editDialog.subjectContains')}</option>
+                  <option value="body_contains">{t('autopilot.editDialog.bodyContains')}</option>
                 </optgroup>
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Equals Value</label>
+              <label className="text-sm font-medium">{t('autopilot.editDialog.equalsValue')}</label>
               {conditionKey === 'category' ? (
                 <select
                   className="w-full p-2 border rounded-md bg-background text-sm"
                   value={conditionValue}
                   onChange={(e) => setConditionValue(e.target.value)}
                 >
-                  <option value="newsletter">Newsletter</option>
-                  <option value="spam">Spam</option>
-                  <option value="promotional">Promotional</option>
-                  <option value="transactional">Transactional</option>
-                  <option value="social">Social</option>
-                  <option value="support">Support</option>
-                  <option value="client">Client</option>
-                  <option value="internal">Internal</option>
-                  <option value="personal">Personal</option>
-                  <option value="other">Other</option>
+                  <option value="newsletter">{t('autopilot.editDialog.cat.newsletter')}</option>
+                  <option value="spam">{t('autopilot.editDialog.cat.spam')}</option>
+                  <option value="promotional">{t('autopilot.editDialog.cat.promotional')}</option>
+                  <option value="transactional">{t('autopilot.editDialog.cat.transactional')}</option>
+                  <option value="social">{t('autopilot.editDialog.cat.social')}</option>
+                  <option value="support">{t('autopilot.editDialog.cat.support')}</option>
+                  <option value="client">{t('autopilot.editDialog.cat.client')}</option>
+                  <option value="internal">{t('autopilot.editDialog.cat.internal')}</option>
+                  <option value="personal">{t('autopilot.editDialog.cat.personal')}</option>
+                  <option value="other">{t('autopilot.editDialog.cat.other')}</option>
                 </select>
               ) : conditionKey === 'sentiment' ? (
                 <select
@@ -244,9 +246,9 @@ export function RuleEditDialog({
                   value={conditionValue}
                   onChange={(e) => setConditionValue(e.target.value)}
                 >
-                  <option value="Positive">Positive</option>
-                  <option value="Neutral">Neutral</option>
-                  <option value="Negative">Negative</option>
+                  <option value="Positive">{t('autopilot.editDialog.sent.positive')}</option>
+                  <option value="Neutral">{t('autopilot.editDialog.sent.neutral')}</option>
+                  <option value="Negative">{t('autopilot.editDialog.sent.negative')}</option>
                 </select>
               ) : conditionKey === 'priority' ? (
                 <select
@@ -254,16 +256,16 @@ export function RuleEditDialog({
                   value={conditionValue}
                   onChange={(e) => setConditionValue(e.target.value)}
                 >
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
+                  <option value="High">{t('autopilot.editDialog.prio.high')}</option>
+                  <option value="Medium">{t('autopilot.editDialog.prio.medium')}</option>
+                  <option value="Low">{t('autopilot.editDialog.prio.low')}</option>
                 </select>
               ) : (
                 <Input
                   placeholder={
                     conditionKey === 'sender_domain' ? 'rta.vn' :
-                    conditionKey === 'sender_email' ? 'john@example.com' :
-                    'Keywords...'
+                      conditionKey === 'sender_email' ? 'john@example.com' :
+                        t('autopilot.editDialog.keywordsPlaceholder')
                   }
                   value={conditionValue}
                   onChange={(e) => setConditionValue(e.target.value)}
@@ -275,7 +277,7 @@ export function RuleEditDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Only if email is older than... (Optional)
+              {t('autopilot.editDialog.olderThan')}
             </label>
             <div className="flex items-center gap-2">
               <Input
@@ -286,32 +288,31 @@ export function RuleEditDialog({
                 value={olderThan}
                 onChange={(e) => setOlderThan(e.target.value)}
               />
-              <span className="text-sm text-muted-foreground">days</span>
+              <span className="text-sm text-muted-foreground">{t('autopilot.editDialog.days')}</span>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Leave empty or 0 to apply rule immediately upon receipt.
+              {t('autopilot.editDialog.olderThanHelp')}
             </p>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Then Perform Action(s)</label>
+            <label className="text-sm font-medium">{t('autopilot.editDialog.performActions')}</label>
             <p className="text-xs text-muted-foreground mb-2">
-              Select one or more actions to execute when the rule matches
+              {t('autopilot.editDialog.actionsDesc')}
             </p>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { value: 'archive', label: 'Archive Email' },
-                { value: 'delete', label: 'Delete Email' },
-                { value: 'draft', label: 'Draft Reply' },
-                { value: 'star', label: 'Star / Flag' },
+                { value: 'archive', label: t('autopilot.editDialog.action.archive') },
+                { value: 'delete', label: t('autopilot.editDialog.action.delete') },
+                { value: 'draft', label: t('autopilot.editDialog.action.draft') },
+                { value: 'star', label: t('autopilot.editDialog.action.star') },
               ].map((option) => (
                 <label
                   key={option.value}
-                  className={`flex items-center gap-2 p-2 border rounded-md cursor-pointer transition-colors ${
-                    actions.includes(option.value)
+                  className={`flex items-center gap-2 p-2 border rounded-md cursor-pointer transition-colors ${actions.includes(option.value)
                       ? 'bg-primary/10 border-primary'
                       : 'bg-background hover:bg-secondary/50'
-                  }`}
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -334,15 +335,15 @@ export function RuleEditDialog({
           {actions.includes('draft') && (
             <>
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                <label className="text-sm font-medium">Draft Instructions (Context)</label>
+                <label className="text-sm font-medium">{t('autopilot.editDialog.draftInstructions')}</label>
                 <textarea
                   className="w-full p-2 border rounded-md bg-background min-h-[80px] text-sm"
-                  placeholder="e.g. Tell them I'm busy until Friday, but interested in the proposal."
+                  placeholder={t('autopilot.editDialog.draftInstPlaceholder')}
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                 />
                 <p className="text-[10px] text-muted-foreground">
-                  Specific context for the AI ghostwriter.
+                  {t('autopilot.editDialog.draftInstHelp')}
                 </p>
               </div>
 
@@ -350,7 +351,7 @@ export function RuleEditDialog({
                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Paperclip className="w-4 h-4" />
-                    Attachments (Optional)
+                    {t('autopilot.editDialog.attachments')}
                   </label>
 
                   <div className="flex flex-col gap-2">
@@ -386,12 +387,12 @@ export function RuleEditDialog({
                         ) : (
                           <Plus className="w-3 h-3 mr-2" />
                         )}
-                        {uploading ? 'Uploading...' : 'Add Attachment'}
+                        {uploading ? t('autopilot.editDialog.uploading') : t('autopilot.editDialog.addAttachment')}
                       </Button>
                     </div>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
-                    Files will be attached to every draft generated by this rule.
+                    {t('autopilot.editDialog.attachmentsHelp')}
                   </p>
                 </div>
               )}
@@ -401,7 +402,7 @@ export function RuleEditDialog({
 
         <DialogFooter className="p-6 border-t bg-secondary/5">
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={saving || !name.trim() || actions.length === 0}>
             {saving ? (
@@ -411,7 +412,7 @@ export function RuleEditDialog({
             ) : (
               <Plus className="w-4 h-4 mr-2" />
             )}
-            {rule ? 'Save Changes' : 'Create Rule'}
+            {rule ? t('common.saveChanges') : t('autopilot.addCustomRule')}
           </Button>
         </DialogFooter>
       </DialogContent>

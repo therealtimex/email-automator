@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.19.0] - 2026-02-01
+
+### Added
+- **Internationalization (i18n)**: Full multi-language support for the application UI.
+  - Implemented a dynamic translation engine with lazy-loading for optimal performance.
+  - Added support for 6 languages: English (🇺🇸), French (🇫🇷), Spanish (🇪🇸), Japanese (🇯🇵), Korean (🇰🇷), and Vietnamese (🇻🇳).
+  - Language preference is automatically persisted and applied across sessions.
+  - Added a global `LanguageSwitcher` component to the top navigation bar.
+
+### Changed
+- **Processor Performance**: Optimized the "Stop Sync" check mechanism. It is now throttled to query the database at most once per second per worker, significantly reducing database load during high-volume processing loops.
+
 ## [2.18.0] - 2026-02-01
 
 ### Added

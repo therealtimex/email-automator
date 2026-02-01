@@ -14,6 +14,7 @@ import { api } from '../../lib/api';
 import { toast } from '../Toast';
 import { supabase } from '../../lib/supabase';
 import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface Rule {
   id: string;
@@ -38,6 +39,7 @@ interface RuleAttachment {
 
 export function AutoPilotDashboard() {
   const { state, actions } = useApp();
+  const { t } = useLanguage();
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +61,7 @@ export function AutoPilotDashboard() {
 
       setRules(rulesResponse.data?.rules || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load rules');
+      setError(err instanceof Error ? err.message : t('autopilot.loadError'));
       console.error('Error fetching rules:', err);
     } finally {
       setLoading(false);
@@ -100,19 +102,19 @@ export function AutoPilotDashboard() {
   };
 
   const handleDeleteRule = async (ruleId: string) => {
-    if (!confirm('Are you sure you want to delete this rule?')) return;
+    if (!confirm(t('autopilot.deleteConfirm'))) return;
 
     try {
       const success = await actions.deleteRule(ruleId);
       if (success) {
-        toast.success('Rule deleted');
+        toast.success(t('autopilot.ruleDeleted'));
         setRules(prev => prev.filter(r => r.id !== ruleId));
       } else {
-        toast.error('Failed to delete rule');
+        toast.error(t('autopilot.ruleDeleteFailed'));
       }
     } catch (err) {
       console.error('Error deleting rule:', err);
-      toast.error('An error occurred while deleting the rule');
+      toast.error(t('autopilot.ruleDeleteError'));
     }
   };
 
@@ -131,16 +133,16 @@ export function AutoPilotDashboard() {
       }
 
       if (success) {
-        toast.success(editingRule ? 'Rule updated' : 'Rule created');
+        toast.success(editingRule ? t('autopilot.ruleUpdated') : t('autopilot.ruleCreated'));
         await fetchData();
         return true;
       } else {
-        toast.error(`Failed to ${editingRule ? 'update' : 'create'} rule`);
+        toast.error(editingRule ? t('autopilot.ruleUpdateFailed') : t('autopilot.ruleCreateFailed'));
         return false;
       }
     } catch (error) {
       console.error('Error saving rule:', error);
-      toast.error('An error occurred while saving the rule');
+      toast.error(t('autopilot.ruleSaveError'));
       return false;
     }
   };
@@ -157,7 +159,7 @@ export function AutoPilotDashboard() {
 
       if (uploadError) throw uploadError;
 
-      toast.success('File uploaded');
+      toast.success(t('autopilot.fileUploaded'));
       return {
         name: file.name,
         path: filePath,
@@ -166,7 +168,7 @@ export function AutoPilotDashboard() {
       };
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload file');
+      toast.error(t('autopilot.fileUploadFailed'));
       return null;
     }
   };
@@ -181,7 +183,7 @@ export function AutoPilotDashboard() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
           <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-600 dark:text-gray-400">Loading rules...</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t('autopilot.loadingRules')}</p>
         </div>
       </div>
     );
@@ -200,7 +202,7 @@ export function AutoPilotDashboard() {
             className="ml-4"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Retry
+            {t('autopilot.refresh')}
           </Button>
         </AlertDescription>
       </Alert>
@@ -215,9 +217,9 @@ export function AutoPilotDashboard() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] p-8">
         <Sparkles className="w-16 h-16 text-gray-300 dark:text-gray-700 mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No Rules Yet</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('autopilot.noRulesTitle')}</h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-md mb-4">
-          Rules will be automatically created when you sign up or connect your first email account.
+          {t('autopilot.noRulesDesc')}
         </p>
       </div>
     );
@@ -231,10 +233,10 @@ export function AutoPilotDashboard() {
           <div>
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-blue-500" />
-              Auto-Pilot Rules
+              {t('autopilot.title')}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {enabledCount} of {systemRules.length} rules enabled
+              {t('autopilot.rulesEnabled').replace('{enabled}', enabledCount.toString()).replace('{total}', systemRules.length.toString())}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -244,7 +246,7 @@ export function AutoPilotDashboard() {
               onClick={handleAddRule}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Custom Rule
+              {t('autopilot.addCustomRule')}
             </Button>
             <Button
               variant="outline"
@@ -253,49 +255,48 @@ export function AutoPilotDashboard() {
               disabled={loading}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              {t('autopilot.refresh')}
             </Button>
           </div>
         </div>
 
-      {/* Info Alert */}
-      {systemRules.length > 0 && (
-        <Alert>
-          <Sparkles className="h-4 w-4" />
-          <AlertDescription>
-            Auto-Pilot rules use AI to automatically organize your inbox.
-            Toggle any rule on or off to customize behavior.
-          </AlertDescription>
-        </Alert>
-      )}
+        {/* Info Alert */}
+        {systemRules.length > 0 && (
+          <Alert>
+            <Sparkles className="h-4 w-4" />
+            <AlertDescription>
+              {t('autopilot.infoDesc')}
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {/* System-Managed Rules (Grouped by Category) */}
-      {systemRules.length > 0 && (
-        <RulesListGrouped
-          rules={systemRules}
-          onToggleRule={handleToggleRule}
-          onEditRule={handleEditRule}
-          onDeleteRule={handleDeleteRule}
-        />
-      )}
-
-      {/* Custom Rules Section */}
-      {customRules.length > 0 && (
-        <div className="space-y-4 pt-4 border-t">
-          <div>
-            <h3 className="text-lg font-semibold">Custom Rules</h3>
-            <p className="text-sm text-muted-foreground">
-              Rules you've created manually
-            </p>
-          </div>
+        {/* System-Managed Rules (Grouped by Category) */}
+        {systemRules.length > 0 && (
           <RulesListGrouped
-            rules={customRules}
+            rules={systemRules}
             onToggleRule={handleToggleRule}
             onEditRule={handleEditRule}
             onDeleteRule={handleDeleteRule}
           />
-        </div>
-      )}
+        )}
+
+        {/* Custom Rules Section */}
+        {customRules.length > 0 && (
+          <div className="space-y-4 pt-4 border-t">
+            <div>
+              <h3 className="text-lg font-semibold">{t('autopilot.customRules')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t('autopilot.customRulesDesc')}
+              </p>
+            </div>
+            <RulesListGrouped
+              rules={customRules}
+              onToggleRule={handleToggleRule}
+              onEditRule={handleEditRule}
+              onDeleteRule={handleDeleteRule}
+            />
+          </div>
+        )}
       </div>
 
       {/* Rule Edit/Create Dialog */}

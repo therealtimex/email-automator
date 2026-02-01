@@ -13,10 +13,12 @@ import { getSupabaseConfig, clearSupabaseConfig, getConfigSource } from '../lib/
 import { SetupWizard } from './SetupWizard';
 import { sounds } from '../lib/sounds';
 import { checkMigrationStatus, type MigrationStatus } from '../lib/migration-check';
+import { useLanguage } from '../context/LanguageContext';
 
 type SettingsTab = 'profile' | 'security' | 'database';
 
 export function AccountSettingsPage() {
+    const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const { state, actions } = useApp();
 
@@ -25,16 +27,16 @@ export function AccountSettingsPage() {
     }, []);
 
     const tabs = [
-        { id: 'profile', label: 'Profile', icon: User },
-        { id: 'security', label: 'Security', icon: Shield },
-        { id: 'database', label: 'Supabase', icon: Database },
+        { id: 'profile', label: t('account.profile'), icon: User },
+        { id: 'security', label: t('account.security'), icon: Shield },
+        { id: 'database', label: t('account.database'), icon: Database },
     ];
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
-                <p className="text-muted-foreground">Manage your profile, security, and connection preferences.</p>
+                <h1 className="text-3xl font-bold tracking-tight">{t('account.title')}</h1>
+                <p className="text-muted-foreground">{t('account.subtitle')}</p>
             </div>
 
             <div className="flex flex-col md:flex-row gap-8">
@@ -49,8 +51,8 @@ export function AccountSettingsPage() {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id as SettingsTab)}
                                     className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${isActive
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'hover:bg-secondary text-muted-foreground'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'hover:bg-secondary text-muted-foreground'
                                         }`}
                                 >
                                     <Icon className="w-4 h-4" />
@@ -64,17 +66,17 @@ export function AccountSettingsPage() {
                         <button
                             onClick={async () => {
                                 await supabase.auth.signOut();
-                                toast.success('Logged out successfully');
+                                toast.success(t('account.logoutSuccess'));
                                 window.location.reload();
                             }}
                             className="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-destructive/10 text-destructive"
                         >
                             <LogOut className="w-4 h-4" />
-                            Sign Out
+                            {t('account.logout')}
                         </button>
 
                         <div className="px-4 py-4 border-t border-border/40 text-center md:text-left">
-                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">Version</p>
+                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">{t('account.version')}</p>
                             <p className="text-xs font-mono text-muted-foreground/70">v{import.meta.env.VITE_APP_VERSION}</p>
                         </div>
                     </div>
@@ -92,6 +94,7 @@ export function AccountSettingsPage() {
 }
 
 function ProfileSection() {
+    const { t } = useLanguage();
     const { state, actions } = useApp();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -112,9 +115,9 @@ function ProfileSection() {
         setSoundsEnabled(next);
         if (next) {
             sounds.playSuccess();
-            toast.success('Sound effects enabled');
+            toast.success(t('account.profile.soundsEnabled'));
         } else {
-            toast.info('Sound effects disabled');
+            toast.info(t('account.profile.soundsDisabled'));
         }
     };
 
@@ -126,7 +129,7 @@ function ProfileSection() {
         });
         setIsSaving(false);
         if (success) {
-            toast.success('Profile updated');
+            toast.success(t('account.profile.updated'));
         }
     };
 
@@ -153,10 +156,10 @@ function ProfileSection() {
 
             // Update profile
             await actions.updateProfile({ avatar_url: publicUrl });
-            toast.success('Avatar updated');
+            toast.success(t('account.profile.avatarUpdated'));
         } catch (error) {
             console.error('Avatar upload error:', error);
-            toast.error('Failed to upload avatar');
+            toast.error(t('account.profile.avatarError'));
         } finally {
             setIsUploading(false);
         }
@@ -165,8 +168,8 @@ function ProfileSection() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>Update your personal details and avatar.</CardDescription>
+                <CardTitle>{t('account.profile.title')}</CardTitle>
+                <CardDescription>{t('account.profile.desc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
@@ -192,41 +195,41 @@ function ProfileSection() {
                     <div className="flex-1 space-y-4 w-full">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="first-name">First Name</Label>
+                                <Label htmlFor="first-name">{t('account.profile.firstName')}</Label>
                                 <Input
                                     id="first-name"
                                     value={firstName}
                                     onChange={(e) => setFirstName(e.target.value)}
-                                    placeholder="John"
+                                    placeholder={t('account.profile.firstNamePlaceholder')}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="last-name">Last Name</Label>
+                                <Label htmlFor="last-name">{t('account.profile.lastName')}</Label>
                                 <Input
                                     id="last-name"
                                     value={lastName}
                                     onChange={(e) => setLastName(e.target.value)}
-                                    placeholder="Doe"
+                                    placeholder={t('account.profile.lastNamePlaceholder')}
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email Address</Label>
+                            <Label htmlFor="email">{t('account.profile.email')}</Label>
                             <Input
                                 id="email"
                                 value={state.profile?.email || ''}
                                 disabled
                                 className="bg-secondary/50"
                             />
-                            <p className="text-[10px] text-muted-foreground">Email cannot be changed directly.</p>
+                            <p className="text-[10px] text-muted-foreground">{t('account.profile.emailHelp')}</p>
                         </div>
                     </div>
                 </div>
 
                 <div className="pt-6 border-t flex items-center justify-between">
                     <div className="space-y-0.5">
-                        <label className="text-sm font-medium">Sound & Haptics</label>
-                        <p className="text-xs text-muted-foreground">Audio feedback when processing emails and completing tasks.</p>
+                        <label className="text-sm font-medium">{t('account.profile.sounds')}</label>
+                        <p className="text-xs text-muted-foreground">{t('account.profile.soundsHelp')}</p>
                     </div>
                     <Button
                         variant={soundsEnabled ? 'default' : 'outline'}
@@ -235,14 +238,14 @@ function ProfileSection() {
                         className="gap-2"
                     >
                         {soundsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                        {soundsEnabled ? 'Enabled' : 'Disabled'}
+                        {soundsEnabled ? t('common.enabled') : t('common.disabled')}
                     </Button>
                 </div>
 
                 <div className="flex justify-end pt-4 border-t">
                     <Button onClick={handleSave} disabled={isSaving}>
                         {isSaving ? <LoadingSpinner size="sm" className="mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                        Save Changes
+                        {t('common.saveChanges')}
                     </Button>
                 </div>
             </CardContent>
@@ -251,21 +254,22 @@ function ProfileSection() {
 }
 
 function SecuritySection() {
+    const { t } = useLanguage();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     const handlePasswordChange = async () => {
         if (!password) {
-            toast.error('Please enter a new password');
+            toast.error(t('account.security.enterPassword'));
             return;
         }
         if (password !== confirmPassword) {
-            toast.error('Passwords do not match');
+            toast.error(t('account.security.passwordsMismatch'));
             return;
         }
         if (password.length < 6) {
-            toast.error('Password must be at least 6 characters');
+            toast.error(t('account.security.passwordTooShort'));
             return;
         }
 
@@ -274,14 +278,14 @@ function SecuritySection() {
             const { api } = await import('../lib/api');
             const result = await api.changePassword(password);
             if (result.success) {
-                toast.success('Password changed successfully');
+                toast.success(t('account.security.passwordChanged'));
                 setPassword('');
                 setConfirmPassword('');
             } else {
                 toast.error(result.error?.message || 'Failed to change password');
             }
         } catch (error) {
-            toast.error('An error occurred');
+            toast.error(t('common.errorOccurred'));
         } finally {
             setIsSaving(false);
         }
@@ -290,12 +294,12 @@ function SecuritySection() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Security</CardTitle>
-                <CardDescription>Manage your password and account security.</CardDescription>
+                <CardTitle>{t('account.security.title')}</CardTitle>
+                <CardDescription>{t('account.security.desc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
+                    <Label htmlFor="new-password">{t('account.security.newPassword')}</Label>
                     <Input
                         id="new-password"
                         type="password"
@@ -305,7 +309,7 @@ function SecuritySection() {
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Label htmlFor="confirm-password">{t('account.security.confirmPassword')}</Label>
                     <Input
                         id="confirm-password"
                         type="password"
@@ -318,7 +322,7 @@ function SecuritySection() {
                 <div className="flex justify-end pt-4 border-t">
                     <Button onClick={handlePasswordChange} disabled={isSaving}>
                         {isSaving ? <LoadingSpinner size="sm" className="mr-2" /> : <Key className="w-4 h-4 mr-2" />}
-                        Update Password
+                        {t('account.security.updatePassword')}
                     </Button>
                 </div>
             </CardContent>
@@ -327,6 +331,7 @@ function SecuritySection() {
 }
 
 function DatabaseSection() {
+    const { t } = useLanguage();
     const [showWizard, setShowWizard] = useState(false);
     const [migrationInfo, setMigrationInfo] = useState<MigrationStatus | null>(null);
     const config = getSupabaseConfig();
@@ -339,7 +344,7 @@ function DatabaseSection() {
     }, []);
 
     const handleClearConfig = () => {
-        if (confirm('Are you sure you want to disconnect from this Supabase project? This will log you out and clear local configuration.')) {
+        if (confirm(t('account.database.clearConfirm'))) {
             clearSupabaseConfig();
             window.location.reload();
         }
@@ -351,9 +356,9 @@ function DatabaseSection() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Database className="w-5 h-5 text-primary" />
-                        Supabase Connection
+                        {t('account.database.title')}
                     </CardTitle>
-                    <CardDescription>Manage your database configuration (BYOK - Bring Your Own Keys).</CardDescription>
+                    <CardDescription>{t('account.database.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {config ? (
@@ -363,7 +368,7 @@ function DatabaseSection() {
                                 <CheckCircle className="w-6 h-6 text-emerald-500 mt-0.5" />
                                 <div className="flex-1 space-y-1">
                                     <div className="flex items-center justify-between">
-                                        <p className="font-semibold text-emerald-700 dark:text-emerald-400">Connected</p>
+                                        <p className="font-semibold text-emerald-700 dark:text-emerald-400">{t('account.database.connected')}</p>
                                         {migrationInfo?.latestMigrationTimestamp && (
                                             <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-500/20" title="Database Schema Version">
                                                 Schema {migrationInfo.latestMigrationTimestamp}
@@ -378,7 +383,7 @@ function DatabaseSection() {
                                 <Alert className="bg-amber-500/5 border-amber-500/20">
                                     <Settings className="h-4 w-4 text-amber-500" />
                                     <AlertDescription className="text-amber-700 dark:text-amber-400 text-xs">
-                                        Configuration is loaded from environment variables. Use the UI to override them.
+                                        {t('account.database.envAlert')}
                                     </AlertDescription>
                                 </Alert>
                             )}
@@ -386,18 +391,18 @@ function DatabaseSection() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <Button variant="outline" onClick={() => setShowWizard(true)} className="w-full">
                                     <Settings className="w-4 h-4 mr-2" />
-                                    Change Connection
+                                    {t('account.database.changeConnection')}
                                 </Button>
                                 {source === 'ui' && (
                                     <Button variant="outline" onClick={handleClearConfig} className="w-full text-destructive hover:bg-destructive/10">
                                         <Trash2 className="w-4 h-4 mr-2" />
-                                        Clear Config
+                                        {t('account.database.clearConfig')}
                                     </Button>
                                 )}
                             </div>
 
                             <div className="space-y-2 pt-4 border-t">
-                                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Anon Public Key</Label>
+                                <Label className="text-xs uppercase tracking-wider text-muted-foreground">{t('account.database.anonKey')}</Label>
                                 <div className="p-2 bg-secondary/50 rounded-lg font-mono text-xs break-all">
                                     {config.anonKey.substring(0, 20)}...{config.anonKey.substring(config.anonKey.length - 10)}
                                 </div>
@@ -407,12 +412,12 @@ function DatabaseSection() {
                         <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
                             <XCircle className="w-12 h-12 text-destructive opacity-20" />
                             <div>
-                                <p className="font-medium">No Connection Detected</p>
-                                <p className="text-sm text-muted-foreground">Configure a Supabase project to get started.</p>
+                                <p className="font-medium">{t('account.database.noConnection')}</p>
+                                <p className="text-sm text-muted-foreground">{t('account.database.configureHelp')}</p>
                             </div>
                             <Button onClick={() => setShowWizard(true)}>
                                 <Database className="w-4 h-4 mr-2" />
-                                Setup Supabase
+                                {t('account.database.setup')}
                             </Button>
                         </div>
                     )}

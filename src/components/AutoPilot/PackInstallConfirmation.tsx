@@ -8,6 +8,7 @@ import React from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { CheckCircle } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface InstalledPack {
   id: string;
@@ -23,6 +24,7 @@ interface PackInstallConfirmationProps {
 }
 
 export function PackInstallConfirmation({ role, installedPacks, onContinue }: PackInstallConfirmationProps) {
+  const { t } = useLanguage();
   const totalRules = installedPacks.reduce((sum, pack) => sum + pack.ruleCount, 0);
 
   return (
@@ -32,9 +34,9 @@ export function PackInstallConfirmation({ role, installedPacks, onContinue }: Pa
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
             <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">✅ All Set!</h1>
+          <h1 className="text-3xl font-bold mb-2">{t('autopilot.onboarding.allSet')}</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            We've enabled {totalRules} automation rule{totalRules !== 1 ? 's' : ''} for you
+            {t('autopilot.onboarding.enabledDesc').replace('{count}', totalRules.toString())}
           </p>
         </div>
 
@@ -46,15 +48,15 @@ export function PackInstallConfirmation({ role, installedPacks, onContinue }: Pa
                   <span className="text-2xl">{pack.icon}</span>
                   <span>{pack.name}</span>
                   <span className="ml-auto text-sm font-normal text-gray-500">
-                    {pack.ruleCount} rules
+                    {pack.ruleCount} {t('autopilot.onboarding.rules')}
                   </span>
                 </CardTitle>
                 <CardDescription>
-                  {pack.id === 'universal' && 'Essential rules that help everyone stay organized'}
-                  {pack.id === 'executive' && 'Focus on high-priority communications and strategic matters'}
-                  {pack.id === 'developer' && 'Surface critical alerts and filter tool noise'}
-                  {pack.id === 'sales' && 'Prioritize leads and customer communications'}
-                  {pack.id === 'operations' && 'Organize tickets and internal communications'}
+                  {pack.id === 'universal' && t('autopilot.onboarding.universalDesc')}
+                  {pack.id === 'executive' && t('autopilot.onboarding.executiveDesc')}
+                  {pack.id === 'developer' && t('autopilot.onboarding.developerDesc')}
+                  {pack.id === 'sales' && t('autopilot.onboarding.salesDesc')}
+                  {pack.id === 'operations' && t('autopilot.onboarding.operationsDesc')}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -63,14 +65,13 @@ export function PackInstallConfirmation({ role, installedPacks, onContinue }: Pa
 
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-blue-900 dark:text-blue-100">
-            💡 <strong>Tip:</strong> All rules are enabled by default, but you can customize or disable them
-            anytime in the Auto-Pilot section.
+            {t('autopilot.onboarding.tip')}
           </p>
         </div>
 
         <div className="flex justify-center">
           <Button onClick={onContinue} size="lg">
-            Start Using Email Automator →
+            {t('autopilot.onboarding.start')}
           </Button>
         </div>
       </div>

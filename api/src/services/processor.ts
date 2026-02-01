@@ -130,6 +130,7 @@ export class EmailProcessorService {
     private gmailService = getGmailService();
     private microsoftService = getMicrosoftService();
     private storageService = getStorageService();
+    private lastStopCheck: number = 0;
 
     constructor(supabase: SupabaseClient) {
         this.supabase = supabase;
@@ -1356,6 +1357,12 @@ export class EmailProcessorService {
         }
     }
     private async checkStopRequested(userId: string, eventLogger?: EventLogger | null): Promise<boolean> {
+        // Throttle check to once per second
+        if (Date.now() - this.lastStopCheck < 1000) {
+            return false;
+        }
+        this.lastStopCheck = Date.now();
+
         try {
             const { data: settings } = await this.supabase
                 .from('user_settings')

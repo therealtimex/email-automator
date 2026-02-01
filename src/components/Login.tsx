@@ -10,6 +10,8 @@ import { ModeToggle } from './mode-toggle';
 import { toast } from './Toast';
 import { Logo } from './Logo';
 import { cn } from '../lib/utils';
+import { useLanguage } from '../context/LanguageContext';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface LoginProps {
     onSuccess?: () => void;
@@ -18,6 +20,7 @@ interface LoginProps {
 }
 
 export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }: LoginProps) {
+    const { t } = useLanguage();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [firstName, setFirstName] = useState('');
@@ -192,6 +195,7 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
                     </Button>
                 )}
                 <ModeToggle />
+                <LanguageSwitcher />
             </div>
 
             <motion.div
@@ -206,7 +210,7 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
                             <Logo className="w-10 h-10 text-primary-foreground" />
                         </div>
                         <h2 className="text-3xl font-black italic tracking-tighter uppercase text-foreground">
-                            {isSignUp ? 'Initialize Automator' : 'Secure Login'}
+                            {isSignUp ? t('login.initialize') : t('login.secureLogin')}
                         </h2>
                         <p className="text-[10px] text-muted-foreground font-bold tracking-[0.2em] uppercase">
                             {isSignUp
@@ -231,7 +235,7 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
                                             value={firstName}
                                             onChange={(e) => setFirstName(e.target.value)}
                                             required={isSignUp}
-                                            placeholder="John"
+                                            placeholder={t('login.firstNamePlaceholder')}
                                             className="bg-background"
                                         />
                                     </div>
@@ -241,7 +245,7 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
                                             value={lastName}
                                             onChange={(e) => setLastName(e.target.value)}
                                             required={isSignUp}
-                                            placeholder="Doe"
+                                            placeholder={t('login.lastNamePlaceholder')}
                                             className="bg-background"
                                         />
                                     </div>
@@ -260,7 +264,7 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
                                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/30" size={16} />
                                         <Input
                                             type="email"
-                                            placeholder="admin@automator.ai"
+                                            placeholder={t('login.emailPlaceholder')}
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
                                             required
@@ -361,7 +365,7 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
                                 ) : (
                                     <>
                                         {isSignUp ? <UserPlus className="w-5 h-5 mr-2" /> : (loginMode === 'otp' ? <Mail className="w-5 h-5 mr-2" /> : <LogIn className="w-5 h-5 mr-2" />)}
-                                        {isSignUp ? 'Initialize Master' : (loginMode === 'otp' ? 'Send Magic Link' : 'Open Dashboard')}
+                                        {isSignUp ? t('login.initializeMaster') : (loginMode === 'otp' ? t('login.sendMagicLink') : t('login.openDashboard'))}
                                     </>
                                 )}
                             </Button>
