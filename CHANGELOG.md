@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.19.2] - 2026-02-01
+
+### Changed
+- **Translations**: Simplified and clarified the setup wizard language strings across all supported locales. Replaced sci-fi thematic terms (e.g., "Ignition", "Coordinates", "Matrix Key") with standard technical terms ("Launch", "Connection Details", "Anon Key") for better user comprehension.
+- **Documentation**: Removed outdated documentation files (`SIMPLIFICATION_REFACTOR.md`, `ZERO_CONFIG_IMPLEMENTATION.md`) to reduce project clutter.
+
 ## [2.19.1] - 2026-02-01
 
 ### Fixed
