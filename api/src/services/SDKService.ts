@@ -255,6 +255,48 @@ export class SDKService {
             };
         }
 
+        // If only model is set, use default provider with custom model
+        if (!settings.llm_provider && settings.llm_model) {
+            const defaultProvider = await this.getDefaultChatProvider();
+            return {
+                provider: defaultProvider.provider,
+                model: settings.llm_model,
+                isDefaultFallback: false
+            };
+        }
+
+        // If only provider is set, use custom provider with its default model
+        if (settings.llm_provider && !settings.llm_model) {
+            const sdk = this.getSDK();
+            if (sdk) {
+                try {
+                    const { providers } = await this.withTimeout<ProvidersResponse>(
+                        sdk.llm.chatProviders(),
+                        30000,
+                        'Chat providers fetch timed out'
+                    );
+                    if (providers) {
+                        const provider = providers.find(p => p.provider === settings.llm_provider);
+                        if (provider && provider.models && provider.models.length > 0) {
+                            return {
+                                provider: settings.llm_provider,
+                                model: provider.models[0].id,
+                                isDefaultFallback: false
+                            };
+                        }
+                    }
+                } catch (error: any) {
+                    logger.warn(`Failed to fetch models for provider ${settings.llm_provider}`, { error: error?.message || String(error) });
+                }
+            }
+            // Fallback to using the provider with hardcoded default model
+            return {
+                provider: settings.llm_provider,
+                model: this.DEFAULT_LLM_MODEL,
+                isDefaultFallback: true
+            };
+        }
+
         // Try to get from SDK discovery first
         return await this.getDefaultChatProvider();
     }

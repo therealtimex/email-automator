@@ -114,21 +114,13 @@ Deno.serve(async (req) => {
       const settingsData = settingsRes.data;
       const integrationsData = integrationsRes.data || [];
 
-      // Return default settings if none exist
+      // Return default settings if none exist (should rarely happen due to trigger)
       const settings = settingsData || {
         user_id: user.id,
         llm_provider: 'realtimexai',
         llm_model: 'gpt-4o-mini',
         sync_interval_minutes: 5,
       };
-
-      // Proactive upgrade for existing settings objects
-      if (settings.llm_model === 'gpt-4.1-mini' || !settings.llm_model) {
-        settings.llm_model = 'gpt-4o-mini';
-      }
-      if (!settings.llm_provider) {
-        settings.llm_provider = 'realtimexai';
-      }
 
       // Merge credentials
       const google = integrationsData.find((i: any) => i.provider === 'google');

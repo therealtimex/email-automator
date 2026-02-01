@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.14.1] - 2026-01-31
+
+### Fixed
+- **LLM Resolution**: Improved the robustness of the SDK Service when handling partial configurations.
+    - If a user specifies a model but no provider, the system now correctly pairs it with the default provider.
+    - If a user specifies a provider but no model, the system dynamically fetches the first available model for that provider instead of failing or using an incompatible default.
+- **Settings API**: Removed legacy server-side overrides for default models in the `api-v1-settings` Edge Function, preventing conflicts with the new client-side SDK configuration logic.
+
 ## [2.14.0] - 2026-01-31
 
 ### Added
