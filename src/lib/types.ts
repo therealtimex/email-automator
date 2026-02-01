@@ -49,6 +49,13 @@ export interface Email {
     processing_status: 'pending' | 'processing' | 'completed' | 'failed';
     processing_error?: string | null;
     retry_count: number;
+    // Draft tracking fields
+    draft_id?: string | null;
+    draft_content?: string | null;
+    draft_status?: 'pending' | 'sent' | 'dismissed';
+    draft_created_at?: string | null;
+    draft_sent_at?: string | null;
+    draft_dismissed_at?: string | null;
 }
 
 export interface Rule {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock, Cpu, Brain, Zap, AlertCircle, Info, Code, CheckCircle2, UserCircle, Sparkles } from 'lucide-react';
+import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock, Cpu, Brain, Zap, AlertCircle, Info, Code, CheckCircle2, UserCircle, Sparkles, FileText } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/mode-toggle';
 import { Button } from './components/ui/button';
@@ -11,6 +11,8 @@ import { ToastContainer, toast } from './components/Toast';
 import { PageLoader } from './components/LoadingSpinner';
 import { SetupWizard } from './components/SetupWizard';
 import { Dashboard } from './components/Dashboard';
+import { Drafts } from './components/Drafts';
+import { DraftPreviewModal } from './components/DraftPreviewModal';
 import { Configuration } from "./components/Configuration";
 import { AccountSettingsPage } from './components/AccountSettingsPage';
 import { AutoPilotDashboard } from './components/AutoPilot';
@@ -43,7 +45,7 @@ import {
     DialogTitle,
 } from './components/ui/dialog';
 
-type TabType = 'dashboard' | 'autopilot' | 'config' | 'analytics' | 'account';
+type TabType = 'dashboard' | 'drafts' | 'autopilot' | 'config' | 'analytics' | 'account';
 
 import { sounds } from './lib/sounds';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
@@ -64,6 +66,7 @@ function AppContent() {
     const [suppressMigrationBanner, setSuppressMigrationBanner] = useState(false);
     const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
     const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+    const [previewEmail, setPreviewEmail] = useState<any | null>(null);
 
     // Handle OAuth Callback (e.g. Gmail)
     useEffect(() => {
@@ -306,6 +309,15 @@ function AppContent() {
                                     <span className="hidden sm:inline">{t('nav.dashboard')}</span>
                                 </Button>
                                 <Button
+                                    variant={activeTab === 'drafts' ? 'secondary' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setActiveTab('drafts')}
+                                    className="gap-2"
+                                >
+                                    <FileText className="w-4 h-4" />
+                                    <span className="hidden sm:inline">{t('nav.drafts') || 'Drafts'}</span>
+                                </Button>
+                                <Button
                                     variant={activeTab === 'autopilot' ? 'secondary' : 'ghost'}
                                     size="sm"
                                     onClick={() => setActiveTab('autopilot')}
@@ -356,6 +368,7 @@ function AppContent() {
                 {/* Main Content */}
                 <main className="max-w-7xl mx-auto p-4 sm:p-8 mt-4 mb-12">
                     {activeTab === 'dashboard' && <Dashboard />}
+                    {activeTab === 'drafts' && <Drafts onPreview={setPreviewEmail} />}
                     {activeTab === 'autopilot' && <AutoPilotDashboard />}
                     {activeTab === 'config' && <Configuration />}
                     {activeTab === 'analytics' && <AnalyticsPage />}
@@ -399,6 +412,38 @@ function AppContent() {
                         open={showMigrationModal}
                         onOpenChange={setShowMigrationModal}
                         status={migrationStatus}
+                    />
+                )}
+
+                {/* Draft Preview Modal */}
+                {previewEmail && (
+                    <DraftPreviewModal
+                        email={previewEmail}
+                        onClose={() => setPreviewEmail(null)}
+                        onSend={async (emailId) => {
+                            const response = await fetch(`/api/v1/drafts/${emailId}/send`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
+                                },
+                            });
+                            if (response.ok) {
+                                toast.success(t('drafts.sendSuccess') || 'Draft sent successfully!');
+                            } else {
+                                toast.error(t('drafts.sendError') || 'Failed to send draft');
+                            }
+                        }}
+                        onDismiss={async (emailId) => {
+                            const response = await fetch(`/api/v1/drafts/${emailId}/dismiss`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
+                                },
+                            });
+                            if (response.ok) {
+                                toast.success(t('drafts.dismissSuccess') || 'Draft dismissed');
+                            }
+                        }}
                     />
                 )}
 

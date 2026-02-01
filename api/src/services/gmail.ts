@@ -278,7 +278,7 @@ export class GmailService {
                 }
                 return null;
             }));
-            
+
             messages.push(...hydrated.filter((m): m is GmailMessage => m !== null));
         }
 
@@ -321,8 +321,8 @@ export class GmailService {
         const threadId = original.data.threadId;
 
         // Ensure subject has Re: prefix
-        const subject = originalSubject.toLowerCase().startsWith('re:') 
-            ? originalSubject 
+        const subject = originalSubject.toLowerCase().startsWith('re:')
+            ? originalSubject
             : `Re: ${originalSubject}`;
 
         logger.info('Creating draft', { threadId, toAddress, subject });
@@ -358,7 +358,7 @@ export class GmailService {
                 try {
                     const content = await this.fetchAttachment(supabase, attachment.path);
                     const base64Content = Buffer.from(content).toString('base64');
-                    
+
                     rawMessage += [
                         `--${boundary}`,
                         `Content-Type: ${attachment.type}; name="${attachment.name}"`,
@@ -372,7 +372,7 @@ export class GmailService {
                     logger.error('Failed to attach file', err, { path: attachment.path });
                 }
             }
-            
+
             rawMessage += `--${boundary}--`;
         } else {
             // Simple plain text message
@@ -412,6 +412,25 @@ export class GmailService {
             throw error;
         }
     }
+
+    async sendDraft(account: EmailAccount, draftId: string): Promise<void> {
+        const gmail = await this.getAuthenticatedClient(account);
+
+        try {
+            await gmail.users.drafts.send({
+                userId: 'me',
+                requestBody: {
+                    id: draftId,
+                },
+            });
+
+            logger.info('Draft sent successfully', { draftId });
+        } catch (error) {
+            logger.error('Gmail API Error sending draft', error);
+            throw error;
+        }
+    }
+
 
     async addLabel(account: EmailAccount, messageId: string, labelIds: string[]): Promise<void> {
         const gmail = await this.getAuthenticatedClient(account);

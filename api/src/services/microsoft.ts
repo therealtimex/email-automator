@@ -157,7 +157,7 @@ export class MicrosoftService {
         logger.info('Refreshing Microsoft token', { accountId: account.id });
 
         const refreshToken = account.refresh_token;
-        
+
         // If we have a refresh token stored, we can try to use the CCA
         if (refreshToken) {
             try {
@@ -358,7 +358,7 @@ export class MicrosoftService {
                 },
             }
         );
-        
+
         if (!originalResponse.ok) {
             throw new Error('Failed to fetch original message metadata');
         }
@@ -402,6 +402,29 @@ export class MicrosoftService {
         logger.debug('Outlook draft created', { draftId: draft.id });
         return draft.id;
     }
+
+    async sendDraft(account: EmailAccount, draftId: string): Promise<void> {
+        const accessToken = account.access_token || '';
+
+        const response = await fetch(
+            `https://graph.microsoft.com/v1.0/me/messages/${draftId}/send`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.text();
+            logger.error('Failed to send Outlook draft', new Error(error));
+            throw new Error('Failed to send draft');
+        }
+
+        logger.debug('Outlook draft sent', { draftId });
+    }
+
 
     /**
      * Get or create a folder by path (supports nested folders like "Finance/Receipts")

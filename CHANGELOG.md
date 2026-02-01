@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.20.0] - 2026-02-01
+
+### Added
+- **Draft Review Center**: A centralized dashboard for reviewing, editing, and sending AI-generated draft replies.
+  - **Draft Tracking**: Enhanced database schema to track draft status (`pending`, `sent`, `dismissed`) and lifecycle events (`created_at`, `sent_at`, `dismissed_at`).
+  - **Draft Preview**: New modal interface for side-by-side comparison of the original email and the AI-generated draft.
+  - **Regeneration**: Ability to request draft regeneration with specific instructions (e.g., "Make it more formal").
+  - **Bulk Actions**: Support for selecting multiple drafts to send or dismiss in bulk.
+  - **Deep Integration**: Direct links to open drafts in Gmail or Outlook for final touches.
+
+### Changed
+- **Navigation**: Added a new "Drafts" tab to the main navigation bar.
+- **Database**: Added migration `20260201000000_add_draft_tracking.sql` to backfill existing draft data and enable the new tracking features.
+
 ## [2.19.2] - 2026-02-01
 
 ### Changed
