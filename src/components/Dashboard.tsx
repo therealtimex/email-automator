@@ -19,14 +19,14 @@ import {
     DialogTitle,
 } from './ui/dialog';
 
-export function AITraceModal({ 
-    email, 
-    isOpen, 
+export function AITraceModal({
+    email,
+    isOpen,
     onOpenChange,
     onRetry
-}: { 
-    email: Email | null, 
-    isOpen: boolean, 
+}: {
+    email: Email | null,
+    isOpen: boolean,
     onOpenChange: (open: boolean) => void,
     onRetry?: (email: Email) => void
 }) {
@@ -77,9 +77,9 @@ export function AITraceModal({
                         </DialogDescription>
                     </div>
                     {email?.processing_status === 'failed' && onRetry && (
-                        <Button 
-                            size="sm" 
-                            variant="outline" 
+                        <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => {
                                 onRetry(email);
                                 onOpenChange(false);
@@ -106,7 +106,7 @@ export function AITraceModal({
                                 {i !== events.length - 1 && (
                                     <div className="absolute left-[15px] top-8 bottom-[-24px] w-px bg-border" />
                                 )}
-                                
+
                                 {/* Icon Badge */}
                                 <div className="absolute left-0 top-0 w-8 h-8 rounded-full border bg-background flex items-center justify-center z-10 shadow-sm">
                                     {getIcon(event.event_type)}
@@ -128,7 +128,7 @@ export function AITraceModal({
                                         {event.event_type === 'info' && (
                                             <div className="space-y-3">
                                                 <p className="text-sm text-foreground/90">{event.details?.message}</p>
-                                                
+
                                                 {event.details?.system_prompt && (
                                                     <div className="space-y-1">
                                                         <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
@@ -139,7 +139,7 @@ export function AITraceModal({
                                                         </pre>
                                                     </div>
                                                 )}
-                                                
+
                                                 {event.details?.content_preview && (
                                                     <div className="space-y-1">
                                                         <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
@@ -165,7 +165,7 @@ export function AITraceModal({
                                                         <span className="font-bold uppercase">{event.details?.sentiment || 'Analyzing...'}</span>
                                                     </div>
                                                 </div>
-                                                
+
                                                 {event.details?.system_prompt && (
                                                     <div className="space-y-1">
                                                         <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
@@ -224,14 +224,14 @@ export function AITraceModal({
                                         {event.event_type === 'error' && (
                                             <div className="space-y-2">
                                                 <p className="text-sm text-red-600 dark:text-red-400 font-bold">
-                                                    {typeof event.details?.error === 'object' 
-                                                        ? (event.details.error.message || JSON.stringify(event.details.error)) 
+                                                    {typeof event.details?.error === 'object'
+                                                        ? (event.details.error.message || JSON.stringify(event.details.error))
                                                         : event.details?.error}
                                                 </p>
                                                 {event.details?.raw_response && (
                                                     <pre className="text-[10px] bg-red-500/5 p-2 rounded border border-red-500/10 overflow-x-auto whitespace-pre-wrap font-mono">
-                                                        {typeof event.details.raw_response === 'object' 
-                                                            ? JSON.stringify(event.details.raw_response, null, 2) 
+                                                        {typeof event.details.raw_response === 'object'
+                                                            ? JSON.stringify(event.details.raw_response, null, 2)
                                                             : event.details.raw_response}
                                                     </pre>
                                                 )}
@@ -270,7 +270,7 @@ export function Dashboard() {
     const { state, actions, dispatch } = useApp();
     const { openTerminal } = useTerminal();
     const [isLoading, setIsLoading] = useState(true);
-    const [isSyncing, setIsSyncing] = useState(false);
+    const { isSyncing } = state;
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -328,9 +328,7 @@ export function Dashboard() {
         }
         sounds.playStart();
         openTerminal();
-        setIsSyncing(true);
         const success = await actions.triggerSync();
-        setIsSyncing(false);
         if (success) {
             sounds.playSuccess();
             toast.success('Sync completed! Check your emails.');
@@ -460,10 +458,10 @@ export function Dashboard() {
                         </div>
                         <Button type="submit" size="sm" className="h-9 px-4">Search</Button>
                     </form>
-                    
+
                     {/* Sort Controls */}
                     <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-md border border-border/50 h-9">
-                        <select 
+                        <select
                             className="bg-transparent text-xs font-medium border-none focus:ring-0 cursor-pointer pl-2 pr-8 h-full"
                             value={state.sortBy}
                             onChange={(e) => handleSortChange(e.target.value as 'date' | 'created_at')}
@@ -550,10 +548,10 @@ export function Dashboard() {
                             />
                         ))}
 
-                        <AITraceModal 
-                            isOpen={isTraceOpen} 
-                            onOpenChange={setIsTraceOpen} 
-                            email={traceEmail} 
+                        <AITraceModal
+                            isOpen={isTraceOpen}
+                            onOpenChange={setIsTraceOpen}
+                            email={traceEmail}
                             onRetry={handleRetry}
                         />
 
@@ -594,9 +592,9 @@ export function Dashboard() {
                     <Card className="p-6 border-primary/20 bg-primary/5 animate-in slide-in-from-right-5">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold">Email Details</h3>
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 className="h-6 w-6 p-0"
                                 onClick={() => setSelectedEmail(null)}
                             >
@@ -674,15 +672,15 @@ export function Dashboard() {
                                         <div className="flex items-center gap-2">
                                             <span className={cn(
                                                 "w-1.5 h-1.5 rounded-full",
-                                                log.status === 'success' ? "bg-emerald-500" : 
-                                                log.status === 'running' ? "bg-blue-500 animate-pulse" : "bg-red-500"
+                                                log.status === 'success' ? "bg-emerald-500" :
+                                                    log.status === 'running' ? "bg-blue-500 animate-pulse" : "bg-red-500"
                                             )} />
                                             <p className="font-medium text-xs">
                                                 {new Date(log.started_at).toLocaleDateString()} {new Date(log.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
                                         <p className="text-[10px] text-muted-foreground pl-3.5">
-                                            Processed: <span className="font-medium text-foreground">{log.emails_processed}</span> • 
+                                            Processed: <span className="font-medium text-foreground">{log.emails_processed}</span> •
                                             Actioned: <span className="font-medium text-foreground">{log.emails_deleted + log.emails_drafted}</span>
                                         </p>
                                         {log.error_message && (
@@ -692,10 +690,10 @@ export function Dashboard() {
                                         )}
                                     </div>
                                     <div className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-                                        {log.status === 'running' ? 'Running' : 
-                                         log.completed_at ? 
-                                            `${Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)}s` 
-                                            : '...'}
+                                        {log.status === 'running' ? 'Running' :
+                                            log.completed_at ?
+                                                `${Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)}s`
+                                                : '...'}
                                     </div>
                                 </div>
                             ))
@@ -747,12 +745,12 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, 
 
             <div className="space-y-6">
                 {accounts.map(account => (
-                    <AccountSyncRow 
-                        key={account.id} 
-                        account={account} 
-                        onUpdate={onUpdate} 
-                        onSync={onSync} 
-                        openTerminal={openTerminal} 
+                    <AccountSyncRow
+                        key={account.id}
+                        account={account}
+                        onUpdate={onUpdate}
+                        onSync={onSync}
+                        openTerminal={openTerminal}
                     />
                 ))}
             </div>
@@ -760,32 +758,32 @@ function SyncSettings({ accounts, onUpdate, onSync, settings, onUpdateSettings, 
     );
 }
 
-function AccountSyncRow({ 
-    account, 
-    onUpdate, 
-    onSync, 
-    openTerminal 
-}: { 
-    account: EmailAccount, 
+function AccountSyncRow({
+    account,
+    onUpdate,
+    onSync,
+    openTerminal
+}: {
+    account: EmailAccount,
     onUpdate: (id: string, updates: Partial<EmailAccount>) => Promise<boolean>,
     onSync: (id: string) => void,
     openTerminal: () => void
 }) {
     const [updating, setUpdating] = useState(false);
-    
+
     // Local state for inputs to prevent aggressive updates while typing
     const [localStartDate, setLocalStartDate] = useState('');
     const [localMaxEmails, setLocalMaxEmails] = useState<string>('');
 
     const toLocalISOString = (dateInput: string | number | Date | null | undefined) => {
         if (!dateInput) return '';
-        const input = (typeof dateInput === 'string' && /^\d+$/.test(dateInput)) 
-            ? parseInt(dateInput) 
+        const input = (typeof dateInput === 'string' && /^\d+$/.test(dateInput))
+            ? parseInt(dateInput)
             : dateInput;
-            
+
         const date = new Date(input);
         if (isNaN(date.getTime())) return '';
-        
+
         const pad = (n: number) => n < 10 ? '0' + n : n;
         return date.getFullYear() +
             '-' + pad(date.getMonth() + 1) +
@@ -796,10 +794,10 @@ function AccountSyncRow({
 
     // Initialize local state from account props
     useEffect(() => {
-        const effectiveDate = account.sync_start_date 
-            || account.last_sync_checkpoint 
+        const effectiveDate = account.sync_start_date
+            || account.last_sync_checkpoint
             || account.last_sync_at;
-        
+
         setLocalStartDate(toLocalISOString(effectiveDate));
         setLocalMaxEmails((account.sync_max_emails_per_run || 50).toString());
     }, [account.id, account.sync_start_date, account.last_sync_checkpoint, account.last_sync_at, account.sync_max_emails_per_run]);
@@ -813,7 +811,7 @@ function AccountSyncRow({
     const handleBlurStartDate = () => {
         const currentValue = account.sync_start_date ? new Date(account.sync_start_date).toISOString() : '';
         const newValue = localStartDate ? new Date(localStartDate).toISOString() : '';
-        
+
         if (newValue !== currentValue) {
             handleUpdate({ sync_start_date: newValue || null });
         }
@@ -929,7 +927,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
     const getExternalMailUrl = () => {
         if (!email.email_accounts) return '#';
         const { provider, email_address } = email.email_accounts;
-        
+
         if (provider === 'gmail') {
             // Gmail deep link using the message ID
             return `https://mail.google.com/mail/u/${email_address}/#all/${email.external_id}`;
@@ -990,10 +988,10 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                     <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1" title={email.processing_error || 'Unknown error'}>
                                         <AlertCircle className="w-2.5 h-2.5" /> Failed
                                     </span>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-5 w-5 text-red-600 hover:bg-red-500/10" 
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 text-red-600 hover:bg-red-500/10"
                                         onClick={(e) => { e.stopPropagation(); onRetry(email); }}
                                         title="Retry Processing"
                                     >
@@ -1031,7 +1029,7 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                 <div className="bg-secondary/30 p-3 rounded-lg border border-border/50 flex justify-between items-center">
                     <div className="flex items-center gap-2 text-xs font-medium">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        Suggested: 
+                        Suggested:
                         {(email.suggested_actions && email.suggested_actions.length > 0) ? (
                             <div className="flex gap-1 flex-wrap">
                                 {email.suggested_actions.map(action => (
@@ -1043,9 +1041,9 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                         ) : (
                             <span className="text-foreground">{email.suggested_action || 'none'}</span>
                         )}
-                        
+
                         {(email.actions_taken && email.actions_taken.length > 0) ? (
-                             <span className="text-muted-foreground ml-2 truncate max-w-[100px]" title={email.actions_taken.join(', ')}>
+                            <span className="text-muted-foreground ml-2 truncate max-w-[100px]" title={email.actions_taken.join(', ')}>
                                 (Done: {email.actions_taken.join(', ')})
                             </span>
                         ) : email.action_taken ? (
@@ -1085,9 +1083,9 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                         ) : (
                             // Normal action buttons
                             <>
-                                <a 
-                                    href={getExternalMailUrl()} 
-                                    target="_blank" 
+                                <a
+                                    href={getExternalMailUrl()}
+                                    target="_blank"
                                     rel="noreferrer"
                                     className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
                                     title={`Open in ${email.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook'}`}

@@ -149,4 +149,27 @@ router.get('/logs',
     })
 );
 
+// Stop ongoing sync
+router.post('/stop',
+    authMiddleware,
+    asyncHandler(async (req, res) => {
+        const userId = req.user!.id;
+
+        if (!req.supabase) {
+            return res.status(503).json({
+                error: 'Supabase service is not configured.'
+            });
+        }
+
+        const { error } = await req.supabase
+            .from('user_settings')
+            .update({ sync_stop_requested: true })
+            .eq('user_id', userId);
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Stop request registered' });
+    })
+);
+
 export default router;

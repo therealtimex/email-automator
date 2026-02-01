@@ -138,6 +138,9 @@ export class EmailProcessorService {
     async syncAccount(accountId: string, userId: string): Promise<ProcessingResult> {
         const result: ProcessingResult = { processed: 0, deleted: 0, drafted: 0, errors: 0 };
 
+        // Reset stop request flag at the start of a manual sync
+        await this.resetStopRequest(userId);
+
         // Zero-Config UX: Auto-install Universal Pack for new users (self-healing)
         try {
             const rulePackService = new RulePackService(this.supabase);
@@ -214,6 +217,9 @@ export class EmailProcessorService {
             const eventLogger = log ? new EventLogger(this.supabase, log.id) : null;
             if (eventLogger) await eventLogger.info('Running', 'Starting sync process');
 
+            // --- STOP CHECK ---
+            if (await this.checkStopRequested(userId, eventLogger)) return result;
+
             // Process based on provider
             try {
                 if (refreshedAccount.provider === 'gmail') {
@@ -227,6 +233,7 @@ export class EmailProcessorService {
             }
 
             // After processing new emails, run retention rules for this account
+            if (await this.checkStopRequested(userId, eventLogger)) return result;
             await this.runRetentionRules(refreshedAccount, rules || [], settings, result, eventLogger);
 
             // Wait for background worker to process the queue (ensure sync is fully complete before event)
@@ -380,6 +387,9 @@ export class EmailProcessorService {
         let maxInternalDate = currentStartMs;
 
         for (const message of messages) {
+            // --- STOP CHECK ---
+            if (await this.checkStopRequested(account.user_id, eventLogger)) break;
+
             try {
                 await this.processMessage(account, message, rules, settings, result, eventLogger);
 
@@ -466,6 +476,9 @@ export class EmailProcessorService {
         let latestCheckpoint = effectiveStartIso;
 
         for (const message of messages) {
+            // --- STOP CHECK ---
+            if (await this.checkStopRequested(account.user_id, eventLogger)) break;
+
             try {
                 const processResult = await this.processMessage(account, message, rules, settings, result, eventLogger);
 
@@ -633,6 +646,9 @@ export class EmailProcessorService {
         logger.info('Worker: Processing batch', { userId, count: pendingEmails.length });
 
         for (const email of pendingEmails) {
+            // --- STOP CHECK ---
+            if (await this.checkStopRequested(userId)) break;
+
             await this.processPendingEmail(email, userId, settings, result);
         }
 
@@ -1337,6 +1353,37 @@ export class EmailProcessorService {
                 await eventLogger.error('Action Failed', { error: errMsg, action }, email.id);
             }
             // Do NOT throw here - we want to continue with other emails/actions
+        }
+    }
+    private async checkStopRequested(userId: string, eventLogger?: EventLogger | null): Promise<boolean> {
+        try {
+            const { data: settings } = await this.supabase
+                .from('user_settings')
+                .select('sync_stop_requested')
+                .eq('user_id', userId)
+                .single();
+
+            if (settings?.sync_stop_requested) {
+                logger.info('Stop sync requested by user', { userId });
+                if (eventLogger) {
+                    await eventLogger.info('Stopped', 'Sync interrupted by user.', undefined);
+                }
+                return true;
+            }
+        } catch (err) {
+            logger.warn('Failed to check stop request status', { error: err, userId });
+        }
+        return false;
+    }
+
+    private async resetStopRequest(userId: string): Promise<void> {
+        try {
+            await this.supabase
+                .from('user_settings')
+                .update({ sync_stop_requested: false })
+                .eq('user_id', userId);
+        } catch (err) {
+            logger.warn('Failed to reset stop request status', { error: err, userId });
         }
     }
 }

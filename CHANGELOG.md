@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.18.0] - 2026-02-01
+
+### Added
+- **Stop Sync Request**: Users can now manually stop an ongoing sync process directly from the Live Terminal.
+  - Added a "STOP SYNC" button to the Live Terminal that appears during active synchronization.
+  - Implemented a backend interrupt mechanism that safely halts processing between email batches.
+  - Added visual feedback (red pulsing indicator) when a stop request is processing.
+
 ## [2.17.0] - 2026-01-31
 
 ### Added

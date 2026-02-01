@@ -345,6 +345,12 @@ class HybridApiClient {
         return this.expressRequest<{ logs: any[] }>(`/api/sync/logs?limit=${limit}`);
     }
 
+    async stopSync() {
+        return this.expressRequest<{ success: boolean }>('/api/sync/stop', {
+            method: 'POST',
+        });
+    }
+
     // ============================================================================
     // ACTION ENDPOINTS (Express API - Local App)
     // ============================================================================

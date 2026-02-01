@@ -41,6 +41,7 @@ interface AppState {
     sortOrder: 'asc' | 'desc';
     activeCategory: string | null;
     activeSearch: string;
+    isSyncing: boolean;
 }
 
 const initialState: AppState = {
@@ -62,6 +63,7 @@ const initialState: AppState = {
     sortOrder: 'desc',
     activeCategory: null,
     activeSearch: '',
+    isSyncing: false,
 };
 
 // Actions
@@ -86,6 +88,7 @@ type Action =
     | { type: 'SET_SETTINGS'; payload: UserSettings }
     | { type: 'SET_STATS'; payload: Stats }
     | { type: 'SET_SELECTED_EMAIL'; payload: string | null }
+    | { type: 'SET_SYNCING'; payload: boolean }
     | { type: 'CLEAR_DATA' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -116,11 +119,11 @@ function reducer(state: AppState, action: Action): AppState {
             };
         case 'ADD_EMAIL': {
             const email = action.payload;
-            
+
             // Check if email matches current filters
             const matchesCategory = !state.activeCategory || email.category === state.activeCategory;
-            const matchesSearch = !state.activeSearch || 
-                email.subject?.toLowerCase().includes(state.activeSearch.toLowerCase()) || 
+            const matchesSearch = !state.activeSearch ||
+                email.subject?.toLowerCase().includes(state.activeSearch.toLowerCase()) ||
                 email.sender?.toLowerCase().includes(state.activeSearch.toLowerCase());
 
             if (!matchesCategory || !matchesSearch) {
@@ -210,6 +213,8 @@ function reducer(state: AppState, action: Action): AppState {
             return { ...state, stats: action.payload };
         case 'SET_SELECTED_EMAIL':
             return { ...state, selectedEmailId: action.payload };
+        case 'SET_SYNCING':
+            return { ...state, isSyncing: action.payload };
         case 'CLEAR_DATA':
             return { ...initialState, isLoading: false, isInitialized: true };
         default:
@@ -232,6 +237,7 @@ interface AppContextType {
         executeAction: (emailId: string, action: string, draftContent?: string) => Promise<boolean>;
         triggerSync: (accountId?: string) => Promise<boolean>;
         disconnectAccount: (accountId: string) => Promise<boolean>;
+        stopSync: () => Promise<boolean>;
         updateSettings: (settings: Partial<UserSettings>) => Promise<boolean>;
         updateProfile: (updates: { first_name?: string; last_name?: string; avatar_url?: string }) => Promise<boolean>;
         updateAccount: (accountId: string, updates: Partial<EmailAccount>) => Promise<boolean>;
@@ -456,18 +462,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
         },
 
         triggerSync: async (accountId?: string) => {
-            const response = accountId
-                ? await api.triggerSync(accountId)
-                : await api.syncAll();
-            
-            // Always refresh accounts to show updated sync status
-            await actions.fetchAccounts();
-            
-            if (response.error) {
-                dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Sync failed') });
-                return false;
+            dispatch({ type: 'SET_SYNCING', payload: true });
+            try {
+                const response = accountId
+                    ? await api.triggerSync(accountId)
+                    : await api.syncAll();
+
+                // Always refresh accounts to show updated sync status
+                await actions.fetchAccounts();
+
+                if (response.error) {
+                    dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Sync failed') });
+                    return false;
+                }
+                return true;
+            } finally {
+                dispatch({ type: 'SET_SYNCING', payload: false });
             }
-            return true;
+        },
+
+        stopSync: async () => {
+            const response = await api.stopSync();
+            if (response.data?.success) {
+                toast.info('Stop request sent');
+                return true;
+            }
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to stop sync') });
+            return false;
         },
 
         disconnectAccount: async (accountId: string) => {
@@ -521,10 +542,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 if (email) {
                     dispatch({
                         type: 'UPDATE_EMAIL',
-                        payload: { 
-                            ...email, 
+                        payload: {
+                            ...email,
                             processing_status: 'pending',
-                            processing_error: null 
+                            processing_error: null
                         }
                     });
                 }

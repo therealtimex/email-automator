@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { ProcessingEvent } from '../lib/types';
-import { 
-    Terminal, 
-    Brain, 
-    Zap, 
-    Info, 
-    AlertTriangle, 
+import {
+    Terminal,
+    Brain,
+    Zap,
+    Info,
+    AlertTriangle,
     Activity,
     Minimize2,
     ChevronDown,
@@ -18,12 +18,16 @@ import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
 import { useTerminal } from '../context/TerminalContext';
+import { useApp } from '../context/AppContext';
+import { Square } from 'lucide-react';
 
 export function LiveTerminal() {
     const [events, setEvents] = useState<ProcessingEvent[]>([]);
     const { isExpanded, setIsExpanded } = useTerminal();
+    const { state, actions } = useApp();
+    const { isSyncing } = state;
     const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
-    
+
     // Initial fetch of recent events
     useEffect(() => {
         fetchRecentEvents();
@@ -40,7 +44,7 @@ export function LiveTerminal() {
                 },
                 (payload) => {
                     const newEvent = payload.new as ProcessingEvent;
-                    
+
                     // Auto-expand errors
                     if (newEvent.event_type === 'error') {
                         setExpandedEvents(prev => ({ ...prev, [newEvent.id]: true }));
@@ -49,7 +53,7 @@ export function LiveTerminal() {
                     setEvents((prev) => {
                         // Insert at the beginning (descending order)
                         const updated = [newEvent, ...prev];
-                        
+
                         // Auto-collapse logic: If it's a completion event and terminal is expanded
                         if (newEvent.details?.is_completion && isExpanded) {
                             setTimeout(() => {
@@ -75,7 +79,7 @@ export function LiveTerminal() {
             .select('*')
             .order('created_at', { ascending: false })
             .limit(50);
-        
+
         if (data) {
             setEvents(data);
         }
@@ -87,7 +91,7 @@ export function LiveTerminal() {
 
     const getIcon = (event: ProcessingEvent) => {
         if (event.details?.is_completion) return <CheckCircle className="w-3 h-3 text-emerald-500" />;
-        
+
         switch (event.event_type) {
             case 'analysis': return <Brain className="w-3 h-3 text-purple-500" />;
             case 'action': return <Zap className="w-3 h-3 text-emerald-500" />;
@@ -103,16 +107,22 @@ export function LiveTerminal() {
     if (!isExpanded) {
         return (
             <div className="fixed bottom-4 right-4 z-50">
-                <Button 
+                <Button
                     onClick={() => setIsExpanded(true)}
                     className="shadow-lg bg-primary text-primary-foreground hover:opacity-90 border border-border"
                 >
                     <Terminal className="w-4 h-4 mr-2" />
                     Live Activity
-                    {events.length > 0 && (
+                    {(events.length > 0 || isSyncing) && (
                         <span className="ml-2 flex h-2 w-2 relative">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            <span className={cn(
+                                "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+                                isSyncing ? "bg-red-400" : "bg-green-400"
+                            )}></span>
+                            <span className={cn(
+                                "relative inline-flex rounded-full h-2 w-2",
+                                isSyncing ? "bg-red-500" : "bg-green-500"
+                            )}></span>
                         </span>
                     )}
                 </Button>
@@ -126,23 +136,39 @@ export function LiveTerminal() {
                 <div className="flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-primary" />
                     <CardTitle className="text-sm font-mono font-bold">Agent Terminal</CardTitle>
-                    <div className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 font-bold">
+                    <div className={cn(
+                        "flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-bold animate-pulse transition-colors duration-500",
+                        isSyncing
+                            ? "text-red-600 dark:text-red-400 bg-red-500/10 border-red-500/20"
+                            : "text-green-600 dark:text-green-400 bg-green-500/10 border-green-500/20"
+                    )}>
                         <Activity className="w-3 h-3" />
-                        LIVE
+                        {isSyncing ? 'SYNCING' : 'LIVE'}
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
+                    {isSyncing && (
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-7 text-[10px] font-mono font-bold bg-red-600 hover:bg-red-700 animate-in fade-in zoom-in duration-300"
+                            onClick={() => actions.stopSync()}
+                        >
+                            <Square className="w-3 h-3 mr-1 fill-current" />
+                            STOP SYNC
+                        </Button>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-7 text-[10px] font-mono hover:bg-secondary"
                         onClick={() => setEvents([])}
                     >
                         Clear
                     </Button>
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-7 w-7 p-0 hover:bg-secondary"
                         onClick={() => setIsExpanded(false)}
                     >
@@ -156,14 +182,14 @@ export function LiveTerminal() {
                         Waiting for agent activity...
                     </div>
                 )}
-                
+
                 {events.map((event, i) => (
                     <div key={event.id} className="relative pl-8 animate-in fade-in slide-in-from-top-2 duration-300">
                         {/* Connecting Line */}
                         {i !== events.length - 1 && (
                             <div className="absolute left-[13px] top-7 bottom-[-24px] w-[1px] bg-border" />
                         )}
-                        
+
                         {/* Icon Badge */}
                         <div className={cn(
                             "absolute left-0 top-0 w-7 h-7 rounded-full border border-border bg-card flex items-center justify-center z-10 shadow-sm",
@@ -190,9 +216,9 @@ export function LiveTerminal() {
                                     <span className="text-[10px] text-muted-foreground/60">{formatTime(event.created_at)}</span>
                                 </div>
                                 {(event.details?.system_prompt || event.details?._raw_response || event.details?.raw_response) && (
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
                                         className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
                                         onClick={() => toggleExpand(event.id)}
                                     >
@@ -254,8 +280,8 @@ export function LiveTerminal() {
                                 </div>
                             ) : event.event_type === 'error' && event.details ? (
                                 <div className="bg-red-500/5 border border-red-500/10 rounded-lg p-2.5 text-red-600 dark:text-red-400 font-medium">
-                                    {typeof event.details.error === 'object' 
-                                        ? (event.details.error.message || JSON.stringify(event.details.error)) 
+                                    {typeof event.details.error === 'object'
+                                        ? (event.details.error.message || JSON.stringify(event.details.error))
                                         : event.details.error}
                                 </div>
                             ) : event.details?.is_completion ? (
@@ -332,8 +358,8 @@ export function LiveTerminal() {
                                             </div>
                                             <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
                                                 <pre className="text-[10px] text-muted-foreground select-all whitespace-pre-wrap">
-                                                    {typeof event.details.raw_response === 'object' 
-                                                        ? JSON.stringify(event.details.raw_response, null, 2) 
+                                                    {typeof event.details.raw_response === 'object'
+                                                        ? JSON.stringify(event.details.raw_response, null, 2)
                                                         : event.details.raw_response}
                                                 </pre>
                                             </div>
