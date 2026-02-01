@@ -36,18 +36,24 @@ export const ContextAwareAnalysisSchema = z.object({
     summary: z.string().describe('A brief summary of the email content'),
     category: z.enum(['spam', 'newsletter', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'other'])
         .describe('The category of the email'),
+    sentiment: z.enum(['Positive', 'Neutral', 'Negative']).optional()
+        .describe('The emotional tone of the email'),
     priority: z.enum(['High', 'Medium', 'Low'])
         .describe('The urgency of the email'),
+    key_points: z.array(z.string()).optional()
+        .describe('Key points extracted from the email'),
+    language: z.string().optional()
+        .describe('The primary language of the email (e.g., "English", "Vietnamese", "Japanese")'),
 
-    matched_rule: z.object({
-        rule_id: z.string().nullable().describe('ID of the matched rule, or null if no match'),
-        rule_name: z.string().nullable().describe('Name of the matched rule'),
+    matched_rules: z.array(z.object({
+        rule_id: z.string().describe('ID of the matched rule'),
+        rule_name: z.string().describe('Name of the matched rule'),
         confidence: z.number().min(0).max(1).describe('Confidence score for the match (0-1)'),
-        reasoning: z.string().describe('Explanation of why this rule was matched or why no rule matched'),
-    }),
+        reasoning: z.string().describe('Brief explanation of why this rule matched'),
+    })).describe('All rules that apply to this email (can be multiple)'),
 
-    actions_to_execute: z.array(z.enum(['none', 'delete', 'archive', 'draft', 'read', 'star']))
-        .describe('Actions to execute based on the matched rule'),
+    actions_to_execute: z.array(z.enum(['none', 'delete', 'archive', 'draft', 'star']))
+        .describe('Actions to execute after conflict resolution'),
 
     draft_content: z.string().nullable().optional()
         .describe('Generated draft reply if the action includes drafting'),
@@ -349,7 +355,7 @@ REQUIRED JSON STRUCTURE:
             rulesContext = compiledRulesContext.map(r => `- ${r.name}: ${r.intent}`).join('\n');
         }
 
-        const systemPrompt = `You are an AI Automation Agent. Analyze the email and match it against the user's rules.
+        const systemPrompt = `You are an AI Automation Agent. Analyze the email and identify ALL rules that apply.
 
 Rules Context:
 ${rulesContext}
@@ -359,20 +365,25 @@ REQUIRED JSON STRUCTURE:
   "summary": "A brief summary of the email content",
   "category": "spam|newsletter|promotional|transactional|social|support|client|internal|personal|other",
   "priority": "High|Medium|Low",
-  "matched_rule": {
-    "rule_id": "string or null",
-    "rule_name": "string or null",
-    "confidence": 0.0 to 1.0,
-    "reasoning": "Brief explanation"
-  },
-  "actions_to_execute": ["none"|"delete"|"archive"|"draft"|"read"|"star"],
+  "matched_rules": [
+    {
+      "rule_id": "string",
+      "rule_name": "string",
+      "confidence": 0.0 to 1.0,
+      "reasoning": "Brief explanation"
+    }
+  ],
+  "actions_to_execute": ["none"|"delete"|"archive"|"draft"|"star"],
   "draft_content": "Suggested reply if drafting, otherwise null"
 }
 
-IMPORTANT:
-- Use "draft" action only if a rule explicitly requests it or if it's very clear a reply is needed.
-- Categorize accurately.
-- Confidence 0.7+ is required for automatic execution.`;
+CRITICAL INSTRUCTIONS:
+- Identify ALL rules that apply to this email (not just the best one)
+- Return an empty array if no rules match
+- Only include rules with confidence >= 0.7
+- For each matched rule, explain why it applies
+- Actions will be merged by the system - you don't need to resolve conflicts
+- Use "draft" action only if a rule explicitly requests it`;
 
         if (eventLogger) {
             await eventLogger.info('Thinking', `Context-aware analysis: ${context.subject}`, {

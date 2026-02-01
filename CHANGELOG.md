@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.16.0] - 2026-01-31
+
+### Added
+- **Multi-Rule Matching**: The AI engine now identifies *all* applicable rules for a single email instead of stopping at the first match. This allows for more granular and overlapping automation strategies (e.g., one rule for "Star from VIP" and another for "Label: Project X").
+- **Conflict Resolution Engine**: Implemented a sophisticated conflict resolver that handles multiple matched rules:
+    - **Exclusive Actions** (Delete, Archive): The highest priority rule wins.
+    - **Additive Actions** (Label, Star): Actions from all matching rules are combined.
+    - **Drafting**: The highest priority rule determines the draft content instructions.
+- **Enhanced Analysis Metadata**: AI now extracts `sentiment` (Positive, Neutral, Negative), `key_points`, and `language` during the initial analysis phase, enabling richer downstream automation logic.
+
 ## [2.15.0] - 2026-01-31
 
 ### Removed

@@ -20,6 +20,111 @@ export interface ProcessingResult {
     errors: number;
 }
 
+/**
+ * Action classification for conflict resolution
+ */
+const ACTION_TYPES = {
+    // Exclusive: Only one can apply (highest priority wins)
+    EXCLUSIVE: ['delete', 'archive'] as const,
+
+    // Additive: All can apply (accumulate across rules)
+    ADDITIVE: ['star', 'unstar', 'important', 'pin'] as const,
+
+    // Semi-Exclusive: Only one makes sense, but non-conflicting
+    SEMI_EXCLUSIVE: ['draft'] as const
+};
+
+interface ResolvedActions {
+    exclusive?: string;  // The winning exclusive action (delete or archive)
+    labels: string[];    // All labels to apply
+    additive: string[];  // Star, important, etc
+    draft?: {
+        content: string;
+        instructions: string;
+        attachments?: any[];
+    };
+}
+
+/**
+ * Resolves conflicts between multiple matching rules
+ *
+ * Strategy:
+ * - EXCLUSIVE actions (delete, archive): Highest priority rule wins
+ * - ADDITIVE actions (labels, star): Apply ALL from ALL matching rules
+ * - SEMI-EXCLUSIVE (draft): Highest priority rule wins
+ * - If DELETE wins, skip all other actions (email is gone anyway)
+ *
+ * @param matchedRules - Rules sorted by priority (descending)
+ * @param allRules - Full rule objects for looking up actions
+ * @returns Resolved action set to execute
+ */
+function resolveRuleConflicts(
+    matchedRules: Array<{ rule_id: string; confidence: number }>,
+    allRules: Rule[]
+): ResolvedActions {
+    const resolved: ResolvedActions = {
+        labels: [],
+        additive: []
+    };
+
+    // Process rules in priority order (already sorted)
+    for (const match of matchedRules) {
+        const rule = allRules.find(r => r.id === match.rule_id);
+        if (!rule) continue;
+
+        const actions = rule.actions || [];
+
+        for (const action of actions) {
+            // Handle label actions (always additive)
+            if (action.startsWith('label:')) {
+                const label = action.substring(6); // Remove 'label:' prefix
+                if (!resolved.labels.includes(label)) {
+                    resolved.labels.push(label);
+                }
+                continue;
+            }
+
+            // Handle exclusive actions (delete/archive)
+            if (ACTION_TYPES.EXCLUSIVE.includes(action as any)) {
+                // Only set if not already set by higher priority rule
+                if (!resolved.exclusive) {
+                    resolved.exclusive = action;
+                }
+                continue;
+            }
+
+            // Handle additive actions (star, important, etc)
+            if (ACTION_TYPES.ADDITIVE.includes(action as any)) {
+                if (!resolved.additive.includes(action)) {
+                    resolved.additive.push(action);
+                }
+                continue;
+            }
+
+            // Handle draft (semi-exclusive)
+            if (action === 'draft' && !resolved.draft) {
+                resolved.draft = {
+                    content: '', // Will be generated later
+                    instructions: rule.instructions || '',
+                    attachments: rule.attachments
+                };
+                continue;
+            }
+        }
+    }
+
+    // Nuclear option: If DELETE wins, discard everything else
+    if (resolved.exclusive === 'delete') {
+        return {
+            exclusive: 'delete',
+            labels: [],
+            additive: []
+        };
+    }
+
+    return resolved;
+}
+
 export class EmailProcessorService {
     private supabase: SupabaseClient;
     private gmailService = getGmailService();
@@ -676,6 +781,7 @@ export class EmailProcessorService {
             }
 
             // 6. Update the email record with context-aware results
+            const primaryRule = analysis.matched_rules[0]; // Highest priority/confidence rule
             await this.supabase
                 .from('emails')
                 .update({
@@ -683,51 +789,147 @@ export class EmailProcessorService {
                     ai_analysis: analysis as any,
                     suggested_actions: analysis.actions_to_execute || [],
                     suggested_action: analysis.actions_to_execute?.[0] || 'none',
-                    matched_rule_id: analysis.matched_rule.rule_id,
-                    matched_rule_confidence: analysis.matched_rule.confidence,
+                    matched_rule_id: primaryRule?.rule_id || null,
+                    matched_rule_confidence: primaryRule?.confidence || 0,
                     processing_status: 'completed'
                 })
                 .eq('id', email.id);
 
-            // 7. Execute actions if rule matched with sufficient confidence
-            if (account && analysis.matched_rule.rule_id && analysis.matched_rule.confidence >= 0.7) {
-                const matchedRule = rules?.find(r => r.id === analysis.matched_rule.rule_id);
+            // 7. Execute actions with conflict resolution
+            if (account && analysis.matched_rules.length > 0 && rules) {
+                // Filter rules by minimum confidence threshold
+                const highConfidenceMatches = analysis.matched_rules.filter(m => m.confidence >= 0.7);
 
-                if (eventLogger) {
-                    await eventLogger.info('Rule Matched',
-                        `"${analysis.matched_rule.rule_name}" matched with ${(analysis.matched_rule.confidence * 100).toFixed(0)}% confidence`,
-                        { reasoning: analysis.matched_rule.reasoning },
+                if (highConfidenceMatches.length > 0) {
+                    // Sort matched rules by their priority (from rules table)
+                    const sortedMatches = highConfidenceMatches
+                        .map(match => ({
+                            ...match,
+                            priority: rules.find(r => r.id === match.rule_id)?.priority || 0
+                        }))
+                        .sort((a, b) => b.priority - a.priority);
+
+                    // Log all matched rules
+                    if (eventLogger) {
+                        const matchSummary = sortedMatches.map(m =>
+                            `"${m.rule_name}" (${(m.confidence * 100).toFixed(0)}%)`
+                        ).join(', ');
+                        await eventLogger.info('Rules Matched',
+                            `${sortedMatches.length} rule(s) apply: ${matchSummary}`,
+                            { rules: sortedMatches.map(m => ({ name: m.rule_name, confidence: m.confidence, reasoning: m.reasoning })) },
+                            email.id
+                        );
+                    }
+
+                    // Resolve conflicts between rules
+                    const resolved = resolveRuleConflicts(sortedMatches, rules);
+
+                    if (eventLogger) {
+                        await eventLogger.info('Actions Resolved',
+                            `After conflict resolution: ${[resolved.exclusive, ...resolved.labels.map(l => `label:${l}`), ...resolved.additive, resolved.draft ? 'draft' : null].filter(Boolean).join(', ')}`,
+                            { resolved },
+                            email.id
+                        );
+                    }
+
+                    // Execute exclusive action (delete or archive)
+                    if (resolved.exclusive) {
+                        await this.executeAction(
+                            account,
+                            email,
+                            resolved.exclusive as any,
+                            undefined,
+                            eventLogger,
+                            `Rules: ${sortedMatches.map(m => m.rule_name).join(', ')}`
+                        );
+
+                        if (result) {
+                            if (resolved.exclusive === 'delete') result.deleted++;
+                        }
+                    }
+
+                    // If deleted, skip other actions (email is gone)
+                    if (resolved.exclusive === 'delete') {
+                        return;
+                    }
+
+                    // Execute label actions
+                    for (const label of resolved.labels) {
+                        await this.executeAction(
+                            account,
+                            email,
+                            `label:${label}` as any,
+                            undefined,
+                            eventLogger,
+                            `Rules: ${sortedMatches.map(m => m.rule_name).join(', ')}`
+                        );
+                    }
+
+                    // Execute additive actions (star, important, etc)
+                    for (const action of resolved.additive) {
+                        await this.executeAction(
+                            account,
+                            email,
+                            action as any,
+                            undefined,
+                            eventLogger,
+                            `Rules: ${sortedMatches.map(m => m.rule_name).join(', ')}`
+                        );
+                    }
+
+                    // Execute draft action
+                    if (resolved.draft) {
+                        // Build rich context for draft generation
+                        const emailDomain = account.email_address?.split('@')[1] || undefined;
+                        const richContext = {
+                            myEmail: account.email_address,
+                            myName: undefined,
+                            myRole: settings?.user_role || undefined,
+                            myCompany: emailDomain,
+                            category: analysis?.category,
+                            sentiment: analysis?.sentiment,
+                            priority: analysis?.priority,
+                            keyPoints: analysis?.key_points,
+                            language: analysis?.language,
+                            senderEmail: email.sender || undefined,
+                            senderName: email.sender || undefined,
+                            receivedDate: email.date ? new Date(email.date) : undefined
+                        };
+
+                        const draftContent = await intelligenceService.generateDraftReply({
+                            subject: email.subject || '',
+                            sender: email.sender || '',
+                            body: email.body_snippet || ''
+                        }, resolved.draft.instructions, {
+                            llm_provider: settings?.llm_provider,
+                            llm_model: settings?.llm_model
+                        }, richContext);
+
+                        if (draftContent) {
+                            await this.executeAction(
+                                account,
+                                email,
+                                'draft' as any,
+                                draftContent,
+                                eventLogger,
+                                `Rules: ${sortedMatches.map(m => m.rule_name).join(', ')}`,
+                                resolved.draft.attachments
+                            );
+
+                            if (result) result.drafted++;
+                        }
+                    }
+                } else if (eventLogger) {
+                    await eventLogger.info('Low Confidence',
+                        `${analysis.matched_rules.length} rule(s) matched but below 0.7 confidence threshold`,
+                        { rules: analysis.matched_rules },
                         email.id
                     );
                 }
-
-                // Execute each action from the AI's decision
-                for (const action of analysis.actions_to_execute) {
-                    if (action === 'none') continue;
-
-                    // Use AI-generated draft content if available (handle null from AI)
-                    const draftContent = action === 'draft' ? (analysis.draft_content || undefined) : undefined;
-
-                    await this.executeAction(
-                        account,
-                        email,
-                        action as any,
-                        draftContent,
-                        eventLogger,
-                        `Rule: ${matchedRule?.name || analysis.matched_rule.rule_name}`,
-                        matchedRule?.attachments
-                    );
-
-                    // Update metrics if result object provided
-                    if (result) {
-                        if (action === 'delete') result.deleted++;
-                        else if (action === 'draft') result.drafted++;
-                    }
-                }
             } else if (eventLogger && rules && rules.length > 0) {
                 await eventLogger.info('No Match',
-                    analysis.matched_rule.reasoning,
-                    { confidence: analysis.matched_rule.confidence },
+                    'No rules matched this email',
+                    { category: analysis.category },
                     email.id
                 );
             }
