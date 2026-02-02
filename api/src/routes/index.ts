@@ -9,6 +9,7 @@ import emailsRoutes from './emails.js';
 import migrateRoutes from './migrate.js';
 import sdkRoutes from './sdk.js';
 import rulePacksRoutes from './rulePacks.js';
+import draftsRoutes from './drafts.js';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/emails', emailsRoutes);
 router.use('/migrate', migrateRoutes);
 router.use('/sdk', sdkRoutes);
 router.use('/rule-packs', rulePacksRoutes);
+router.use('/drafts', draftsRoutes);
 
 export default router;

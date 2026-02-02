@@ -431,6 +431,67 @@ export class GmailService {
         }
     }
 
+    /**
+     * Send a reply to a thread (used for sending drafts directly without creating a draft object first)
+     */
+    async sendReply(
+        account: EmailAccount,
+        originalMessageId: string,
+        replyContent: string,
+        subject: string
+    ): Promise<string> {
+        const gmail = await this.getAuthenticatedClient(account);
+
+        //Fetch original to get threadId and Message-ID
+        const original = await gmail.users.messages.get({ userId: 'me', id: originalMessageId });
+        const headers = original.data.payload?.headers || [];
+        const getHeader = (name: string) => headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+
+        const toAddress = getHeader('From');
+        const originalMsgId = getHeader('Message-ID');
+        const threadId = original.data.threadId;
+
+        // Threading headers
+        const replyHeaders = [];
+        if (originalMsgId) {
+            replyHeaders.push(`In-Reply-To: ${originalMsgId}`);
+            replyHeaders.push(`References: ${originalMsgId}`);
+        }
+
+        const rawMessage = [
+            `To: ${toAddress}`,
+            `Subject: ${subject}`,
+            ...replyHeaders,
+            'MIME-Version: 1.0',
+            'Content-Type: text/plain; charset="UTF-8"',
+            '',
+            replyContent,
+        ].join('\r\n');
+
+        const encodedMessage = Buffer.from(rawMessage)
+            .toString('base64')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+
+        try {
+            const result = await gmail.users.messages.send({
+                userId: 'me',
+                requestBody: {
+                    threadId,
+                    raw: encodedMessage,
+                },
+            });
+
+            const messageId = result.data.id || 'unknown';
+            logger.info('Reply sent successfully', { messageId, threadId });
+            return messageId;
+        } catch (error) {
+            logger.error('Gmail API Error sending reply', error);
+            throw error;
+        }
+    }
+
 
     async addLabel(account: EmailAccount, messageId: string, labelIds: string[]): Promise<void> {
         const gmail = await this.getAuthenticatedClient(account);

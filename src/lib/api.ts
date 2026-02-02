@@ -7,7 +7,7 @@
  */
 
 import { getApiConfig } from './api-config';
-import { EmailAccount } from './types';
+import { EmailAccount, Email } from './types';
 
 interface ApiOptions extends RequestInit {
     auth?: boolean;
@@ -373,6 +373,32 @@ class HybridApiClient {
         return this.expressRequest<{ success: number; failed: number }>('/api/actions/bulk', {
             method: 'POST',
             body: JSON.stringify({ emailIds, action }),
+        });
+    }
+
+    // ============================================================================
+    // DRAFTS ENDPOINTS (Express API - Local App)
+    // ============================================================================
+
+    async getDrafts(params: { status?: 'pending' | 'sent' | 'dismissed'; limit?: number; offset?: number; account_id?: string } = {}) {
+        const query = new URLSearchParams();
+        if (params.status) query.set('status', params.status);
+        if (params.limit) query.set('limit', params.limit.toString());
+        if (params.offset) query.set('offset', params.offset.toString());
+        if (params.account_id && params.account_id !== 'all') query.set('account_id', params.account_id);
+
+        return this.expressRequest<{ drafts: Email[]; total: number }>(`/api/drafts?${query}`);
+    }
+
+    async sendDraft(emailId: string) {
+        return this.expressRequest<{ success: boolean; messageId: string }>(`/api/drafts/${emailId}/send`, {
+            method: 'POST'
+        });
+    }
+
+    async dismissDraft(emailId: string) {
+        return this.expressRequest<{ success: boolean }>(`/api/drafts/${emailId}/dismiss`, {
+            method: 'POST'
         });
     }
 

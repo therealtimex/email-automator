@@ -44,27 +44,17 @@ export function Drafts({ onPreview }: DraftsProps) {
     const fetchDrafts = async () => {
         setLoading(true);
         try {
-            const params = new URLSearchParams({
+            const response = await api.getDrafts({
                 status: filterStatus,
-                limit: '100',
+                limit: 100,
+                account_id: filterAccount
             });
 
-            if (filterAccount !== 'all') {
-                params.append('account_id', filterAccount);
+            if (response.error) {
+                throw new Error(typeof response.error === 'string' ? response.error : response.error.message);
             }
 
-            const response = await fetch(`/api/v1/drafts?${params}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch drafts');
-            }
-
-            const data = await response.json();
-            setDrafts(data.drafts || []);
+            setDrafts(response.data?.drafts || []);
         } catch (error) {
             console.error('Failed to fetch drafts:', error);
             toast.error(t('drafts.loadError') || 'Failed to load drafts');
@@ -76,15 +66,10 @@ export function Drafts({ onPreview }: DraftsProps) {
     const handleSend = async (emailId: string) => {
         setActionLoading(emailId);
         try {
-            const response = await fetch(`/api/v1/drafts/${emailId}/send`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
-                },
-            });
+            const response = await api.sendDraft(emailId);
 
-            if (!response.ok) {
-                throw new Error('Failed to send draft');
+            if (response.error) {
+                throw new Error(typeof response.error === 'string' ? response.error : response.error.message);
             }
 
             toast.success(t('drafts.sendSuccess') || 'Draft sent successfully!');
@@ -100,15 +85,10 @@ export function Drafts({ onPreview }: DraftsProps) {
     const handleDismiss = async (emailId: string) => {
         setActionLoading(emailId);
         try {
-            const response = await fetch(`/api/v1/drafts/${emailId}/dismiss`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
-                },
-            });
+            const response = await api.dismissDraft(emailId);
 
-            if (!response.ok) {
-                throw new Error('Failed to dismiss draft');
+            if (response.error) {
+                throw new Error(typeof response.error === 'string' ? response.error : response.error.message);
             }
 
             toast.success(t('drafts.dismissSuccess') || 'Draft dismissed');

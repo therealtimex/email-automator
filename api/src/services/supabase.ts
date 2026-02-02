@@ -30,7 +30,7 @@ export function getServerSupabase(forceRefresh = false): SupabaseClient | null {
     const key = config.supabase.anonKey;
 
     if (!url || !key || !isValidUrl(url)) {
-        logger.warn('Supabase not configured or invalid URL - skipping client initialization');
+        logger.debug('Supabase not configured or invalid URL - skipping client initialization');
         return null;
     }
 
@@ -56,7 +56,7 @@ export function getServiceRoleSupabase(): SupabaseClient | null {
     const key = config.supabase.serviceRoleKey;
 
     if (!url || !key || !isValidUrl(url)) {
-        logger.warn('Service role Supabase not configured or invalid URL');
+        logger.debug('Service role Supabase not configured or invalid URL');
         return null;
     }
 
@@ -117,6 +117,13 @@ export interface Email {
     processing_status: 'pending' | 'processing' | 'completed' | 'failed';
     processing_error?: string | null;
     retry_count: number;
+    // Draft fields
+    draft_status?: 'pending' | 'sent' | 'dismissed' | null;
+    draft_content?: string | null;  // For persisting generated draft
+    draft_id?: string | null;       // Gmail/Outlook draft ID
+    draft_created_at?: string | null;
+    draft_sent_at?: string | null;
+    draft_dismissed_at?: string | null;
 }
 
 export interface Rule {

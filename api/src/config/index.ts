@@ -48,10 +48,10 @@ function parseArgs(args: string[]): { port: number | null, noUi: boolean, rename
             port = p;
         }
     }
-    
+
     const noUi = args.includes('--no-ui');
     const rename = args.includes('--rename');
-    
+
     return { port, noUi, rename };
 }
 
@@ -120,12 +120,13 @@ export const config = {
 export function validateConfig(): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    if (!config.supabase.url) {
-        errors.push('SUPABASE_URL is required');
-    }
-    if (!config.supabase.anonKey) {
-        errors.push('SUPABASE_ANON_KEY is required');
-    }
+    // For BYOK (Bring Your Own Key) apps, .env is optional
+    // if (!config.supabase.url) {
+    //     errors.push('SUPABASE_URL is required');
+    // }
+    // if (!config.supabase.anonKey) {
+    //     errors.push('SUPABASE_ANON_KEY is required');
+    // }
     if (config.isProduction && config.security.jwtSecret === 'dev-secret-change-in-production') {
         errors.push('JWT_SECRET must be set in production');
     }

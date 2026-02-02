@@ -1102,10 +1102,33 @@ export class EmailProcessorService {
                         }
                     }
 
-                    await this.executeAction(account, email, action, draftContent, eventLogger, `Rule: ${rule.name}`, rule.attachments);
+                    // PERSISTENCE FIX: Save the generated draft content to the database
+                    if (draftContent) {
+                        await this.supabase
+                            .from('emails')
+                            .update({
+                                draft_content: draftContent,
+                                draft_status: 'pending',
+                                draft_created_at: new Date().toISOString()
+                            })
+                            .eq('id', email.id);
+
+                        // Update local object so executeAction uses it if needed
+                        email.draft_content = draftContent;
+                    }
+
+                    const resultId = await this.executeAction(account, email, action, draftContent, eventLogger, `Rule: ${rule.name}`, rule.attachments);
 
                     if (action === 'delete') result.deleted++;
                     else if (action === 'draft') result.drafted++;
+
+                    // If action was draft, executeAction returns draftId. Save it.
+                    if (action === 'draft' && resultId) {
+                        await this.supabase
+                            .from('emails')
+                            .update({ draft_id: resultId })
+                            .eq('id', email.id);
+                    }
                 }
             }
         }
@@ -1326,7 +1349,7 @@ export class EmailProcessorService {
         eventLogger?: EventLogger | null,
         reason?: string,
         attachments?: any[]
-    ): Promise<void> {
+    ): Promise<string | void> {
         try {
             if (eventLogger) {
                 await eventLogger.info('Acting', `Executing action: ${action}`, { reason, hasAttachments: !!attachments?.length }, email.id);
@@ -1358,6 +1381,7 @@ export class EmailProcessorService {
                     if (eventLogger) {
                         await eventLogger.info('Drafted', `Draft created successfully. ID: ${draftId}`, { draftId }, email.id);
                     }
+                    return draftId;
                 } else if (action === 'star') {
                     await this.gmailService.starMessage(account, email.external_id);
                 } else if (action === 'important') {
@@ -1374,7 +1398,8 @@ export class EmailProcessorService {
                 } else if (action === 'archive') {
                     await this.microsoftService.archiveMessage(account, email.external_id);
                 } else if (action === 'draft' && draftContent) {
-                    await this.microsoftService.createDraft(account, email.external_id, draftContent);
+                    const draftId = await this.microsoftService.createDraft(account, email.external_id, draftContent);
+                    return draftId;
                 } else if (action === 'star' || action === 'important') {
                     await this.microsoftService.flagMessage(account, email.external_id);
                 }

@@ -425,6 +425,68 @@ export class MicrosoftService {
         logger.debug('Outlook draft sent', { draftId });
     }
 
+    async sendReply(
+        account: EmailAccount,
+        originalMessageId: string,
+        replyContent: string
+    ): Promise<string> {
+        const accessToken = account.access_token || '';
+
+        // Create reply
+        const createResponse = await fetch(
+            `https://graph.microsoft.com/v1.0/me/messages/${originalMessageId}/createReply`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        if (!createResponse.ok) {
+            throw new Error('Failed to create reply draft');
+        }
+
+        const draft = await createResponse.json();
+
+        // Update content
+        await fetch(
+            `https://graph.microsoft.com/v1.0/me/messages/${draft.id}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    body: {
+                        contentType: 'text',
+                        content: replyContent,
+                    },
+                }),
+            }
+        );
+
+        // Send
+        const sendResponse = await fetch(
+            `https://graph.microsoft.com/v1.0/me/messages/${draft.id}/send`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        if (!sendResponse.ok) {
+            throw new Error('Failed to send reply');
+        }
+
+        logger.info('Reply sent successfully', { messageId: draft.id });
+        return draft.id;
+    }
+
 
     /**
      * Get or create a folder by path (supports nested folders like "Finance/Receipts")
