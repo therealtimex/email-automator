@@ -53,8 +53,14 @@ type TabType = 'dashboard' | 'drafts' | 'autopilot' | 'config' | 'analytics' | '
 import { sounds } from './lib/sounds';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
+import { TTSProvider } from './context/TTSContext';
+import { AgentProvider } from './context/AgentContext';
+import { AgentOverlay } from './components/AgentOverlay';
 
 function AppContent() {
+
+
+
     const { state, isSubscribed, actions } = useApp();
     const { t } = useLanguage();
     const [user, setUser] = useState<any>(null);
@@ -467,8 +473,10 @@ function AppContent() {
                 )}
 
                 <LiveTerminal />
+                <AgentOverlay />
 
                 <Dialog open={showPersonaWizard} onOpenChange={(open) => {
+
                     if (!open) setPersonaDismissed(true);
                     setShowPersonaWizard(open);
                 }}>
@@ -853,11 +861,17 @@ function App() {
             <ThemeProvider defaultTheme="system" storageKey="email-automator-theme">
                 <ErrorBoundary>
                     <TerminalProvider>
-                        <AppProvider>
-                            <AppContent />
-                            <ToastContainer />
-                        </AppProvider>
+                        <TTSProvider>
+                            <AgentProvider>
+                                <AppProvider>
+                                    <AppContent />
+                                    <ToastContainer />
+                                </AppProvider>
+                            </AgentProvider>
+                        </TTSProvider>
                     </TerminalProvider>
+
+
                 </ErrorBoundary>
             </ThemeProvider>
         </LanguageProvider>

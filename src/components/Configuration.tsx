@@ -10,8 +10,10 @@ import { supabase } from '../lib/supabase';
 import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
 import { EmailAccount, Rule, UserSettings, RuleAttachment } from '../lib/types';
+import { usePageAgent } from '../hooks/usePageAgent';
 import {
     Dialog,
+
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -55,8 +57,24 @@ export function Configuration() {
     const [testingLlm, setTestingLlm] = useState(false);
     const [localSettings, setLocalSettings] = useState<Partial<ExtendedUserSettings>>({});
 
+    usePageAgent({
+        page_id: 'configuration_wizard',
+        system_instruction: "You are the Configuration Wizard. Guide the user through setting up their accounts, rules, and system preferences. Explain what each setting does and help them troubleshoot connections.",
+        data: {
+            accounts_count: state.accounts.length,
+            connected_providers: state.accounts.map(a => a.provider),
+            rules_count: state.rules.length,
+            active_rules: state.rules.filter(r => r.is_enabled).map(r => r.name),
+            current_settings: {
+                llm_provider: localSettings.llm_provider,
+                llm_model: localSettings.llm_model
+            }
+        }
+    });
+
     // Gmail credentials modal state
     const [showGmailModal, setShowGmailModal] = useState(false);
+
     const [gmailModalStep, setGmailModalStep] = useState<'credentials' | 'code'>('credentials');
     const [credentialsJson, setCredentialsJson] = useState('');
     const [gmailClientId, setGmailClientId] = useState('');

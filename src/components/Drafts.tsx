@@ -8,8 +8,10 @@ import { api } from '../lib/api';
 import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
 import { cn } from '../lib/utils';
+import { usePageAgent } from '../hooks/usePageAgent';
 
 interface DraftsProps {
+
     onPreview: (email: Email) => void;
 }
 
@@ -25,10 +27,28 @@ export function Drafts({ onPreview }: DraftsProps) {
     const [filterAccount, setFilterAccount] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<'pending' | 'sent' | 'dismissed'>('pending');
 
+    // Agent Context Injection
+    usePageAgent({
+        page_id: 'draft_review',
+        system_instruction: "You are the Draft Review Assistant. Help the user review, send, or dismiss their email drafts. You can summarize the pending drafts and take actions based on user commands.",
+        data: {
+            count: drafts.length,
+            drafts: drafts.slice(0, 10).map(d => ({
+                id: d.id,
+                subject: d.subject || 'No Subject',
+                to: d.recipient || 'Unknown',
+                sender: d.sender,
+                ai_summary: (d.ai_analysis as any)?.summary || 'No summary'
+            })),
+            filters: { account: filterAccount, status: filterStatus }
+        }
+    });
+
     useEffect(() => {
         fetchDrafts();
         fetchAccounts();
     }, [filterAccount, filterStatus]);
+
 
     const fetchAccounts = async () => {
         try {
