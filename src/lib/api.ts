@@ -494,6 +494,63 @@ class HybridApiClient {
             body: JSON.stringify({ role })
         });
     }
+
+    // ========================================
+    // Adaptive Learning API (Phase 4)
+    // ========================================
+
+    async submitFeedback(feedback: {
+        email_id: string;
+        feedback_type: 'analysis' | 'draft';
+        original_state: any;
+        corrected_state: any;
+    }) {
+        if (!this.supabaseClient) return { error: 'Supabase client not initialized' };
+
+        const { data: { user } } = await this.supabaseClient.auth.getUser();
+        if (!user) return { error: 'Not authenticated' };
+
+        const { error } = await this.supabaseClient
+            .from('user_feedback')
+            .insert({
+                user_id: user.id,
+                email_id: feedback.email_id,
+                feedback_type: feedback.feedback_type,
+                original_data: feedback.original_state,
+                corrected_data: feedback.corrected_state,
+            });
+
+        return { success: !error, error };
+    }
+
+    async getLearningMetrics() {
+        if (!this.supabaseClient) return { error: 'Supabase client not initialized' };
+
+        const { data: { user } } = await this.supabaseClient.auth.getUser();
+        if (!user) return { error: 'Not authenticated' };
+
+        // Get metrics
+        const { data: metrics } = await this.supabaseClient
+            .from('learning_metrics')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+        // Get user settings for patterns/VIPs
+        const { data: settings } = await this.supabaseClient
+            .from('user_settings')
+            .select('category_patterns, vip_senders')
+            .eq('user_id', user.id)
+            .single();
+
+        return {
+            data: {
+                ...metrics,
+                category_patterns: settings?.category_patterns || {},
+                vip_senders: settings?.vip_senders || []
+            }
+        };
+    }
 }
 
 export const api = new HybridApiClient();

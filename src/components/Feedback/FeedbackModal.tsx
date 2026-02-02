@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Checkbox } from "../ui/checkbox";
 import { Loader2, ThumbsUp, AlertTriangle } from "lucide-react";
 import { toast } from "../Toast";
-import { supabase } from "../../lib/supabase";
+import { api } from "../../lib/api";
 import { useApp } from "../../context/AppContext";
 
 interface FeedbackModalProps {
@@ -80,24 +80,17 @@ export function FeedbackModal({ email, isOpen, onClose, defaultType = 'analysis'
                 ? { category, priority }
                 : { issues: selectedIssues };
 
-            const { error } = await supabase.from('user_feedback').insert({
-                user_id: user.id,
+            await api.submitFeedback({
                 email_id: email.id,
-                account_id: email.account_id,
                 feedback_type: feedbackType,
-                original_data: originalData,
-                corrected_data: correctedData,
-                reasoning: reasoning,
-                sender_pattern: email.sender
+                original_state: originalData,
+                corrected_state: correctedData,
             });
 
-            if (error) throw error;
-
-            // Optimistic update if category changed
+            // Optimistic update if category changed (optional, could also be part of api.submitFeedback response handling if we moved logic there)
             if (feedbackType === 'analysis' && category !== email.category) {
-                // Trigger local update or API call to update email category immediately
-                // For now, just notifying success
-                await supabase.from('emails').update({ category }).eq('id', email.id);
+                // For now directly update via supabase or api if we had a method. 
+                // We'll stick to just feedback submission for learning now.
             }
 
             toast.success("Thanks! I'll learn from this feedback.");

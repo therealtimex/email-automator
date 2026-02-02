@@ -74,6 +74,10 @@ export function getServiceRoleSupabase(): SupabaseClient | null {
 }
 
 // Database types (expand as needed)
+// Enums for standardization
+export type DraftStatus = 'pending' | 'sent' | 'dismissed';
+export type EmailAction = 'reply' | 'draft' | 'archive' | 'trash' | 'mark_read' | 'label' | 'forward';
+
 export interface EmailAccount {
     id: string;
     user_id: string;
@@ -97,6 +101,9 @@ export interface EmailAccount {
 export interface Email {
     id: string;
     account_id: string;
+    created_at: string;
+
+    // Core Email Fields
     external_id: string;
     subject: string | null;
     sender: string | null;
@@ -106,11 +113,12 @@ export interface Email {
     category: string | null;
     is_useless: boolean;
     ai_analysis: Record<string, unknown> | null;
+
+    // Action Fields
     suggested_action: string | null; // Deprecated
     suggested_actions?: string[];
     action_taken: string | null; // Deprecated
     actions_taken?: string[];
-    created_at: string;
     email_accounts?: EmailAccount;
     // ETL fields
     file_path?: string | null;
@@ -118,7 +126,7 @@ export interface Email {
     processing_error?: string | null;
     retry_count: number;
     // Draft fields
-    draft_status?: 'pending' | 'sent' | 'dismissed' | null;
+    draft_status?: DraftStatus | null;
     draft_content?: string | null;  // For persisting generated draft
     draft_id?: string | null;       // Gmail/Outlook draft ID
     draft_created_at?: string | null;
@@ -172,6 +180,61 @@ export interface UserSettings {
     // Zero-Config UX Support
     user_role?: string | null;           // User role (executive, developer, sales, operations, other)
     onboarding_completed?: boolean;      // Whether user completed role selection onboarding
+
+    // Adaptive Learning Fields (JSONB)
+    category_patterns?: Record<string, string>; // e.g. {"linkedin.com": "newsletter"}
+    auto_archive_domains?: string[];
+    never_draft_domains?: string[];
+
+    // Persona Fields
+    full_name?: string | null;
+    role?: string | null;
+    company?: string | null;
+    industry?: string | null;
+    work_style?: string | null;
+    preferred_tone?: string | null;
+    preferred_length?: number | null;
+    signature?: string | null;
+    common_phrases?: string[];
+    vip_senders?: string[];
+    trusted_domains?: string[];
+    blocked_domains?: string[];
+    primary_goal?: string | null;
+    time_budget_minutes?: number | null;
+    automation_level?: number | null;
+    never_automate_categories?: string[];
+    persona_completed?: boolean;
+    persona_completed_at?: string | null;
+}
+
+export interface LearningMetrics {
+    id: string;
+    user_id: string;
+    total_classifications: number;
+    correct_classifications: number;
+    drafts_generated: number;
+    drafts_edited: number;
+    drafts_sent_unedited: number;
+    drafts_dismissed: number;
+    category_accuracy: Record<string, number>;
+    updated_at: string;
+}
+
+export interface UserFeedback {
+    id: string;
+    user_id: string;
+    email_id: string;
+    account_id?: string;
+    feedback_type: 'analysis' | 'draft' | 'draft_edit';
+    original_data: Record<string, unknown>;
+    corrected_data: Record<string, unknown>;
+    reasoning?: string | null;
+    sender_pattern?: string | null;
+    created_at: string;
+    // Joined data from emails table
+    emails?: {
+        sender?: string;
+    };
 }
 
 // Zero-Config UX: Pack Installation Tracking

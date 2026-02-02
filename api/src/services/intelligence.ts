@@ -84,6 +84,9 @@ export interface EmailContext {
     userPreferences?: {
         autoTrashSpam?: boolean;
         smartDrafts?: boolean;
+        categoryPatterns?: Record<string, string>;
+        vipSenders?: string[];
+        preferredLength?: number;
     };
 }
 
@@ -121,6 +124,17 @@ export class IntelligenceService {
         if (context.metadata?.autoSubmitted && context.metadata.autoSubmitted !== 'no') metadataSignals.push(`- Auto-Submitted: ${context.metadata.autoSubmitted}`);
         if (context.metadata?.importance) metadataSignals.push(`- Priority: ${context.metadata.importance}`);
 
+        // Adaptive Learning Signals
+        if (context.userPreferences?.vipSenders?.includes(context.sender)) {
+            metadataSignals.push('- SENDER IS VIP (High Priority Required)');
+        }
+
+        const senderDomain = context.sender.split('@')[1];
+        if (senderDomain && context.userPreferences?.categoryPatterns?.[senderDomain]) {
+            const learnedCategory = context.userPreferences.categoryPatterns[senderDomain];
+            metadataSignals.push(`- LEARNED PATTERN: Sender domain '${senderDomain}' is strictly category '${learnedCategory}'`);
+        }
+
         const systemPrompt = `You are an AI Email Assistant. Analyze the email and return structured JSON.
 
 CATEGORY DEFINITIONS:
@@ -142,6 +156,8 @@ CRITICAL RULES:
 2. Emails from noreply@, no-reply@ are likely "transactional" or "notification"
 3. Weekly/Monthly digests are "newsletter"
 4. If "List-Unsubscribe" header is present, it is likely "newsletter" or "promotional"
+5. Follow "LEARNED PATTERN" signals strictly if present
+6. VIP Senders must be "High" priority unless irrelevant (e.g. OOO auto-reply)
 
 FEW-SHOT EXAMPLES:
 

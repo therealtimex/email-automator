@@ -784,6 +784,9 @@ export class EmailProcessorService {
                     userPreferences: {
                         autoTrashSpam: settings?.auto_trash_spam,
                         smartDrafts: settings?.smart_drafts,
+                        categoryPatterns: settings?.category_patterns,
+                        vipSenders: settings?.vip_senders,
+                        preferredLength: settings?.preferred_length
                     },
                 },
                 compiledContext || '',  // Pre-compiled context (fast path)
@@ -1102,32 +1105,70 @@ export class EmailProcessorService {
                         }
                     }
 
-                    // PERSISTENCE FIX: Save the generated draft content to the database
-                    if (draftContent) {
+                    // TRANSACTION SAFETY: Wrap draft creation in try-catch with rollback
+                    try {
+                        // Step 1: Save draft content to database
+                        if (draftContent) {
+                            const { error: updateError } = await this.supabase
+                                .from('emails')
+                                .update({
+                                    draft_content: draftContent,
+                                    draft_status: 'pending',
+                                    draft_created_at: new Date().toISOString()
+                                })
+                                .eq('id', email.id);
+
+                            if (updateError) {
+                                throw new Error(`Failed to save draft content: ${updateError.message}`);
+                            }
+
+                            // Update local object so executeAction uses it if needed
+                            email.draft_content = draftContent;
+                        }
+
+                        // Step 2: Execute action (creates draft in email provider)
+                        const resultId = await this.executeAction(account, email, action, draftContent, eventLogger, `Rule: ${rule.name}`, rule.attachments);
+
+                        // Step 3: Update counters
+                        if (action === 'delete') result.deleted++;
+                        else if (action === 'draft') result.drafted++;
+
+                        // Step 4: Save draft ID if action was draft
+                        if (action === 'draft' && resultId) {
+                            const { error: draftIdError } = await this.supabase
+                                .from('emails')
+                                .update({ draft_id: resultId })
+                                .eq('id', email.id);
+
+                            if (draftIdError) {
+                                // Log error but don't fail - draft was created successfully in provider
+                                logger.error('Failed to save draft_id, but draft was created', new Error(draftIdError.message));
+                            }
+                        }
+                    } catch (actionError) {
+                        // ROLLBACK: Clear draft status if action failed
+                        logger.error('Action execution failed, rolling back draft status', actionError as Error);
+
                         await this.supabase
                             .from('emails')
                             .update({
-                                draft_content: draftContent,
-                                draft_status: 'pending',
-                                draft_created_at: new Date().toISOString()
+                                draft_status: null,
+                                draft_created_at: null,
+                                processing_error: actionError instanceof Error ? actionError.message : String(actionError)
                             })
                             .eq('id', email.id);
 
-                        // Update local object so executeAction uses it if needed
-                        email.draft_content = draftContent;
-                    }
+                        // Log to event logger if available
+                        if (eventLogger) {
+                            await eventLogger.error(
+                                'Action Failed',
+                                `Failed to execute ${action}: ${actionError instanceof Error ? actionError.message : String(actionError)}`,
+                                email.id
+                            );
+                        }
 
-                    const resultId = await this.executeAction(account, email, action, draftContent, eventLogger, `Rule: ${rule.name}`, rule.attachments);
-
-                    if (action === 'delete') result.deleted++;
-                    else if (action === 'draft') result.drafted++;
-
-                    // If action was draft, executeAction returns draftId. Save it.
-                    if (action === 'draft' && resultId) {
-                        await this.supabase
-                            .from('emails')
-                            .update({ draft_id: resultId })
-                            .eq('id', email.id);
+                        // Continue to next email instead of crashing
+                        continue;
                     }
                 }
             }

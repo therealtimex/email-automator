@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { config } from '../config/index.js';
 import { createLogger } from '../utils/logger.js';
 import { EmailProcessorService } from './processor.js';
+import { LearningService } from './learning.js';
 import { getServerSupabase } from './supabase.js';
 
 const logger = createLogger('Scheduler');
@@ -36,6 +37,9 @@ class SyncScheduler {
 
         // Schedule cleanup job
         this.scheduleCleanup();
+
+        // Schedule learning job
+        this.scheduleLearningJob();
     }
 
     stop(): void {
@@ -187,6 +191,46 @@ class SyncScheduler {
 
         this.jobs.set(jobId, job);
         logger.info('Scheduled daily cleanup');
+    }
+
+    private scheduleLearningJob(): void {
+        const jobId = 'learning';
+        const interval = 24 * 60 * 60 * 1000; // Daily
+
+        const job: ScheduledJob = {
+            id: jobId,
+            name: 'Adaptive Learning',
+            interval,
+            lastRun: null,
+            isRunning: false,
+            timer: null,
+        };
+
+        job.timer = setInterval(async () => {
+            if (job.isRunning) return;
+
+            job.isRunning = true;
+            try {
+                await this.runLearningJob();
+                job.lastRun = new Date();
+            } catch (error) {
+                logger.error('Learning job failed', error);
+            } finally {
+                job.isRunning = false;
+            }
+        }, interval);
+
+        this.jobs.set(jobId, job);
+        logger.info('Scheduled daily learning job');
+    }
+
+    private async runLearningJob(): Promise<void> {
+        if (!this.supabase) return;
+
+        logger.info('Running learning job');
+        const learningService = new LearningService(this.supabase);
+        await learningService.processFeedback();
+        logger.info('Learning job completed');
     }
 
     private async runCleanup(): Promise<void> {

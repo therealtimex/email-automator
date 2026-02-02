@@ -11,6 +11,7 @@ const logger = createLogger('DraftsRoutes');
 
 // List drafts
 router.get('/',
+    apiRateLimit,
     authMiddleware,
     asyncHandler(async (req, res) => {
         const {
@@ -23,7 +24,9 @@ router.get('/',
         let query = req.supabase!
             .from('emails')
             .select(`
-                *,
+                id, subject, sender, recipient, date,
+                draft_status, draft_created_at, draft_content, ai_analysis,
+                account_id, external_id, draft_id,
                 email_accounts!inner(id, user_id, email_address, provider)
             `, { count: 'exact' })
             .eq('email_accounts.user_id', req.user!.id)
@@ -57,23 +60,27 @@ router.post('/:emailId/send',
         const { emailId } = req.params;
         const userId = req.user!.id;
 
-        // Fetch email with account info
+        // Fetch email with account info and SECURITY CHECK in query
         const { data: email, error } = await req.supabase!
             .from('emails')
-            .select('*, email_accounts(*)')
+            .select('*, email_accounts!inner(*)')
             .eq('id', emailId)
+            .eq('email_accounts.user_id', userId) // Security: Ensure user owns the account
             .single();
 
         if (error || !email) {
             throw new NotFoundError('Email');
         }
 
-        if (email.email_accounts.user_id !== userId) {
-            throw new NotFoundError('Email');
-        }
+        // if (email.email_accounts.user_id !== userId) {
+        //     throw new NotFoundError('Email');
+        // }
 
         const account = email.email_accounts;
-        const draftContent = email.draft_content || email.ai_analysis?.draft_response;
+        // CRITICAL: Priority Definition
+        // 1. draft_content (User edits / Persisted draft) overrides everything
+        // 2. ai_analysis.draft_response (Fallback if no manual content)
+        const draftContent = email.draft_content ?? email.ai_analysis?.draft_response;
 
         logger.debug('Sending draft', {
             emailId,
@@ -104,14 +111,12 @@ router.post('/:emailId/send',
             if (email.draft_id) {
                 if (account.provider === 'gmail') {
                     const gmailService = getGmailService();
-                    await gmailService.sendDraft(account, email.draft_id);
-                    // draftId is the same as messageId when sending draft in some contexts, or we don't get a new ID.
-                    // But sendDraft is void. We can assume success.
+                    sentMessageId = await gmailService.sendDraft(account, email.draft_id);
                 } else if (account.provider === 'outlook') {
                     const microsoftService = getMicrosoftService();
-                    await microsoftService.sendDraft(account, email.draft_id);
+                    sentMessageId = await microsoftService.sendDraft(account, email.draft_id);
                 }
-                logger.info('Sent existing draft', { draftId: email.draft_id });
+                logger.info('Sent existing draft', { draftId: email.draft_id, sentMessageId });
             }
             // Fallback: Create new reply using content (if draft object was deleted externally or not saved)
             else {

@@ -413,18 +413,20 @@ export class GmailService {
         }
     }
 
-    async sendDraft(account: EmailAccount, draftId: string): Promise<void> {
+    async sendDraft(account: EmailAccount, draftId: string): Promise<string> {
         const gmail = await this.getAuthenticatedClient(account);
 
         try {
-            await gmail.users.drafts.send({
+            const response = await gmail.users.drafts.send({
                 userId: 'me',
                 requestBody: {
                     id: draftId,
                 },
             });
 
-            logger.info('Draft sent successfully', { draftId });
+            const sentMessageId = response.data.id || draftId; // Fallback to draftId if no DB ID returned (rare)
+            logger.info('Draft sent successfully', { draftId, sentMessageId });
+            return sentMessageId;
         } catch (error) {
             logger.error('Gmail API Error sending draft', error);
             throw error;

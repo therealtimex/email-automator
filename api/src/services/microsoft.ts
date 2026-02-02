@@ -403,7 +403,7 @@ export class MicrosoftService {
         return draft.id;
     }
 
-    async sendDraft(account: EmailAccount, draftId: string): Promise<void> {
+    async sendDraft(account: EmailAccount, draftId: string): Promise<string> {
         const accessToken = account.access_token || '';
 
         const response = await fetch(
@@ -423,6 +423,7 @@ export class MicrosoftService {
         }
 
         logger.debug('Outlook draft sent', { draftId });
+        return draftId; // Outlook API returns 202 Accepted, so we return the input ID as reference
     }
 
     async sendReply(
