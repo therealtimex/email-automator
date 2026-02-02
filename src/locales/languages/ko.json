@@ -459,5 +459,14 @@
     "terminal.action.delete": "휴지통으로 이동됨",
     "terminal.action.archive": "이메일 아카이브됨",
     "terminal.action.draft": "답장 초안 작성됨",
-    "terminal.action.star": "이메일 별표 표시됨"
+    "terminal.action.star": "이메일 별표 표시됨",
+    "common.edit": "편집",
+    "persona.title": "디지털 페르소나",
+    "persona.subtitle": "AI 비서가 귀하를 대신하여 행동하는 방식을 관리합니다.",
+    "persona.identity": "정체성",
+    "persona.communication": "커뮤니케이션",
+    "persona.automation": "자동화",
+    "persona.network": "네트워크",
+    "persona.edit.title": "페르소나 편집",
+    "persona.edit.desc": "디지털 비서 설정을 업데이트합니다."
 }

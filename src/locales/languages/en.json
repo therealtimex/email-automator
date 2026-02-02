@@ -459,5 +459,14 @@
     "terminal.action.delete": "Moved to Trash",
     "terminal.action.archive": "Archived Email",
     "terminal.action.draft": "Drafted Reply",
-    "terminal.action.star": "Starred Email"
+    "terminal.action.star": "Starred Email",
+    "persona.title": "Digital Persona",
+    "persona.subtitle": "Manage how your AI assistant represents you.",
+    "persona.identity": "Identity",
+    "persona.communication": "Communication",
+    "persona.automation": "Automation",
+    "persona.network": "Network",
+    "persona.edit.title": "Edit Persona",
+    "persona.edit.desc": "Update your digital assistant preferences.",
+    "common.edit": "Edit"
 }

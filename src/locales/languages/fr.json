@@ -459,5 +459,14 @@
     "terminal.action.delete": "Déplacé vers la corbeille",
     "terminal.action.archive": "E-mail archivé",
     "terminal.action.draft": "Brouillon de réponse créé",
-    "terminal.action.star": "E-mail marqué d'une étoile"
+    "terminal.action.star": "E-mail marqué d'une étoile",
+    "common.edit": "Modifier",
+    "persona.title": "Persona Numérique",
+    "persona.subtitle": "Gérez la façon dont votre assistant IA vous représente.",
+    "persona.identity": "Identité",
+    "persona.communication": "Communication",
+    "persona.automation": "Automatisation",
+    "persona.network": "Réseau",
+    "persona.edit.title": "Modifier la Persona",
+    "persona.edit.desc": "Mettez à jour les préférences de votre assistant numérique."
 }

@@ -459,5 +459,14 @@
     "terminal.action.delete": "Movido a la papelera",
     "terminal.action.archive": "Correo electrónico archivado",
     "terminal.action.draft": "Borrador de respuesta creado",
-    "terminal.action.star": "Correo electrónico marcado con estrella"
+    "terminal.action.star": "Correo electrónico marcado con estrella",
+    "common.edit": "Editar",
+    "persona.title": "Persona Digital",
+    "persona.subtitle": "Gestiona cómo tu asistente de IA te representa.",
+    "persona.identity": "Identidad",
+    "persona.communication": "Comunicación",
+    "persona.automation": "Automatización",
+    "persona.network": "Red",
+    "persona.edit.title": "Editar Persona",
+    "persona.edit.desc": "Actualiza las preferencias de tu asistente digital."
 }

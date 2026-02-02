@@ -459,5 +459,14 @@
     "terminal.action.delete": "Đã chuyển vào Thùng rác",
     "terminal.action.archive": "Đã lưu trữ Email",
     "terminal.action.draft": "Đã tạo bản nháp trả lời",
-    "terminal.action.star": "Đã gắn sao Email"
+    "terminal.action.star": "Đã gắn sao Email",
+    "persona.title": "Hồ sơ số",
+    "persona.subtitle": "Quản lý cách trợ lý AI đại diện cho bạn.",
+    "persona.identity": "Danh tính",
+    "persona.communication": "Giao tiếp",
+    "persona.automation": "Tự động hóa",
+    "persona.network": "Mạng lưới",
+    "persona.edit.title": "Chỉnh sửa Hồ sơ",
+    "persona.edit.desc": "Cập nhật tùy chọn trợ lý kỹ thuật số của bạn.",
+    "common.edit": "Chỉnh sửa"
 }

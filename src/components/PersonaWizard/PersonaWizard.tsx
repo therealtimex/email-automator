@@ -13,15 +13,18 @@ import { supabase } from "../../lib/supabase";
 import { useApp } from "../../context/AppContext";
 import { toast } from "../Toast";
 
+import { cn } from "../../lib/utils";
+
 interface PersonaWizardProps {
     onComplete: () => void;
     onClose?: () => void;
     initialData?: UserPersona;
+    className?: string;
 }
 
 const TOTAL_STEPS = 4;
 
-export function PersonaWizard({ onComplete, onClose, initialData }: PersonaWizardProps) {
+export function PersonaWizard({ onComplete, onClose, initialData, className }: PersonaWizardProps) {
     const { t } = useLanguage();
     const { state } = useApp();
     const { user } = state;
@@ -103,7 +106,7 @@ export function PersonaWizard({ onComplete, onClose, initialData }: PersonaWizar
     const progress = (currentStep / TOTAL_STEPS) * 100;
 
     return (
-        <Card className="w-full max-w-2xl mx-auto border-none shadow-none md:border md:shadow-lg">
+        <Card className={cn("w-full max-w-2xl mx-auto border-none shadow-none md:border md:shadow-lg", className)}>
             <CardHeader>
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-muted-foreground">Step {currentStep} of {TOTAL_STEPS}</span>

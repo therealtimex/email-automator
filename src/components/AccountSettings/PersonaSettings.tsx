@@ -27,14 +27,19 @@ export function PersonaSettings() {
     if (isEditing) {
         return (
             <Dialog open={true} onOpenChange={setIsEditing}>
-                <DialogContent className="max-w-3xl">
-                    <DialogTitle>{t('persona.edit.title') || 'Edit Persona'}</DialogTitle>
-                    <DialogDescription>{t('persona.edit.desc') || 'Update your digital assistant preferences.'}</DialogDescription>
-                    <PersonaWizard
-                        initialData={persona}
-                        onComplete={handleEditComplete}
-                        onClose={() => setIsEditing(false)}
-                    />
+                <DialogContent className="max-w-5xl sm:max-w-5xl h-[80vh] flex flex-col p-0 overflow-hidden">
+                    <div className="p-6 pb-0">
+                        <DialogTitle>{t('persona.edit.title') || 'Edit Persona'}</DialogTitle>
+                        <DialogDescription>{t('persona.edit.desc') || 'Update your digital assistant preferences.'}</DialogDescription>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-6 pt-2">
+                        <PersonaWizard
+                            initialData={persona}
+                            onComplete={handleEditComplete}
+                            onClose={() => setIsEditing(false)}
+                            className="max-w-none shadow-none border-0 p-0"
+                        />
+                    </div>
                 </DialogContent>
             </Dialog>
         );

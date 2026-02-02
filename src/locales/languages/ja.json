@@ -459,5 +459,14 @@
     "terminal.action.delete": "ゴミ箱に移動",
     "terminal.action.archive": "メールをアーカイブ",
     "terminal.action.draft": "返信下書きを作成",
-    "terminal.action.star": "メールにスターを付ける"
+    "terminal.action.star": "メールにスターを付ける",
+    "common.edit": "編集",
+    "persona.title": "デジタルペルソナ",
+    "persona.subtitle": "AIアシスタントがあなたをどのように表現するかを管理します。",
+    "persona.identity": "アイデンティティ",
+    "persona.communication": "コミュニケーション",
+    "persona.automation": "自動化",
+    "persona.network": "ネットワーク",
+    "persona.edit.title": "ペルソナの編集",
+    "persona.edit.desc": "デジタルアシスタントの設定を更新します。"
 }
