@@ -34,7 +34,14 @@ export class AgentService {
             ? `\nVISIBLE DATA:\n${JSON.stringify(context.data, null, 2)}`
             : "";
 
-        const systemPrompt = `${baseIdentity}${pageInstruction}${dataContext}\n\nBe concise and helpful.`;
+        // Construct Tool Instructions
+        let toolInstructions = "";
+        if (context.tools && context.tools.length > 0) {
+            const toolDescs = context.tools.map(t => `- ${t.name}: ${t.description} (Args: ${JSON.stringify(t.parameters || {})})`).join('\n');
+            toolInstructions = `\n\nAVAILABLE TOOLS:\n${toolDescs}\n\nIMPORTANT: To take action, you MUST output a JSON object at the END of your response in this EXACT format:\n<<<ACTION>>>{"name": "tool_name", "args": { ... }}`;
+        }
+
+        const systemPrompt = `${baseIdentity}${pageInstruction}${dataContext}${toolInstructions}\n\nBe concise and helpful.`;
 
         // 2. Prepare Messages
         // Explicitly map history to ensure role is strongly typed as 'system' | 'user' | 'assistant'
@@ -67,8 +74,25 @@ export class AgentService {
 
         console.log('[AgentService] LLM Response:', JSON.stringify(response, null, 2));
 
+        let content = response.response?.content || "I couldn't generate a response.";
+        let action = undefined;
+
+        // Parse Action
+        if (content.includes('<<<ACTION>>>')) {
+            const parts = content.split('<<<ACTION>>>');
+            content = parts[0].trim(); // user-facing text
+            try {
+                const actionJson = parts[1].trim();
+                action = JSON.parse(actionJson);
+                console.log('[AgentService] Detected Action:', action);
+            } catch (e) {
+                console.error('[AgentService] Failed to parse action JSON:', e);
+            }
+        }
+
         return {
-            content: response.response?.content || "I couldn't generate a response.",
+            content,
+            action,
             // SDK returns 'metrics' inside 'response' object, not top-level 'usage'
             usage: (response.response as any)?.metrics || undefined
         };

@@ -1,12 +1,20 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { useTTS } from '../hooks/useTTS';
 
+export interface ToolDefinition {
+    name: string;
+    description: string;
+    parameters?: any;
+    callback: (args: any) => Promise<any> | any;
+}
+
 export interface AgentConfig {
     page_id: string;
     system_instruction?: string;
     data?: any;
-    tools?: any[];
+    tools?: ToolDefinition[];
 }
+
 
 export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
@@ -63,11 +71,22 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             const token = localStorage.getItem('supabase.auth.token');
 
             // Payload matches api/src/routes/agent.ts expectations
+            // Payload: Strip callbacks from tools before sending
+            const contextPayload = {
+                ...currentConfig,
+                tools: currentConfig.tools?.map(t => ({
+                    name: t.name,
+                    description: t.description,
+                    parameters: t.parameters
+                }))
+            };
+
             const body = {
                 message: content,
-                context: currentConfig,
-                history: chatHistory.slice(-10) // Send recent history
+                context: contextPayload,
+                history: chatHistory.slice(-10)
             };
+
 
             const res = await fetch(endpoint, {
                 method: 'POST',
@@ -83,13 +102,35 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
             if (data.success && data.response) {
                 const aiContent = data.response.content;
-                const aiMsg: ChatMessage = { role: 'assistant', content: aiContent };
+                const aiAction = data.response.action;
 
+                const aiMsg: ChatMessage = { role: 'assistant', content: aiContent };
                 setChatHistory(prev => [...prev, aiMsg]);
 
                 // Speak response
-                setAgentState('speaking');
-                await speak(aiContent, undefined, { speed: 1.1 }); // slightly faster for conversational feel
+                if (aiContent) {
+                    setAgentState('speaking');
+                    await speak(aiContent, undefined, { speed: 1.1 });
+                }
+
+                // Execute Action
+                if (aiAction && currentConfig.tools) {
+                    console.log(`[AgentContext] Executing tool: ${aiAction.name}`, aiAction.args);
+                    const tool = currentConfig.tools.find(t => t.name === aiAction.name);
+                    if (tool) {
+                        try {
+                            // Execute callback
+                            await tool.callback(aiAction.args);
+                            // Optional: provide feedback to chat?
+                        } catch (err) {
+                            console.error(`[AgentContext] Tool execution failed:`, err);
+                            setChatHistory(prev => [...prev, { role: 'system', content: `Error executing ${aiAction.name}` }]);
+                        }
+                    } else {
+                        console.warn(`[AgentContext] Tool not found: ${aiAction.name}`);
+                    }
+                }
+
                 setAgentState('idle');
             } else {
                 setChatHistory(prev => [...prev, { role: 'assistant', content: "Sorry, I encountered an error." }]);

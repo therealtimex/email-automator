@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useAgentContext, AgentConfig } from '../context/AgentContext';
+import { useAgentContext, AgentConfig, ToolDefinition } from '../context/AgentContext';
+
 
 /**
  * Hook to inject page-specific context into the active Agent
