@@ -37,6 +37,8 @@ import {
 import { UpdateBanner } from './components/UpdateBanner';
 import { LiveTerminal } from './components/LiveTerminal';
 import { ProcessingEvent } from './lib/types';
+import { PersonaWizard } from './components/PersonaWizard/PersonaWizard';
+import { LearningDashboard } from './components/Analytics/LearningDashboard';
 import {
     Dialog,
     DialogContent,
@@ -44,6 +46,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from './components/ui/dialog';
+
 
 type TabType = 'dashboard' | 'drafts' | 'autopilot' | 'config' | 'analytics' | 'account';
 
@@ -67,6 +70,22 @@ function AppContent() {
     const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
     const [showUpdateBanner, setShowUpdateBanner] = useState(false);
     const [previewEmail, setPreviewEmail] = useState<any | null>(null);
+    const [showPersonaWizard, setShowPersonaWizard] = useState(false);
+    const [personaDismissed, setPersonaDismissed] = useState(false);
+
+    // Check for Persona completion
+    useEffect(() => {
+        if (state.isInitialized && state.isAuthenticated && state.settings && !state.isLoading) {
+            // If persona not completed, and not already showing, and not dismissed for this session
+            if (!state.settings.persona_completed && !showPersonaWizard && !personaDismissed) {
+                // Small delay to allow UI to settle
+                const timer = setTimeout(() => {
+                    setShowPersonaWizard(true);
+                }, 2000);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [state.isInitialized, state.isAuthenticated, state.settings, state.isLoading, personaDismissed]);
 
     // Handle OAuth Callback (e.g. Gmail)
     useEffect(() => {
@@ -448,6 +467,24 @@ function AppContent() {
                 )}
 
                 <LiveTerminal />
+
+                <Dialog open={showPersonaWizard} onOpenChange={(open) => {
+                    if (!open) setPersonaDismissed(true);
+                    setShowPersonaWizard(open);
+                }}>
+                    <DialogContent className="max-w-3xl border-none bg-transparent shadow-none p-0 sm:max-w-3xl">
+                        <PersonaWizard
+                            onComplete={() => {
+                                setShowPersonaWizard(false);
+                                actions.fetchSettings(); // Refresh settings to update state
+                            }}
+                            onClose={() => {
+                                setShowPersonaWizard(false);
+                                setPersonaDismissed(true);
+                            }}
+                        />
+                    </DialogContent>
+                </Dialog>
             </div>
         </MigrationProvider>
     );
@@ -613,6 +650,8 @@ function AnalyticsPage() {
     const [selectedAccountEmail, setSelectedAccountEmail] = useState<string | undefined>(undefined);
     const [isRunTraceOpen, setIsRunTraceOpen] = useState(false);
 
+    const [activeSubTab, setActiveSubTab] = useState<'overview' | 'learning'>('overview');
+
     useEffect(() => {
         actions.fetchStats();
     }, []);
@@ -631,125 +670,155 @@ function AnalyticsPage() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-                <BarChart3 className="w-6 h-6 text-primary" />
-                {t('analytics.title')}
-            </h2>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <BarChart3 className="w-6 h-6 text-primary" />
+                    {t('analytics.title')}
+                </h2>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard
-                    title={t('analytics.totalEmails')}
-                    value={stats.totalEmails}
-                    color="primary"
-                />
-                <StatCard
-                    title={t('analytics.spamCaught')}
-                    value={stats.categoryCounts['spam'] || 0}
-                    color="destructive"
-                />
-                <StatCard
-                    title={t('analytics.actionsTaken')}
-                    value={Object.values(stats.actionCounts).reduce((a, b) => a + b, 0) - (stats.actionCounts['none'] || 0)}
-                    color="emerald"
-                />
-                <StatCard
-                    title={t('analytics.accounts')}
-                    value={stats.accountCount}
-                    color="blue"
-                />
+                <div className="flex p-1 bg-muted rounded-lg w-full md:w-auto">
+                    <button
+                        onClick={() => setActiveSubTab('overview')}
+                        className={`flex-1 md:w-32 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeSubTab === 'overview'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:bg-background/50'
+                            }`}
+                    >
+                        Overview
+                    </button>
+                    <button
+                        onClick={() => setActiveSubTab('learning')}
+                        className={`flex-1 md:w-32 px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2 ${activeSubTab === 'learning'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:bg-background/50'
+                            }`}
+                    >
+                        <Brain className="w-3.5 h-3.5" />
+                        Learning
+                    </button>
+                </div>
             </div>
 
-            {/* Category Breakdown */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-card border rounded-xl p-6">
-                    <h3 className="font-semibold mb-4">{t('analytics.categories')}</h3>
-                    <div className="space-y-3">
-                        {Object.entries(stats.categoryCounts).map(([category, count]) => (
-                            <div key={category} className="flex items-center gap-3">
-                                <div className="flex-1">
-                                    <div className="flex justify-between text-sm mb-1">
-                                        <span className="capitalize">{category}</span>
-                                        <span className="text-muted-foreground">{count}</span>
+            {activeSubTab === 'learning' ? (
+                <LearningDashboard />
+            ) : (
+                <div className="space-y-8">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <StatCard
+                            title={t('analytics.totalEmails')}
+                            value={stats.totalEmails}
+                            color="primary"
+                        />
+                        <StatCard
+                            title={t('analytics.spamCaught')}
+                            value={stats.categoryCounts['spam'] || 0}
+                            color="destructive"
+                        />
+                        <StatCard
+                            title={t('analytics.actionsTaken')}
+                            value={Object.values(stats.actionCounts).reduce((a, b) => a + b, 0) - (stats.actionCounts['none'] || 0)}
+                            color="emerald"
+                        />
+                        <StatCard
+                            title={t('analytics.accounts')}
+                            value={stats.accountCount}
+                            color="blue"
+                        />
+                    </div>
+
+                    {/* Category Breakdown */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="bg-card border rounded-xl p-6">
+                            <h3 className="font-semibold mb-4">{t('analytics.categories')}</h3>
+                            <div className="space-y-3">
+                                {Object.entries(stats.categoryCounts).map(([category, count]) => (
+                                    <div key={category} className="flex items-center gap-3">
+                                        <div className="flex-1">
+                                            <div className="flex justify-between text-sm mb-1">
+                                                <span className="capitalize">{category}</span>
+                                                <span className="text-muted-foreground">{count}</span>
+                                            </div>
+                                            <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-primary rounded-full transition-all"
+                                                    style={{ width: `${(count / stats.totalEmails) * 100}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-card border rounded-xl p-6">
+                            <h3 className="font-semibold mb-4">{t('analytics.actionsTaken')}</h3>
+                            <div className="space-y-3">
+                                {Object.entries(stats.actionCounts).map(([action, count]) => (
+                                    <div key={action} className="flex items-center justify-between py-2 border-b last:border-0">
+                                        <span className="capitalize">{action}</span>
+                                        <span className="font-medium">{count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Recent Syncs */}
+                    <div className="bg-card border rounded-xl p-6">
+                        <h3 className="font-semibold mb-4">{t('analytics.recentActivity')}</h3>
+                        {stats.recentSyncs.length === 0 ? (
+                            <p className="text-muted-foreground text-sm">{t('analytics.noActivity')}</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {stats.recentSyncs.map((log: any) => {
+                                    const duration = log.completed_at
+                                        ? Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)
+                                        : null;
+
+                                    return (
                                         <div
-                                            className="h-full bg-primary rounded-full transition-all"
-                                            style={{ width: `${(count / stats.totalEmails) * 100}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="bg-card border rounded-xl p-6">
-                    <h3 className="font-semibold mb-4">{t('analytics.actionsTaken')}</h3>
-                    <div className="space-y-3">
-                        {Object.entries(stats.actionCounts).map(([action, count]) => (
-                            <div key={action} className="flex items-center justify-between py-2 border-b last:border-0">
-                                <span className="capitalize">{action}</span>
-                                <span className="font-medium">{count}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Recent Syncs */}
-            <div className="bg-card border rounded-xl p-6">
-                <h3 className="font-semibold mb-4">{t('analytics.recentActivity')}</h3>
-                {stats.recentSyncs.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">{t('analytics.noActivity')}</p>
-                ) : (
-                    <div className="space-y-3">
-                        {stats.recentSyncs.map((log: any) => {
-                            const duration = log.completed_at
-                                ? Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)
-                                : null;
-
-                            return (
-                                <div
-                                    key={log.id}
-                                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg hover:bg-secondary/30 transition-colors gap-3 cursor-pointer group"
-                                    onClick={() => handleViewRunTrace(log.id, log.email_accounts?.email_address)}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn(
-                                            "w-2.5 h-2.5 rounded-full",
-                                            log.status === 'success' ? 'bg-emerald-500' :
-                                                log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] animate-pulse'
-                                        )} />
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-medium group-hover:text-primary transition-colors">
-                                                {log.email_accounts?.email_address || t('common.systemSync')}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                                <Clock className="w-3 h-3" />
-                                                {new Date(log.started_at).toLocaleString()}
-                                                {duration !== null && (
-                                                    <span className="ml-2 px-1.5 py-0.5 bg-secondary rounded-full">
-                                                        {duration}s
+                                            key={log.id}
+                                            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg hover:bg-secondary/30 transition-colors gap-3 cursor-pointer group"
+                                            onClick={() => handleViewRunTrace(log.id, log.email_accounts?.email_address)}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn(
+                                                    "w-2.5 h-2.5 rounded-full",
+                                                    log.status === 'success' ? 'bg-emerald-500' :
+                                                        log.status === 'failed' ? 'bg-destructive' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] animate-pulse'
+                                                )} />
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                                                        {log.email_accounts?.email_address || t('common.systemSync')}
                                                     </span>
-                                                )}
-                                            </span>
+                                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                        <Clock className="w-3 h-3" />
+                                                        {new Date(log.started_at).toLocaleString()}
+                                                        {duration !== null && (
+                                                            <span className="ml-2 px-1.5 py-0.5 bg-secondary rounded-full">
+                                                                {duration}s
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="font-bold text-primary">{t('analytics.emails').replace('{count}', log.emails_processed.toString())}</span>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {t('analytics.deleted').replace('{count}', log.emails_deleted.toString())}, {t('analytics.drafted').replace('{count}', log.emails_drafted.toString())}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-4 text-xs">
-                                        <div className="flex flex-col items-end">
-                                            <span className="font-bold text-primary">{t('analytics.emails').replace('{count}', log.emails_processed.toString())}</span>
-                                            <span className="text-[10px] text-muted-foreground">
-                                                {t('analytics.deleted').replace('{count}', log.emails_deleted.toString())}, {t('analytics.drafted').replace('{count}', log.emails_drafted.toString())}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
             <RunTraceModal
                 runId={selectedRunId}
@@ -757,6 +826,7 @@ function AnalyticsPage() {
                 isOpen={isRunTraceOpen}
                 onOpenChange={setIsRunTraceOpen}
             />
+
         </div>
     );
 }
@@ -795,3 +865,4 @@ function App() {
 }
 
 export default App;
+

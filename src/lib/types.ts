@@ -141,6 +141,91 @@ export interface ProcessingEvent {
     created_at: string;
 }
 
+export interface LearningMetrics {
+    id: string;
+    user_id: string;
+    total_classifications: number;
+    correct_classifications: number;
+    drafts_generated: number;
+    drafts_edited: number;
+    drafts_sent_unedited: number;
+    drafts_dismissed: number;
+    category_accuracy: Record<string, number>;
+    updated_at: string;
+}
+
+// User Persona & Preferences
+export interface UserPersona {
+    // Professional Identity
+    full_name?: string;
+    role?: string;
+    company?: string;
+    industry?: string;
+    work_style?: 'corporate' | 'startup' | 'creative' | 'academic';
+
+    // Communication
+    preferred_tone?: 'formal' | 'professional' | 'casual' | 'friendly';
+    preferred_length?: 'brief' | 'medium' | 'detailed';
+    signature?: string;
+    common_phrases?: string[];
+
+    // Relationships
+    vip_senders?: string[];
+    trusted_domains?: string[];
+    blocked_domains?: string[];
+
+    // Goals & Automation
+    primary_goal?: 'inbox_zero' | 'respond_faster' | 'focus' | 'reduce_time';
+    time_budget_minutes?: number;
+    automation_level?: number; // 1-10
+    never_automate_categories?: string[];
+
+    // Adaptive Learning Fields (Phase 4)
+    category_patterns?: Record<string, string>; // { "domain.com": "newsletter" }
+    auto_archive_domains?: string[];
+    never_draft_domains?: string[];
+
+    // Metadata
+    persona_completed?: boolean;
+    persona_completed_at?: string;
+}
+
+export interface UserPreferences extends UserPersona {
+    id: string;
+    // ... kept for backward compatibility if needed, but UserSettings is the main one now
+}
+
+export interface UserSettings extends UserPersona {
+    id?: string;
+    user_id?: string;
+    llm_provider: string | null;
+    llm_model: string | null;
+    auto_trash_spam?: boolean;
+    smart_drafts?: boolean;
+    storage_path?: string | null;
+    intelligent_rename?: boolean;
+    sync_interval_minutes: number;
+    // Zero-Config UX
+    user_role?: string | null;
+    onboarding_completed?: boolean;
+    // Legacy
+    preferences?: Record<string, any>;
+}
+
+export interface UserFeedback {
+    id: string;
+    user_id: string;
+    email_id?: string;
+    account_id?: string;
+    feedback_type: 'analysis' | 'draft' | 'general' | 'implicit_edit';
+    original_data: any;
+    corrected_data: any;
+    sender_pattern?: string;
+    reasoning?: string;
+    created_at: string;
+    processed_for_learning: boolean;
+}
+
 // Enums
 export type EmailCategory = 'spam' | 'newsletter' | 'news' | 'promotional' | 'transactional' | 'social' | 'support' | 'client' | 'internal' | 'personal' | 'other';
 export type EmailAction = 'none' | 'delete' | 'archive' | 'reply' | 'flag' | 'draft';

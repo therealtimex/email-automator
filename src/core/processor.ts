@@ -22,16 +22,23 @@ export class EmailProcessor {
 
         if (accError || !account) throw accError || new Error('Account not found');
 
+        // 1.5 Fetch user settings (Phase 4 Adaptive Learning)
+        const { data: userSettings } = await this.supabase
+            .from('user_settings')
+            .select('*')
+            .eq('user_id', account.user_id)
+            .single();
+
         // 2. Setup client based on provider
         if (account.provider === 'gmail') {
-            await this.syncGmail(account);
+            await this.syncGmail(account, userSettings);
         } else {
             // TODO: Implement Outlook sync
             console.log('Outlook sync not implemented yet');
         }
     }
 
-    private async syncGmail(account: any) {
+    private async syncGmail(account: any, userSettings?: any) {
         const auth = new google.auth.OAuth2(
             process.env.GMAIL_CLIENT_ID,
             process.env.GMAIL_CLIENT_SECRET
@@ -87,7 +94,7 @@ export class EmailProcessor {
             }
 
             // 5. Analyze with AI
-            const analysis = await this.ai.analyzeEmail(body, { subject, sender, date });
+            const analysis = await this.ai.analyzeEmail(body, { subject, sender, date }, userSettings);
 
             // 6. Save to Supabase
             if (analysis) {

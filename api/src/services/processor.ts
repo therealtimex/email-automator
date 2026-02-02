@@ -10,6 +10,8 @@ import { generateEmailFilename } from '../utils/filename.js';
 import { EmailAccount, Email, Rule, ProcessingLog } from './supabase.js';
 import { EventLogger } from './eventLogger.js';
 import { RulePackService } from './RulePackService.js';
+import { processDraftWithNames } from '../utils/nameExtraction.js';
+import { shouldSkipDraft } from '../utils/senderValidation.js';
 
 const logger = createLogger('Processor');
 
@@ -1017,6 +1019,24 @@ export class EmailProcessorService {
 
                     // If the action is to draft, and it has specific instructions, generate it now
                     if (action === 'draft' && rule.instructions) {
+                        // CRITICAL: Check if sender is noreply/automated BEFORE generating draft
+                        if (shouldSkipDraft(email.sender || '')) {
+                            logger.info('Skipping draft for noreply sender', {
+                                emailId: email.id,
+                                sender: email.sender,
+                                rule: rule.name
+                            });
+                            if (eventLogger) {
+                                await eventLogger.info('Skipped Draft',
+                                    'Sender is noreply/automated address - no draft needed',
+                                    { sender: email.sender },
+                                    email.id
+                                );
+                            }
+                            // Skip this action, continue to next
+                            continue;
+                        }
+
                         if (eventLogger) await eventLogger.info('Thinking', `Generating customized draft based on rule: ${rule.name}`, undefined, email.id);
 
                         const intelligenceService = getIntelligenceService();
@@ -1025,9 +1045,18 @@ export class EmailProcessorService {
                         const emailDomain = account.email_address?.split('@')[1] || undefined;
                         const richContext = {
                             myEmail: account.email_address,
-                            myName: undefined, // Profile not available in this scope
-                            myRole: settings?.user_role || undefined,
-                            myCompany: emailDomain,
+                            myName: settings?.full_name || undefined,
+                            myRole: settings?.role || settings?.user_role || undefined,
+                            myCompany: settings?.company || emailDomain,
+                            myIndustry: settings?.industry || undefined,
+                            workStyle: settings?.work_style || undefined,
+                            communicationStyle: {
+                                tone: settings?.preferred_tone,
+                                length: settings?.preferred_length,
+                                signature: settings?.signature,
+                                commonPhrases: settings?.common_phrases
+                            },
+                            primaryGoal: settings?.primary_goal || undefined,
                             category: analysis?.category,
                             sentiment: analysis?.sentiment,
                             priority: analysis?.priority,
@@ -1049,6 +1078,27 @@ export class EmailProcessorService {
 
                         if (customizedDraft) {
                             draftContent = customizedDraft;
+                        }
+                    }
+
+                    // CRITICAL: Replace placeholders before executing draft action
+                    if (action === 'draft' && draftContent) {
+                        try {
+                            draftContent = await processDraftWithNames(
+                                draftContent,
+                                email.sender || '',
+                                account.user_id,
+                                this.supabase
+                            );
+                        } catch (error) {
+                            logger.error('Failed to process draft names', error, { emailId: email.id });
+                            if (eventLogger) {
+                                await eventLogger.error('Draft Processing Failed', {
+                                    error: error instanceof Error ? error.message : String(error)
+                                }, email.id);
+                            }
+                            // Skip draft action if placeholder replacement fails
+                            continue;
                         }
                     }
 

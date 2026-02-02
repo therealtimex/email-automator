@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Shield, Database, Save, Loader2, LogOut, Trash2, Settings, CheckCircle, XCircle, ExternalLink, Key, Camera, Volume2, VolumeX } from 'lucide-react';
+import { User, Shield, Database, Save, Loader2, LogOut, Trash2, Settings, CheckCircle, XCircle, ExternalLink, Key, Camera, Volume2, VolumeX, UserCog } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,11 +11,12 @@ import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
 import { getSupabaseConfig, clearSupabaseConfig, getConfigSource } from '../lib/supabase-config';
 import { SetupWizard } from './SetupWizard';
+import { PersonaSettings } from './AccountSettings/PersonaSettings';
 import { sounds } from '../lib/sounds';
 import { checkMigrationStatus, type MigrationStatus } from '../lib/migration-check';
 import { useLanguage } from '../context/LanguageContext';
 
-type SettingsTab = 'profile' | 'security' | 'database';
+type SettingsTab = 'profile' | 'security' | 'database' | 'persona';
 
 export function AccountSettingsPage() {
     const { t } = useLanguage();
@@ -28,6 +29,7 @@ export function AccountSettingsPage() {
 
     const tabs = [
         { id: 'profile', label: t('account.profile'), icon: User },
+        { id: 'persona', label: t('persona.title') || 'Persona', icon: UserCog },
         { id: 'security', label: t('account.security'), icon: Shield },
         { id: 'database', label: t('account.database'), icon: Database },
     ];
@@ -85,6 +87,7 @@ export function AccountSettingsPage() {
                 {/* Content Area */}
                 <div className="flex-1 space-y-6">
                     {activeTab === 'profile' && <ProfileSection />}
+                    {activeTab === 'persona' && <PersonaSettings />}
                     {activeTab === 'security' && <SecuritySection />}
                     {activeTab === 'database' && <DatabaseSection />}
                 </div>

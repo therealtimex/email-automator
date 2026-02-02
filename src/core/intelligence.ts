@@ -38,14 +38,14 @@ export class IntelligenceLayer {
         this.model = process.env.LLM_MODEL || 'gpt-4o-mini';
     }
 
-    async analyzeEmail(content: string, context: { subject: string; sender: string; date: string }): Promise<EmailAnalysis | null> {
+    async analyzeEmail(content: string, context: { subject: string; sender: string; date: string }, userSettings?: any): Promise<EmailAnalysis | null> {
         if (!this.client) {
             console.error('AI client not initialized');
             return null;
         }
 
         try {
-            const systemPrompt = `You are an AI Email Assistant. Analyze the provided email and extract structured information.
+            let systemPrompt = `You are an AI Email Assistant. Analyze the provided email and extract structured information.
 Return ONLY a valid JSON object with these fields:
 {
   "summary": "string - brief summary",
@@ -63,6 +63,32 @@ Context:
 - From: ${context.sender}
 - Date: ${context.date}`;
 
+            // --- Adaptive Learning Injection (Phase 4) ---
+            if (userSettings) {
+                const patterns = userSettings.category_patterns || {};
+                const senderDomain = context.sender.split('@')[1];
+
+                systemPrompt += `\n\nUSER PREFERENCES (LEARNED):`;
+
+                // 1. Learned Categories
+                if (senderDomain && patterns[senderDomain]) {
+                    systemPrompt += `\n- CRITICAL: User has explicitly categorized emails from "@${senderDomain}" as "${patterns[senderDomain]}". YOU MUST RESPECT THIS.`;
+                }
+
+                // 2. Draft Preferences
+                if (userSettings.preferred_tone) {
+                    systemPrompt += `\n- Draft Tone: ${userSettings.preferred_tone}`;
+                }
+                if (userSettings.preferred_length) {
+                    systemPrompt += `\n- Draft Length: ${userSettings.preferred_length}`;
+                }
+
+                // 3. Negative Constraints
+                if (userSettings.never_draft_domains?.includes(senderDomain)) {
+                    systemPrompt += `\n- CRITICAL: DO NOT generate a draft_response for this sender. Set draft_response to null/empty string.`;
+                }
+            }
+
             const response = await this.client.chat.completions.create({
                 model: this.model,
                 messages: [
@@ -77,6 +103,16 @@ Context:
 
             // Parse and validate with Zod
             const parsed = JSON.parse(rawResponse);
+
+            // Hard override if critical pattern matched (Safety Net)
+            if (userSettings) {
+                const senderDomain = context.sender.split('@')[1];
+                const patterns = userSettings.category_patterns || {};
+                if (senderDomain && patterns[senderDomain]) {
+                    parsed.category = patterns[senderDomain];
+                }
+            }
+
             const validated = EmailAnalysisSchema.parse(parsed);
 
             return validated;

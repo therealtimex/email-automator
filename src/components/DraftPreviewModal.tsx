@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { X, Send, Edit, RefreshCw, Mail, User, Calendar, Loader2 } from 'lucide-react';
+import { X, Send, Edit, RefreshCw, Mail, User, Calendar, Loader2, MessageSquare } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Email } from '../lib/types';
 import { toast } from './Toast';
 import { cn } from '../lib/utils';
+import { FeedbackModal } from './Feedback/FeedbackModal';
 
 interface DraftPreviewModalProps {
     email: Email;
@@ -19,6 +20,7 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
     const [loading, setLoading] = useState(false);
     const [regenerateInstructions, setRegenerateInstructions] = useState('');
     const [showRegenerateForm, setShowRegenerateForm] = useState(false);
+    const [showFeedback, setShowFeedback] = useState(false);
 
     const draftContent = email.draft_content || email.ai_analysis?.draft_response || '';
     const originalBody = email.body_snippet || '';
@@ -233,6 +235,15 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                                 {t('drafts.regenerate') || 'Regenerate'}
                             </Button>
                         )}
+                        <Button
+                            onClick={() => setShowFeedback(true)}
+                            variant="ghost"
+                            className="gap-2 text-muted-foreground hover:text-foreground"
+                            title="Report issues with this draft"
+                        >
+                            <MessageSquare className="w-4 h-4" />
+                            {t('drafts.feedback') || "What's wrong?"}
+                        </Button>
                     </div>
                     <Button
                         onClick={handleDismiss}
@@ -245,6 +256,15 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                     </Button>
                 </div>
             </Card>
+
+            {showFeedback && (
+                <FeedbackModal
+                    email={email}
+                    isOpen={showFeedback}
+                    onClose={() => setShowFeedback(false)}
+                    defaultType="draft"
+                />
+            )}
         </div>
     );
 }

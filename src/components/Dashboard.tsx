@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, X, MessageSquare } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -19,6 +19,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from './ui/dialog';
+import { FeedbackModal } from './Feedback/FeedbackModal';
 
 export function AITraceModal({
     email,
@@ -279,8 +280,11 @@ export function Dashboard() {
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
     const [actionLoading, setActionLoading] = useState<Record<string, string>>({});
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
     const [isTraceOpen, setIsTraceOpen] = useState(false);
     const [traceEmail, setTraceEmail] = useState<Email | null>(null);
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+    const [feedbackEmail, setFeedbackEmail] = useState<Email | null>(null);
 
     useEffect(() => {
         // Only fetch emails if user is authenticated
@@ -397,6 +401,11 @@ export function Dashboard() {
         if (success) {
             toast.success('Retrying email processing...');
         }
+    };
+
+    const handleFeedback = (email: Email) => {
+        setFeedbackEmail(email);
+        setIsFeedbackOpen(true);
     };
 
     return (
@@ -543,6 +552,7 @@ export function Dashboard() {
                                 onAction={handleAction}
                                 onRetry={handleRetry}
                                 onViewTrace={handleViewTrace}
+                                onFeedback={handleFeedback}
                                 onSelect={() => setSelectedEmail(email)}
                                 isSelected={selectedEmail?.id === email.id}
                                 loadingAction={actionLoading[email.id]}
@@ -557,6 +567,15 @@ export function Dashboard() {
                             email={traceEmail}
                             onRetry={handleRetry}
                         />
+
+                        {feedbackEmail && (
+                            <FeedbackModal
+                                isOpen={isFeedbackOpen}
+                                onClose={() => setIsFeedbackOpen(false)}
+                                email={feedbackEmail}
+                                defaultType="analysis"
+                            />
+                        )}
 
                         {/* Pagination */}
                         {state.emailsTotal > 20 && (
@@ -916,7 +935,9 @@ interface EmailCardProps {
     email: Email;
     onAction: (email: Email, action: string) => void;
     onRetry: (email: Email) => void;
+
     onViewTrace: (email: Email) => void;
+    onFeedback: (email: Email) => void;
     onSelect: () => void;
     isSelected: boolean;
     loadingAction?: string;
@@ -924,7 +945,7 @@ interface EmailCardProps {
     onCancelDelete?: () => void;
 }
 
-function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
+function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
     const { t } = useLanguage();
     if (!email) return null;
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
@@ -1098,6 +1119,15 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onSelect, isSelected
                                 >
                                     <ExternalLink className="w-3.5 h-3.5" />
                                 </a>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                    onClick={() => onFeedback(email)}
+                                    title={t('dashboard.feedbackTooltip') || "Report Issue / Feedback"}
+                                >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"

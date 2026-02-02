@@ -122,7 +122,44 @@ export class IntelligenceService {
         if (context.metadata?.importance) metadataSignals.push(`- Priority: ${context.metadata.importance}`);
 
         const systemPrompt = `You are an AI Email Assistant. Analyze the email and return structured JSON.
-Definitions for Categories: spam, newsletter, promotional, transactional, social, support, client, internal, personal, other.
+
+CATEGORY DEFINITIONS:
+- spam: Unwanted/unsolicited bulk email, phishing attempts
+- newsletter: Recurring subscription content (weekly digests, company updates) - check for List-Unsubscribe
+- news: Breaking news alerts, timely notifications (Google Alerts, news feeds)
+- promotional: Marketing emails, sales offers, advertisements
+- transactional: Receipts, confirmations, order updates, account notifications
+- social: Social media notifications (LinkedIn, Twitter, Facebook)
+- support: Customer service, help desk, support tickets
+- client: Business correspondence from clients/customers (High Importance)
+- internal: Company-internal communications (colleagues, HR, IT)
+- personal: Personal correspondence from friends/family
+- notification: Platform alerts/notifications (Github, Linear, etc) - distinct from social
+- other: Anything that doesn't fit above categories
+
+CRITICAL RULES:
+1. Platform notifications (linkedin.com, github.com) are ALWAYS "notification" or "social", never "personal"
+2. Emails from noreply@, no-reply@ are likely "transactional" or "notification"
+3. Weekly/Monthly digests are "newsletter"
+4. If "List-Unsubscribe" header is present, it is likely "newsletter" or "promotional"
+
+FEW-SHOT EXAMPLES:
+
+Example 1: LinkedIn Connection
+Subject: Canh Le wants to connect
+From: messages-noreply@linkedin.com
+Signals: [List-Unsubscribe]
+-> { "category": "social", "is_useless": true, "priority": "Low", "suggested_actions": ["archive"] }
+
+Example 2: Cold Sales
+Subject: Boost your productivity
+From: sales@unknown-vendor.com
+-> { "category": "spam", "is_useless": true, "priority": "Low", "suggested_actions": ["delete"] }
+
+Example 3: Client Question
+Subject: Question about the contract
+From: client@valued-customer.com
+-> { "category": "client", "priority": "High", "is_useless": false, "suggested_actions": ["reply", "flag"] }
 
 Context:
 - Subject: ${context.subject}
@@ -220,6 +257,15 @@ REQUIRED JSON STRUCTURE:
             myName?: string;
             myRole?: string;
             myCompany?: string;
+            myIndustry?: string;
+            workStyle?: 'corporate' | 'startup' | 'creative' | 'academic';
+            communicationStyle?: {
+                tone?: string;
+                length?: string;
+                signature?: string;
+                commonPhrases?: string[];
+            };
+            primaryGoal?: string;
 
             // Email analysis metadata
             category?: string;
@@ -254,6 +300,9 @@ REQUIRED JSON STRUCTURE:
                 if (richContext.myCompany) {
                     systemPrompt += ` at ${richContext.myCompany}`;
                 }
+                if (richContext.myIndustry) {
+                    systemPrompt += ` (${richContext.myIndustry} industry)`;
+                }
                 systemPrompt += '.';
             }
 
@@ -277,7 +326,55 @@ REQUIRED JSON STRUCTURE:
                 systemPrompt += `\n\nIMPORTANT: The incoming email is written in ${richContext.language}. You MUST write your reply in ${richContext.language}. Maintain appropriate formality and cultural conventions for ${richContext.language}.`;
             }
 
-            systemPrompt += '\n\nWrite ONLY the email body (no subject line). Be natural, concise, and professional. Match the tone of the incoming email.';
+            // Add persona-specific instructions
+            if (richContext?.workStyle) {
+                const styles = {
+                    corporate: "Maintain a formal, structured, and polite tone.",
+                    startup: "Be direct, concise, and action-oriented. Avoid fluff.",
+                    creative: "Be expressive, flexible, and approachable.",
+                    academic: "Be thorough, precise, and formal."
+                };
+                systemPrompt += `\nYour work style is: ${richContext.workStyle}. ${styles[richContext.workStyle as keyof typeof styles] || ''}`;
+            }
+
+            // Communication Preferences
+            if (richContext?.communicationStyle) {
+                const { tone, length, commonPhrases } = richContext.communicationStyle;
+
+                if (tone) systemPrompt += `\nPreferred Tone: ${tone}.`;
+
+                if (length) {
+                    const lengths = {
+                        brief: "Keep the reply very short (1-2 sentences).",
+                        medium: "Keep the reply distinct and focused (2-3 paragraphs max).",
+                        detailed: "Provide a comprehensive and detailed response."
+                    };
+                    systemPrompt += `\nResponse Length: ${lengths[length as keyof typeof lengths] || 'Medium'}.`;
+                }
+
+                if (commonPhrases && commonPhrases.length > 0) {
+                    systemPrompt += `\nincorporate these phrases if natural: ${commonPhrases.join(', ')}.`;
+                }
+            }
+
+            // Goal Alignment
+            if (richContext?.primaryGoal) {
+                const goals = {
+                    inbox_zero: "Goal: Clear the inbox. Resolve efficiently.",
+                    respond_faster: "Goal: Quick acknowledgment or resolution.",
+                    focus: "Goal: Protect user's time. Defer low-priority items.",
+                    reduce_time: "Goal: Minimal user editing required. Draft ready-to-send."
+                };
+                systemPrompt += `\n${goals[richContext.primaryGoal as keyof typeof goals] || ''}`;
+            }
+
+            systemPrompt += '\n\nWrite ONLY the email body (no subject line). Match the tone of the incoming email unless overridden by preferences.';
+            systemPrompt += '\n\nSTYLE GUIDELINES:';
+            systemPrompt += '\n- Start directly (e.g., "Thanks for the update" or "Hi [Name],")';
+            systemPrompt += '\n- NEVER use robotic phrases like "I hope this email finds you well" or "I am writing to you today"';
+            systemPrompt += '\n- Avoid "Please let me know if you have any questions" unless necessary - just say "Let me know if you need anything else"';
+            systemPrompt += '\n- Keep it under 150 words unless detail is explicitly requested';
+            systemPrompt += '\n- Use active voice';
 
             // Build user message with email context
             let userMessage = '';
@@ -357,13 +454,27 @@ REQUIRED JSON STRUCTURE:
 
         const systemPrompt = `You are an AI Automation Agent. Analyze the email and identify ALL rules that apply.
 
+CATEGORY DEFINITIONS:
+- spam: Unwanted/unsolicited bulk email, phishing attempts
+- newsletter: Recurring subscription content (weekly digests, company updates) - check for List-Unsubscribe
+- news: Breaking news alerts, timely notifications (Google Alerts, news feeds)
+- promotional: Marketing emails, sales offers, advertisements
+- transactional: Receipts, confirmations, order updates, account notifications
+- social: Social media notifications (LinkedIn, Twitter, Facebook)
+- support: Customer service, help desk, support tickets
+- client: Business correspondence from clients/customers (High Importance)
+- internal: Company-internal communications (colleagues, HR, IT)
+- personal: Personal correspondence from friends/family
+- notification: Platform alerts/notifications (Github, Linear, etc) - distinct from social
+- other: Anything that doesn't fit above categories
+
 Rules Context:
 ${rulesContext}
 
 REQUIRED JSON STRUCTURE:
 {
   "summary": "A brief summary of the email content",
-  "category": "spam|newsletter|news|promotional|transactional|social|support|client|internal|personal|other",
+  "category": "spam|newsletter|news|promotional|transactional|social|support|client|internal|personal|notification|other",
   "priority": "High|Medium|Low",
   "matched_rules": [
     {
@@ -377,26 +488,15 @@ REQUIRED JSON STRUCTURE:
   "draft_content": "Suggested reply if drafting, otherwise null"
 }
 
-CATEGORY DEFINITIONS (choose the most specific):
-- spam: Unwanted/unsolicited bulk email, phishing attempts
-- newsletter: Recurring subscription content (weekly digests, company updates)
-- news: Breaking news alerts, timely notifications, one-off news items (Google Alerts, news feeds)
-- promotional: Marketing emails, sales offers, advertisements
-- transactional: Receipts, confirmations, order updates, account notifications
-- social: Social media notifications (LinkedIn, Twitter, Facebook)
-- support: Customer service, help desk, support tickets
-- client: Business correspondence from clients/customers
-- internal: Company-internal communications (colleagues, HR, IT)
-- personal: Personal correspondence from friends/family
-- other: Anything that doesn't fit above categories
-
 CRITICAL INSTRUCTIONS:
 - Identify ALL rules that apply to this email (not just the best one)
 - Return an empty array if no rules match
 - Only include rules with confidence >= 0.7
 - For each matched rule, explain why it applies
 - Actions will be merged by the system - you don't need to resolve conflicts
-- Use "draft" action only if a rule explicitly requests it`;
+- Use "draft" action only if a rule explicitly requests it
+- Platform notifications (linkedin, github) are ALWAYS "notification" or "social"
+- Emails from noreply@ are likely "transactional" or "notification"`;
 
         if (eventLogger) {
             await eventLogger.info('Thinking', `Context-aware analysis: ${context.subject}`, {
