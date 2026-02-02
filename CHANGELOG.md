@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.21.1] - 2026-02-01
+
+### Fixed
+- **Rule Editor**: Resolved an issue where creating or editing rules with draft actions would fail if no instructions were provided. The instructions field is now correctly handled as optional unless specifically required by the action type.
+- **Localization**: Updated English translations for the Rule Editor dialog to ensure consistent terminology and placeholder text for new rule creation flows.
+
 ## [2.21.0] - 2026-02-01
 
 ### Added

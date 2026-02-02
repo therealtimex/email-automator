@@ -377,6 +377,7 @@
     "autopilot.editDialog.bodyContains": "Nội dung chứa...",
     "autopilot.editDialog.equalsValue": "Giá trị Bằng",
     "autopilot.editDialog.cat.newsletter": "Bản tin",
+    "autopilot.editDialog.cat.news": "Tin tức",
     "autopilot.editDialog.cat.spam": "Spam",
     "autopilot.editDialog.cat.promotional": "Quảng cáo",
     "autopilot.editDialog.cat.transactional": "Giao dịch",

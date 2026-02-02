@@ -377,6 +377,7 @@
     "autopilot.editDialog.bodyContains": "本文に含む...",
     "autopilot.editDialog.equalsValue": "値が等しい",
     "autopilot.editDialog.cat.newsletter": "ニュースレター",
+    "autopilot.editDialog.cat.news": "ニュース",
     "autopilot.editDialog.cat.spam": "スパム",
     "autopilot.editDialog.cat.promotional": "プロモーション",
     "autopilot.editDialog.cat.transactional": "トランザクション",

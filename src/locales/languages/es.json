@@ -377,6 +377,7 @@
     "autopilot.editDialog.bodyContains": "El cuerpo contiene...",
     "autopilot.editDialog.equalsValue": "Valor igual",
     "autopilot.editDialog.cat.newsletter": "Boletín",
+    "autopilot.editDialog.cat.news": "Noticias",
     "autopilot.editDialog.cat.spam": "Spam",
     "autopilot.editDialog.cat.promotional": "Promocional",
     "autopilot.editDialog.cat.transactional": "Transaccional",

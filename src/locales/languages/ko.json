@@ -377,6 +377,7 @@
     "autopilot.editDialog.bodyContains": "본문 포함...",
     "autopilot.editDialog.equalsValue": "값이 같음",
     "autopilot.editDialog.cat.newsletter": "뉴스레터",
+    "autopilot.editDialog.cat.news": "뉴스",
     "autopilot.editDialog.cat.spam": "스팸",
     "autopilot.editDialog.cat.promotional": "프로모션",
     "autopilot.editDialog.cat.transactional": "거래",

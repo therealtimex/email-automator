@@ -230,6 +230,7 @@ export function RuleEditDialog({
                   onChange={(e) => setConditionValue(e.target.value)}
                 >
                   <option value="newsletter">{t('autopilot.editDialog.cat.newsletter')}</option>
+                  <option value="news">{t('autopilot.editDialog.cat.news')}</option>
                   <option value="spam">{t('autopilot.editDialog.cat.spam')}</option>
                   <option value="promotional">{t('autopilot.editDialog.cat.promotional')}</option>
                   <option value="transactional">{t('autopilot.editDialog.cat.transactional')}</option>
