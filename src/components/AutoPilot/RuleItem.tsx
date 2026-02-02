@@ -9,6 +9,7 @@ import { Switch } from '../ui/switch';
 import { Button } from '../ui/button';
 import { Settings, TrendingUp } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { AutoPilotBadge } from './AutoPilotBadge';
 
 interface RuleItemProps {
   rule: {
@@ -33,11 +34,7 @@ export function RuleItem({ rule, stats, onToggle, onConfigure }: RuleItemProps) 
       <div className="flex-1">
         <div className="flex items-center gap-2">
           <h4 className="font-medium text-sm">{rule.name}</h4>
-          {rule.is_system_managed && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-              {t('autopilot.badge')}
-            </span>
-          )}
+          {rule.is_system_managed && <AutoPilotBadge />}
         </div>
         {rule.intent && (
           <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">

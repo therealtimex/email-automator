@@ -8,6 +8,7 @@ import React from 'react';
 import { Button } from '../ui/button';
 import { Mail, AlertCircle, Code, Briefcase, Settings as SettingsIcon, Power, Edit2, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { AutoPilotBadge } from './AutoPilotBadge';
 
 interface Rule {
   id: string;
@@ -105,8 +106,8 @@ export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule
             {/* Category Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-secondary/50 flex items-center justify-center">
-                  <span className="text-xl">{config.emoji}</span>
+                <div className="w-10 h-10 rounded-lg bg-secondary/50 flex items-center justify-center text-primary">
+                  <config.icon className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-base flex items-center gap-2">
@@ -132,11 +133,7 @@ export function RulesListGrouped({ rules, onToggleRule, onEditRule, onDeleteRule
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h4 className="font-medium text-sm truncate">{rule.name}</h4>
-                      {rule.is_system_managed && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 shrink-0">
-                          {t('autopilot.badge')}
-                        </span>
-                      )}
+                      {rule.is_system_managed && <AutoPilotBadge />}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       {rule.intent && (
