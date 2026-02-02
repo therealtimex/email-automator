@@ -267,7 +267,10 @@ interface DraftCardProps {
 
 function DraftCard({ draft, isSelected, onSelect, onSend, onDismiss, onPreview, isLoading }: DraftCardProps) {
     const { t } = useLanguage();
-    const draftPreview = draft.draft_content?.substring(0, 200) || draft.ai_analysis?.draft_response?.substring(0, 200) || '';
+    const draftPreview = draft.draft_content?.substring(0, 200)
+        || (draft.ai_analysis as any)?.draft_response?.substring(0, 200)
+        || (draft.ai_analysis as any)?.draft_content?.substring(0, 200)
+        || '';
     const timeAgo = draft.draft_created_at ? getTimeAgo(new Date(draft.draft_created_at)) : '';
 
     return (

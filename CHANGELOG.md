@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.21.0] - 2026-02-01
+
+### Added
+- **Persona Wizard**: A new interactive setup wizard for defining your AI persona. Users can now easily configure their role, industry, communication style, and goals through a guided step-by-step interface.
+- **Learning Dashboard**: Introduced a dedicated dashboard for visualizing adaptive learning signals. Users can see how the AI evolves its understanding of their preferences over time.
+
+### Changed
+- **Draft Persistence**: Enhanced the draft handling system to robustly persist AI-generated drafts to the database (`draft_content` field).
+  - Drafts generated during background processing are now saved immediately, ensuring they appear in the Draft Review Center even if the email provider API fails.
+  - Implemented a priority fallback mechanism for draft content retrieval: `draft_content` (user edits/persisted) > `ai_analysis.draft_response` > `ai_analysis.draft_content`.
+- **Draft API**: Updated the `GET /api/drafts` endpoint to filter out invalid drafts (those with no content) and include robust debugging logs for content availability.
+
+### Fixed
+- **Edge Function Dependencies**: Resolved build failures in Supabase Edge Functions by removing local service file imports and switching to direct `googleapis` and `fetch` calls for external services.
+
 ## [2.20.1] - 2026-02-01
 
 ### Fixed

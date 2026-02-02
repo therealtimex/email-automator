@@ -45,9 +45,47 @@ router.get('/',
 
         if (error) throw error;
 
+        // Debug: Log draft content structure for first few emails
+        if (data && data.length > 0) {
+            logger.info(`Found ${data.length} drafts with draft_status='${status}'`);
+            data.slice(0, 3).forEach((email, idx) => {
+                const aiAnalysis = email.ai_analysis as any;
+                logger.debug(`Draft ${idx + 1} content check`, {
+                    emailId: email.id,
+                    hasDraftContent: !!email.draft_content,
+                    hasAiAnalysis: !!email.ai_analysis,
+                    aiAnalysisKeys: email.ai_analysis ? Object.keys(email.ai_analysis) : [],
+                    hasDraftResponse: !!aiAnalysis?.draft_response,
+                    hasDraftContentInAi: !!aiAnalysis?.draft_content,
+                    draftResponseLength: aiAnalysis?.draft_response?.length || 0,
+                    draftContentLength: aiAnalysis?.draft_content?.length || 0,
+                    persistedDraftLength: email.draft_content?.length || 0
+                });
+            });
+        }
+
+        // Filter out drafts without content (these can't be sent)
+        const validDrafts = (data || []).filter(email => {
+            const aiAnalysis = email.ai_analysis as any;
+            const hasContent = email.draft_content || aiAnalysis?.draft_response || aiAnalysis?.draft_content;
+
+            if (!hasContent) {
+                logger.debug('Draft without content filtered out', {
+                    emailId: email.id,
+                    subject: email.subject,
+                    hasAiAnalysis: !!email.ai_analysis,
+                    aiAnalysisKeys: email.ai_analysis ? Object.keys(email.ai_analysis) : []
+                });
+            }
+
+            return hasContent;
+        });
+
+        logger.info(`Returning ${validDrafts.length} valid drafts out of ${data?.length || 0} total`);
+
         res.json({
-            drafts: data || [],
-            total: count || 0
+            drafts: validDrafts,
+            total: validDrafts.length
         });
     })
 );
@@ -79,27 +117,31 @@ router.post('/:emailId/send',
         const account = email.email_accounts;
         // CRITICAL: Priority Definition
         // 1. draft_content (User edits / Persisted draft) overrides everything
-        // 2. ai_analysis.draft_response (Fallback if no manual content)
-        const draftContent = email.draft_content ?? email.ai_analysis?.draft_response;
+        // 2. ai_analysis.draft_response (EmailAnalysisSchema)
+        // 3. ai_analysis.draft_content (ContextAwareAnalysisSchema)
+        const aiAnalysis = email.ai_analysis as any;
+        const draftContent = email.draft_content ?? aiAnalysis?.draft_response ?? aiAnalysis?.draft_content;
 
         logger.debug('Sending draft', {
             emailId,
             hasDraftContent: !!email.draft_content,
-            hasAiDraft: !!email.ai_analysis?.draft_response,
+            hasAiDraftResponse: !!aiAnalysis?.draft_response,
+            hasAiDraftContent: !!aiAnalysis?.draft_content,
             contentLength: draftContent?.length || 0,
             analysisKeys: email.ai_analysis ? Object.keys(email.ai_analysis) : []
         });
 
         if (!draftContent) {
             logger.warn('Draft content missing', {
-                emailId, emailData: {
-                    draft_content: email.draft_content,
-                    ai_analysis: email.ai_analysis
-                }
+                emailId,
+                draft_content: email.draft_content,
+                ai_draft_response: aiAnalysis?.draft_response,
+                ai_draft_content: aiAnalysis?.draft_content,
+                analysisKeys: email.ai_analysis ? Object.keys(email.ai_analysis) : []
             });
             return res.status(400).json({
                 error: 'No draft content found for this email',
-                details: 'Both draft_content and ai_analysis.draft_response are empty'
+                details: 'No draft found in draft_content, ai_analysis.draft_response, or ai_analysis.draft_content fields'
             });
         }
 

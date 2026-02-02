@@ -1107,8 +1107,8 @@ export class EmailProcessorService {
 
                     // TRANSACTION SAFETY: Wrap draft creation in try-catch with rollback
                     try {
-                        // Step 1: Save draft content to database
-                        if (draftContent) {
+                        // Step 1: Save draft content to database (ONLY if we have content)
+                        if (draftContent && action === 'draft') {
                             const { error: updateError } = await this.supabase
                                 .from('emails')
                                 .update({
@@ -1124,6 +1124,21 @@ export class EmailProcessorService {
 
                             // Update local object so executeAction uses it if needed
                             email.draft_content = draftContent;
+                        } else if (action === 'draft' && !draftContent) {
+                            // Skip draft action if no content generated
+                            logger.warn('Skipping draft action - no content generated', {
+                                emailId: email.id,
+                                ruleName: rule.name
+                            });
+                            if (eventLogger) {
+                                await eventLogger.info(
+                                    'Draft Skipped',
+                                    `No draft content generated for rule: ${rule.name}`,
+                                    {},
+                                    email.id
+                                );
+                            }
+                            continue; // Skip to next rule/email
                         }
 
                         // Step 2: Execute action (creates draft in email provider)
