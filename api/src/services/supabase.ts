@@ -30,7 +30,7 @@ export function getServerSupabase(forceRefresh = false): SupabaseClient | null {
     const key = config.supabase.anonKey;
 
     if (!url || !key || !isValidUrl(url)) {
-        logger.debug('Supabase not configured or invalid URL - skipping client initialization');
+        // BYOK mode: Supabase configured via UI, not .env - this is expected
         return null;
     }
 
@@ -56,7 +56,7 @@ export function getServiceRoleSupabase(): SupabaseClient | null {
     const key = config.supabase.serviceRoleKey;
 
     if (!url || !key || !isValidUrl(url)) {
-        logger.debug('Service role Supabase not configured or invalid URL');
+        // BYOK mode: Service role Supabase configured via UI, not .env - this is expected
         return null;
     }
 

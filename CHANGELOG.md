@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.21.3] - 2026-02-01
+
+### Changed
+- **Logging**: Reduced log verbosity for Supabase client initialization. The "Supabase not configured" message is now silenced during BYOK (Bring Your Own Key) mode, as runtime configuration is the expected behavior for self-hosted deployments.
+
 ## [2.21.2] - 2026-02-01
 
 ### Improved
