@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.21.2] - 2026-02-01
+
+### Improved
+- **Rule Engine**: Enhanced the AI context generation for automation rules. The system now correctly interprets and describes simplified condition formats (e.g., direct `category`, `sentiment`, `priority` matches) when building the prompt for the LLM. This ensures the AI has a clearer understanding of when to apply specific rules during analysis.
+- **Draft API**: Cleaned up verbose debug logging in the `GET /api/drafts` endpoint to reduce noise in production logs.
+
 ## [2.21.1] - 2026-02-01
 
 ### Fixed

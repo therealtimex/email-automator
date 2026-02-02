@@ -736,8 +736,36 @@ export class EmailProcessorService {
                     let conditionText = '';
                     if (r.condition) {
                         const cond = r.condition as any;
+
+                        // Handle new simple condition format: {"category": "news"}
+                        if (cond.category) {
+                            conditionText = `When category is "${cond.category}"`;
+                        }
+                        if (cond.sentiment) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `sentiment is "${cond.sentiment}"`;
+                        }
+                        if (cond.priority) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `priority is "${cond.priority}"`;
+                        }
+                        if (cond.sender_email) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `sender is "${cond.sender_email}"`;
+                        }
+                        if (cond.sender_domain) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `sender domain is "${cond.sender_domain}"`;
+                        }
+                        if (cond.sender_contains) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `sender contains "${cond.sender_contains}"`;
+                        }
+                        if (cond.subject_contains) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `subject contains "${cond.subject_contains}"`;
+                        }
+                        if (cond.body_contains) {
+                            conditionText += (conditionText ? ' AND ' : 'When ') + `body contains "${cond.body_contains}"`;
+                        }
+
+                        // Handle legacy format with field/operator/value
                         if (cond.field) {
-                            conditionText = `When ${cond.field}`;
+                            conditionText += (conditionText ? ' AND ' : 'When ') + cond.field;
                             if (cond.operator === 'equals') {
                                 conditionText += ` equals "${cond.value}"`;
                             } else if (cond.operator === 'contains') {
@@ -748,6 +776,7 @@ export class EmailProcessorService {
                                 conditionText += ` ${cond.operator} "${cond.value}"`;
                             }
                         }
+
                         if (cond.is_useless === true) {
                             conditionText += (conditionText ? ' AND ' : 'When ') + 'email is useless/low-value';
                         }

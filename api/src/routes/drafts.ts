@@ -45,43 +45,11 @@ router.get('/',
 
         if (error) throw error;
 
-        // Debug: Log draft content structure for first few emails
-        if (data && data.length > 0) {
-            logger.info(`Found ${data.length} drafts with draft_status='${status}'`);
-            data.slice(0, 3).forEach((email, idx) => {
-                const aiAnalysis = email.ai_analysis as any;
-                logger.debug(`Draft ${idx + 1} content check`, {
-                    emailId: email.id,
-                    hasDraftContent: !!email.draft_content,
-                    hasAiAnalysis: !!email.ai_analysis,
-                    aiAnalysisKeys: email.ai_analysis ? Object.keys(email.ai_analysis) : [],
-                    hasDraftResponse: !!aiAnalysis?.draft_response,
-                    hasDraftContentInAi: !!aiAnalysis?.draft_content,
-                    draftResponseLength: aiAnalysis?.draft_response?.length || 0,
-                    draftContentLength: aiAnalysis?.draft_content?.length || 0,
-                    persistedDraftLength: email.draft_content?.length || 0
-                });
-            });
-        }
-
         // Filter out drafts without content (these can't be sent)
         const validDrafts = (data || []).filter(email => {
             const aiAnalysis = email.ai_analysis as any;
-            const hasContent = email.draft_content || aiAnalysis?.draft_response || aiAnalysis?.draft_content;
-
-            if (!hasContent) {
-                logger.debug('Draft without content filtered out', {
-                    emailId: email.id,
-                    subject: email.subject,
-                    hasAiAnalysis: !!email.ai_analysis,
-                    aiAnalysisKeys: email.ai_analysis ? Object.keys(email.ai_analysis) : []
-                });
-            }
-
-            return hasContent;
+            return email.draft_content || aiAnalysis?.draft_response || aiAnalysis?.draft_content;
         });
-
-        logger.info(`Returning ${validDrafts.length} valid drafts out of ${data?.length || 0} total`);
 
         res.json({
             drafts: validDrafts,
