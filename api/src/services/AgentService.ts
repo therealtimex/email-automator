@@ -45,41 +45,54 @@ export class AgentService {
         const baseInstruction = context.system_instruction ||
             "You are a helpful Email Automator Assistant helping users with this page.";
 
+        const hasRAGContent = ragContext.chunks.length > 0;
+
         let systemPrompt = `${baseInstruction}
 
-# CRITICAL: Anti-Hallucination Rules
+# Current Context
+- **Current Page**: ${context.page_id}
+- **Page Data**: ${JSON.stringify(context.data || {}, null, 2)}
+`;
 
-**You MUST follow these rules strictly:**
-
-1. **ONLY use information from the Retrieved Documentation below** - If information is not in the retrieved docs, say: "I don't have information about that in the available documentation"
-
-2. **Never fabricate features** - Do not invent capabilities, settings, buttons, or workflows not documented in the retrieved content
-
-3. **Be honest about limitations** - If the retrieved documentation doesn't cover the user's question, acknowledge it clearly
-
-4. **Exact references only** - Only mention page names, buttons, settings, and steps that appear in the Retrieved Documentation
-
-5. **Cite sources** - When answering, reference which documentation section you're using (e.g., "According to the Configuration guide...")
-
----
+        if (hasRAGContent) {
+            // Strict mode: Only use retrieved documentation
+            systemPrompt += `
+# Retrieved Documentation
 
 ${ragContext.contextText}
 
 ---
 
-# Current Context
-- **Current Page**: ${context.page_id}
-- **Page Data**: ${JSON.stringify(context.data || {}, null, 2)}
+# CRITICAL: Anti-Hallucination Rules
 
-# Response Instructions
+**You MUST follow these rules strictly:**
+
+1. **ONLY use information from the Retrieved Documentation above** - If information is not in the retrieved docs, say: "I don't have that information in the documentation"
+
+2. **Never fabricate features** - Do not invent capabilities, settings, buttons, or workflows not documented
+
+3. **Cite sources** - When answering, reference which documentation section you're using (e.g., "According to the Configuration guide...")
+
+4. **Exact references only** - Only mention page names, buttons, settings, and steps that appear in the Retrieved Documentation
 
 **When Answering:**
 - Base your answer ONLY on the Retrieved Documentation above
 - Reference the source file and section when relevant
 - Provide step-by-step instructions when they exist in the docs
-- If user asks about a different page, guide them: "Go to [Page Name] → [Section]"
-- Use tools when available on current page
-- If the retrieved documentation doesn't answer the question, say: "I don't have information about that in the documentation. The available docs cover: [list sources]"`;
+- If user asks about a different page, guide them: "Go to [Page Name] → [Section]"`;
+        } else {
+            // Fallback mode: Use general knowledge
+            systemPrompt += `
+# Knowledge Base Status
+
+The documentation search didn't find relevant content for this query. You can use your general knowledge about email automation, Gmail, Outlook, and productivity tools to provide helpful guidance.
+
+**Guidelines:**
+- Provide helpful, general advice about the topic
+- If discussing specific features, acknowledge you're providing general guidance
+- Suggest they check the app's documentation or settings for specifics
+- Be honest that you don't have the exact documentation available`;
+        }
 
         // Add Tool Instructions if tools are available
         if (context.tools && context.tools.length > 0) {
