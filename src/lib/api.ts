@@ -459,47 +459,6 @@ class HybridApiClient {
     }
 
     // ========================================
-    // Rule Packs API (Zero-Config UX)
-    // ========================================
-
-    async getAvailablePacks() {
-        return await this.expressRequest<any>('/rule-packs');
-    }
-
-    async getInstalledPacks() {
-        return await this.expressRequest<any>('/rule-packs/installed');
-    }
-
-    async getPack(packId: string) {
-        return await this.expressRequest<any>(`/rule-packs/${packId}`);
-    }
-
-    async getPacksForRole(role: string) {
-        return await this.expressRequest<any>(`/rule-packs/for-role/${role}`);
-    }
-
-    async installPack(packId: string) {
-        return await this.expressRequest<any>('/rule-packs/install', {
-            method: 'POST',
-            body: JSON.stringify({ packId })
-        });
-    }
-
-    async uninstallPack(packId: string) {
-        return await this.expressRequest<any>('/rule-packs/uninstall', {
-            method: 'POST',
-            body: JSON.stringify({ packId })
-        });
-    }
-
-    async setUserRole(role: string) {
-        return await this.expressRequest<any>('/rule-packs/set-role', {
-            method: 'POST',
-            body: JSON.stringify({ role })
-        });
-    }
-
-    // ========================================
     // Adaptive Learning API (Phase 4)
     // ========================================
 
