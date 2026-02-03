@@ -72,6 +72,9 @@ export interface Rule {
     attachments?: RuleAttachment[];
     is_enabled: boolean;
     is_system?: boolean; // New flag for pre-defined rules
+    category?: string | null; // Category for UI grouping
+    rule_template_id?: string | null; // Template ID for system defaults
+    is_system_managed?: boolean; // If true, system-managed rule
     created_at: string;
 }
 

@@ -1,8 +1,8 @@
 /**
- * Rule Pack Type Definitions
+ * Default Rule Type Definitions
  *
- * Rule packs are pre-configured sets of automation rules designed for specific user roles
- * or use cases. They enable zero-configuration UX by providing smart defaults.
+ * Default rules are pre-configured automation rules organized by category.
+ * They enable zero-configuration UX by providing smart defaults that users can enable.
  */
 
 export type EmailCategory =
@@ -77,10 +77,22 @@ export interface EnhancedRuleCondition {
 }
 
 /**
- * Rule template definition
+ * Rule category types for organization
  */
-export interface RuleTemplate {
-  id: string;                        // Unique template ID (e.g., 'universal-newsletters')
+export type RuleCategory =
+  | 'email_organization'   // Newsletter cleanup, spam management
+  | 'priority_alerts'      // Urgent/important email handling
+  | 'development'          // GitHub, CI/CD, code review notifications
+  | 'sales_business'       // Client communication, proposals
+  | 'operations'           // Support tickets, monitoring alerts
+  | 'custom';              // User-defined rules
+
+/**
+ * Default rule definition
+ */
+export interface DefaultRule {
+  id: string;                        // Unique rule ID (e.g., 'newsletters-auto-archive')
+  category: RuleCategory;            // Rule category for organization
   name: string;                      // Display name with emoji (e.g., '📚 Newsletter Sweeper')
   intent: string;                    // Human-readable purpose
   description?: string;              // Detailed explanation
@@ -88,29 +100,5 @@ export interface RuleTemplate {
   actions: EmailAction[];            // What to do
   instructions?: string;             // Draft generation instructions (if action includes 'draft')
   priority?: number;                 // Evaluation order (higher = first)
-  is_enabled_by_default: boolean;    // Should be enabled when installed
+  is_enabled_by_default: boolean;    // Should be enabled by default
 }
-
-/**
- * Rule pack definition
- */
-export interface RulePack {
-  id: string;                        // Pack identifier (e.g., 'universal', 'executive')
-  name: string;                      // Display name (e.g., 'Universal Pack')
-  description: string;               // What this pack does
-  icon?: string;                     // Emoji or icon identifier
-  rules: RuleTemplate[];             // Rule templates in this pack
-  enabled_by_default: boolean;       // Auto-install for matching users
-  target_roles?: string[];           // Which roles this pack is designed for
-}
-
-/**
- * User role types for personalization
- */
-export type UserRole =
-  | 'executive'      // Leadership, CEO, VP
-  | 'developer'      // Software engineers, DevOps
-  | 'sales'          // Sales, Business Development
-  | 'operations'     // Support, Operations, Customer Success
-  | 'marketing'      // Marketing, Growth
-  | 'other';         // Manual setup, no personalization

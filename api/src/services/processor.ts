@@ -9,7 +9,7 @@ import { getStorageService } from './storage.js';
 import { generateEmailFilename } from '../utils/filename.js';
 import { EmailAccount, Email, Rule, ProcessingLog } from './supabase.js';
 import { EventLogger } from './eventLogger.js';
-import { RulePackService } from './RulePackService.js';
+import { DefaultRuleService } from './DefaultRuleService.js';
 import { processDraftWithNames } from '../utils/nameExtraction.js';
 import { shouldSkipDraft } from '../utils/senderValidation.js';
 
@@ -144,12 +144,12 @@ export class EmailProcessorService {
         // Reset stop request flag at the start of a manual sync
         await this.resetStopRequest(userId);
 
-        // Zero-Config UX: Auto-install Universal Pack for new users (self-healing)
+        // Zero-Config UX: Auto-seed default rules for new users (self-healing)
         try {
-            const rulePackService = new RulePackService(this.supabase);
-            const { installed } = await rulePackService.ensureUniversalPack(userId);
+            const defaultRuleService = new DefaultRuleService(this.supabase);
+            const { installed } = await defaultRuleService.ensureDefaultRules(userId);
             if (installed) {
-                logger.info(`Auto-installed Universal Pack for user ${userId}`);
+                logger.info(`Seeded default rules for user ${userId}`);
             }
         } catch (error) {
             // Don't fail sync if pack installation fails
