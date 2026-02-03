@@ -1,17 +1,36 @@
 # Getting Started
 
-Welcome to **Email Automator**. This guide will help you set up the application on your local machine.
+Welcome to **Email Automator**. The easiest way to get started is via the RealTimeX Marketplace, which handles installation and cloud provisioning for you.
 
-## 🛠️ Prerequisites
+## 🚀 One-Click Installation (Recommended)
 
-Before you begin, ensure you have the following installed:
+1.  **Open RealTimeX Desktop**: Launch your RealTimeX Desktop application.
+2.  **Go to Marketplace**: Navigate to the "Marketplace" tab.
+3.  **Find the App**: Search for "Email Automator".
+4.  **Install**: Click the **Install** button. The system will automatically:
+    *   Download the application bundle.
+    *   **Provision Cloud Resources**: Automatically set up your private Supabase project (Zero-Config).
+    *   Configure secure authentication.
+5.  **Launch**: Once installed, click **Open** to launch the email automator.
+
+## ☁️ Zero-Config Cloud Provisioning
+
+Email Automator utilizes RealTimeX's **Zero-Config Cloud Provisioning**. You do not need to manually create a database or configure API keys. The installer automatically provisions a free-tier Supabase project for you, ensuring you own your data without the setup hassle.
+
+---
+
+## 🛠️ Manual Installation (Advanced)
+
+If you are a developer or prefer to run from source, you can install manually.
+
+### Prerequisites
 
 *   **Node.js** (v20 or higher)
 *   **Git**
-*   **Docker** (Required for running a local Supabase instance)
-*   **Supabase CLI** (Recommended for managing your database)
+*   **Docker** (Required for local database)
+*   **Supabase CLI**
 
-## 🚀 Installation
+### Steps
 
 1.  **Clone the repository**:
     ```bash
@@ -24,43 +43,38 @@ Before you begin, ensure you have the following installed:
     npm install
     ```
 
-3.  **Start the Local Database**:
-    Make sure Docker is running, then initialize and start Supabase:
+3.  **Start Local Database**:
     ```bash
     npx supabase start
     ```
 
-## 🏃 Running the Application
-
-Email Automator can be run as a **Unified Server** that hosts both the API and the User Interface on a single port.
-
-1.  **Build the Frontend**:
     ```bash
-    npm run build
+    npm run dev
     ```
 
-2.  **Start the Server**:
-    ```bash
-    # Runs on default port 3004 and automatically opens your browser
-    npm run serve
-    ```
+## 🔍 Finding your Supabase Credentials
 
-### CLI Options
-You can customize the startup behavior using command-line arguments:
+If you are installing manually, you will need to find your project keys to complete the **Setup Wizard**.
 
-```bash
-# Run on a custom port without automatically opening the browser
-node bin/email-automator.js --port 3008 --no-ui
-```
-
----
+1.  **Go to Supabase**: Log in to your [Supabase Dashboard](https://supabase.com/dashboard).
+2.  **Select Project**: Open the project you want to connect to.
+3.  **Go to Settings**: Click the **Settings** (cog icon) in the bottom of the sidebar.
+4.  **Open API config**: Select **API** from the settings menu.
+5.  **Copy URL**: Find "Project URL" and copy it.
+6.  **Copy Key**: Find "Project API keys". Copy the key labeled `anon` (public).
+    > [!WARNING]
+    > **Do NOT** use the `service_role` key. It has full admin access and is not safe for the client application.
 
 ## 🔑 Initial Setup (The Wizard)
 
-When you first open the application (default: `http://localhost:3004`), you will be greeted by the **Setup Wizard**.
+When you launch the app for the first time, the **Setup Wizard** will guide you through the process.
 
-1.  **Database Connection**: Provide your Supabase Project URL and Anon Key.
-2.  **Admin Account**: Create your first local admin account.
-3.  **Login**: Sign in to access your dashboard.
+1.  **Database Connection**:
+    *   **Marketplace Users**: This is pre-filled automatically by the zero-config provisioner.
+    *   **Manual Install**: Enter your Supabase URL and Anon Key.
+2.  **Admin Account**:
+    *   Create your local admin account. This email/password is used to log in to the dashboard and is stored securely in your Supabase Auth user table.
+3.  **Login**:
+    *   Sign in with your new credentials to access the main dashboard.
 
 Next step: [**Configuration**](./CONFIGURATION.md)

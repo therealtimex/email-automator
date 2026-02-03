@@ -107,6 +107,9 @@ export function Configuration() {
     const [chatProviders, setChatProviders] = useState<LLMProvider[]>([]);
     const [isLoadingProviders, setIsLoadingProviders] = useState(false);
     const [providerError, setProviderError] = useState<string | null>(null);
+    const [embedProviders, setEmbedProviders] = useState<LLMProvider[]>([]);
+    const [isLoadingEmbedProviders, setIsLoadingEmbedProviders] = useState(false);
+    const [embedProviderError, setEmbedProviderError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchProviders = async () => {
@@ -127,10 +130,32 @@ export function Configuration() {
             }
         };
         fetchProviders();
+
+        const fetchEmbedProviders = async () => {
+            setIsLoadingEmbedProviders(true);
+            setEmbedProviderError(null);
+            try {
+                const response = await api.getEmbedProviders();
+                if (response.data?.success) {
+                    setEmbedProviders(response.data.providers || []);
+                } else {
+                    setEmbedProviderError(response.data?.message || 'Failed to load embedding providers');
+                }
+            } catch (error) {
+                console.error('Failed to fetch embedding providers:', error);
+                setEmbedProviderError('Failed to load embedding providers. Using defaults.');
+            } finally {
+                setIsLoadingEmbedProviders(false);
+            }
+        };
+        fetchEmbedProviders();
     }, []);
 
     const selectedProvider = chatProviders.find(p => p.provider === (localSettings.llm_provider || DEFAULT_PROVIDER));
     const availableModels = selectedProvider?.models || [];
+
+    const selectedEmbedProvider = embedProviders.find(p => p.provider === (localSettings.embedding_provider || DEFAULT_PROVIDER));
+    const availableEmbedModels = selectedEmbedProvider?.models || [];
 
     // Ensure saved model is always in the list (even if not fetched yet)
     const modelsWithSaved = useMemo(() => {
@@ -162,12 +187,49 @@ export function Configuration() {
         ];
     }, [chatProviders, localSettings.llm_provider]);
 
+    // Ensure saved embedding model is always in the list
+    const embedModelsWithSaved = useMemo(() => {
+        if (!localSettings.embedding_model) return availableEmbedModels;
+
+        const hasModel = availableEmbedModels.some(m => m.id === localSettings.embedding_model);
+        if (hasModel) return availableEmbedModels;
+
+        return [
+            { id: localSettings.embedding_model, name: `${localSettings.embedding_model} (saved)` },
+            ...availableEmbedModels
+        ];
+    }, [availableEmbedModels, localSettings.embedding_model]);
+
+    // Ensure saved embedding provider is shown even if not in fetched list yet
+    const embedProvidersWithSaved = useMemo(() => {
+        if (!localSettings.embedding_provider || localSettings.embedding_provider === DEFAULT_PROVIDER) {
+            return embedProviders;
+        }
+
+        const hasProvider = embedProviders.some(p => p.provider === localSettings.embedding_provider);
+        if (hasProvider) return embedProviders;
+
+        return [
+            { provider: localSettings.embedding_provider, name: `${localSettings.embedding_provider} (saved)`, models: [] },
+            ...embedProviders
+        ];
+    }, [embedProviders, localSettings.embedding_provider]);
+
     const handleProviderChange = (providerId: string) => {
         const provider = chatProviders.find(p => p.provider === providerId);
         setLocalSettings(s => ({
             ...s,
             llm_provider: providerId,
             llm_model: provider?.models?.[0]?.id || ''
+        }));
+    };
+
+    const handleEmbedProviderChange = (providerId: string) => {
+        const provider = embedProviders.find(p => p.provider === providerId);
+        setLocalSettings(s => ({
+            ...s,
+            embedding_provider: providerId,
+            embedding_model: provider?.models?.[0]?.id || ''
         }));
     };
 
@@ -1431,6 +1493,92 @@ export function Configuration() {
                                 <Check className="w-4 h-4 mr-2" />
                             )}
                             {t('config.model.saveConfig')}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Embedding Provider Settings (for RAG) */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Database className="w-5 h-5 text-purple-500" />
+                        {t('config.embed.title') || 'Embedding Provider (RAG)'}
+                    </CardTitle>
+                    <CardDescription>
+                        {t('config.embed.desc') || 'Configure the embedding model for knowledge base search and RAG (Retrieval-Augmented Generation). Defaults to realtimexai/text-embedding-3-small if not specified.'}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Embedding Provider</label>
+                            {isLoadingEmbedProviders ? (
+                                <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
+                                    <LoadingSpinner size="sm" className="mr-2" />
+                                    <span className="text-xs text-muted-foreground italic">Discovering...</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <select
+                                        className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                        value={localSettings.embedding_provider || DEFAULT_PROVIDER}
+                                        onChange={(e) => handleEmbedProviderChange(e.target.value)}
+                                        disabled={isLoadingEmbedProviders}
+                                    >
+                                        <option value={DEFAULT_PROVIDER}>RealTimeX AI (Default)</option>
+                                        {embedProvidersWithSaved.filter(p => p.provider !== DEFAULT_PROVIDER).map(p => (
+                                            <option key={p.provider} value={p.provider}>
+                                                {p.name || p.provider}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {embedProviderError && (
+                                        <div className="text-[10px] text-amber-500 mt-1 px-1 bg-amber-50/50 rounded">
+                                            ⚠️ {embedProviderError}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Embedding Model</label>
+                            {embedModelsWithSaved.length > 0 || isLoadingEmbedProviders ? (
+                                <select
+                                    className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                    value={localSettings.embedding_model || ''}
+                                    onChange={(e) => setLocalSettings(s => ({ ...s, embedding_model: e.target.value }))}
+                                    disabled={isLoadingEmbedProviders}
+                                >
+                                    {!localSettings.embedding_model && <option value="">Auto (text-embedding-3-small)</option>}
+                                    {embedModelsWithSaved.map((m: LLMModel) => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.name || m.id}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <Input
+                                    placeholder="e.g. text-embedding-3-small"
+                                    value={localSettings.embedding_model || ''}
+                                    onChange={(e) => setLocalSettings(s => ({ ...s, embedding_model: e.target.value }))}
+                                />
+                            )}
+                            <p className="text-[10px] text-muted-foreground italic">
+                                Used for semantic search in knowledge base. Leave empty to use default (text-embedding-3-small).
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end mt-4">
+                        <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                            {savingSettings ? (
+                                <LoadingSpinner size="sm" className="mr-2" />
+                            ) : (
+                                <Check className="w-4 h-4 mr-2" />
+                            )}
+                            {t('config.embed.save') || 'Save Embedding Settings'}
                         </Button>
                     </div>
                 </CardContent>

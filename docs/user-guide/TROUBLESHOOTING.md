@@ -9,8 +9,9 @@ Common issues and how to resolve them.
 *   Check the terminal window for error logs (e.g. LLM API Key missing).
 
 **Emails are not appearing**
-*   Check your **Sync Scope** start date. Emails older than this date are ignored.
-*   Check the **Max Emails** setting. It may take several sync runs to catch up if you have a massive inbox.
+*   **Check Start Date**: Emails older than your **Sync Scope** start date are ignored.
+*   **Reset Checkpoint**: If you changed the start date but nothing happened, click the **Rotate Icon** (Reset Checkpoint) in the Sync Scope card. This forces a re-scan.
+*   **Check Batch Size**: The **Max Emails** setting limits each run. It may take several cycles to catch up.
 
 ---
 

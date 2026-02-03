@@ -61,8 +61,9 @@ async function setup() {
   // LLM Configuration
   console.log('');
   console.log('3️⃣  LLM Configuration');
-  const llmApiKey = await question('   OpenAI API Key: ');
-  const llmModel = await question('   Model [gpt-4o-mini]: ') || 'gpt-4o-mini';
+  console.log('   ℹ️  AI operations are handled by RealTimeX SDK');
+  console.log('   ℹ️  No API keys needed! Install RealTimeX Desktop to configure providers');
+  console.log('   ℹ️  Download: https://realtimex.ai');
 
   // OAuth Configuration (optional)
   console.log('');
@@ -84,10 +85,9 @@ VITE_SUPABASE_ANON_KEY=${supabaseAnonKey}
 VITE_API_URL=http://localhost:${port}
 PORT=${port}
 
-# OpenAI / LLM Configuration
-LLM_API_KEY=${llmApiKey}
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=${llmModel}
+# LLM Configuration
+# Managed by RealTimeX SDK - No API keys needed!
+# Install RealTimeX Desktop and configure providers via UI
 
 # Security
 JWT_SECRET="dev-secret-change-in-production"

@@ -12,10 +12,16 @@ Manage your profile, security, and the core database connection through the **Ac
 *   **Persistence**: Your login is managed via Supabase Auth and will remain active across sessions unless you manually log out.
 
 ## 🗄️ Supabase Connection (BYOK)
-As part of the **Bring Your Own Key** model, you can manage the underlying database connection at any time.
+As part of the **Bring Your Own Key** model, you can manage the underlying database connection at any time. This connects the local application running on your machine to your private cloud database (for Auth, Storage, and Sync Logs).
 
 *   **Change Connection**: If you migrate your project or need to update keys, use the "Change Connection" button to restart the Setup Wizard.
 *   **Clear Configuration**: Disconnect the application from your current Supabase project. This will log you out and remove all local keys.
+
+## 🔌 Integrations (Provider Credentials)
+Manage your connected email providers (Gmail, Outlook) in the **Integrations** list.
+*   **Transparency**: View exactly which credentials (Client ID, Secret) are stored.
+*   **Security**: All provider secrets are encrypted at rest in the `integrations` table.
+*   **Management**: Delete or update credentials directly from this table.
 
 ---
 

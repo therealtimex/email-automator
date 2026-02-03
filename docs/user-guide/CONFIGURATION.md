@@ -27,12 +27,15 @@ Email Automator uses a **"Bring Your Own Key"** architecture. You provide your o
 
 Use the **Sync Scope** card on the Dashboard sidebar to manage background activity.
 
-### Global Interval
+### Global Controls
 *   **Sync Interval (min)**: Defines how often the background agent wakes up to check for new emails. (Default: 5 minutes).
+*   **Stop Sync**: You can pause synchronization at any time.
 
 ### Per-Account Controls
 *   **Sync From**: Set a specific starting date. The agent will ignore all emails received before this timestamp.
+    > **Priority**: This setting takes **priority** over the internal checkpoint. If you move this date backwards, the system will automatically reset the checkpoint to ensure historical emails are processed.
 *   **Max Emails**: Limits the batch size for each sync run (Default: 50). This prevents overwhelming your local machine during the first sync.
-*   **Reset Checkpoint**: Use the "Rotate" icon to clear the internal memory and force a full re-scan from your "Sync From" date.
+    > **Safety**: New accounts default to "Sync From = Now" and "Max Emails = 50" to ensure a safe initial run.
+*   **Reset Checkpoint**: Use the "Rotate" icon to clear the internal memory and force a full re-scan.
 
 Next step: [**Using the Dashboard**](./DASHBOARD.md)

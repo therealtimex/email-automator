@@ -60,7 +60,14 @@ Email Automator uses an Asynchronous **Extract, Transform, Load (ETL)** pattern 
 The Local App is designed to be highly portable:
 - **Sandbox Friendly**: Automatically falls back to user home directory (`~/.email-automator/emails`) if project-relative storage is restricted.
 - **Self-Healing**: Automatically refreshes provider tokens and Supabase sessions in the background.
-- **Interactive**: Emits real-time state changes via Supabase Realtime for the "Live Activity" dashboard.
+63: - **Interactive**: Emits real-time state changes via Supabase Realtime for the "Live Activity" dashboard.
+64: 
+65: ## 🗄️ Key Database Tables
+66: 
+67: *   **integrations**: Stores provider credentials (Gmail/Outlook) encrypted. Separation from `user_settings` ensures BYOK transparency.
+68: *   **system_logs**: Persistent storage for backend errors and warnings, ensuring issues are traceable even if the local app restarts.
+69: *   **processing_events**: The "brain" logs. Stores every decision, prompt, and action taken by the AI. This powers the LiveTerminal and AITrace.
+70: *   **emails**: Metadata only. Actual content is on local disk.
 
 ## Deployment
 

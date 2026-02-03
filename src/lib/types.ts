@@ -220,6 +220,9 @@ export interface UserSettings extends UserPersona {
     tts_voice?: string | null;
     tts_speed?: number;
     tts_quality?: number;
+    // Embedding Settings (for RAG)
+    embedding_provider?: string | null;
+    embedding_model?: string | null;
     // Legacy
     preferences?: Record<string, any>;
 }

@@ -218,15 +218,36 @@ export class SDKService {
                 throw new Error('No embedding providers available. Please configure a provider in RealTimeX Desktop.');
             }
 
-            // Find first provider with available models
+            // 1. Try to find the preferred default provider (realtimexai)
+            const preferredProvider = providers.find(p => p.provider === this.DEFAULT_EMBED_PROVIDER);
+            if (preferredProvider && preferredProvider.models && preferredProvider.models.length > 0) {
+                // Try to find the preferred default model (text-embedding-3-small) within it
+                const preferredModel = preferredProvider.models.find(m => m.id === this.DEFAULT_EMBED_MODEL) || preferredProvider.models[0];
+
+                this.defaultEmbedProvider = {
+                    provider: preferredProvider.provider,
+                    model: preferredModel.id,
+                    isDefaultFallback: false
+                };
+                logger.info(`Using preferred embed provider: ${this.defaultEmbedProvider.provider}/${this.defaultEmbedProvider.model}`);
+                return this.defaultEmbedProvider;
+            }
+
+            // 2. Fallback to the first provider with available models (excluding native/local)
             for (const p of providers) {
+                // Skip native/local providers as they require local models
+                if (p.provider === 'native' || p.provider === 'local') {
+                    logger.debug(`Skipping native/local provider: ${p.provider}`);
+                    continue;
+                }
+
                 if (p.models && p.models.length > 0) {
                     this.defaultEmbedProvider = {
                         provider: p.provider,
                         model: p.models[0].id,
                         isDefaultFallback: true
                     };
-                    logger.info(`Selected embed provider: ${this.defaultEmbedProvider.provider}/${this.defaultEmbedProvider.model}`);
+                    logger.info(`Defaulting to first available embed provider: ${this.defaultEmbedProvider.provider}/${this.defaultEmbedProvider.model}`);
                     return this.defaultEmbedProvider;
                 }
             }

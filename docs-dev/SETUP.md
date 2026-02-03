@@ -1,10 +1,10 @@
 # Setup and Installation Guide
 
-## Prerequisites
+## 🛠️ Prerequisites
 
-- Node.js (v18+)
-- Supabase Account (and project)
-- Google Cloud Console Project (for Gmail OAuth)
+- **Node.js**: v20 or higher
+- **Supabase Account**: For database hosting
+- **Supabase CLI**: Recommended for local development
 
 ## 1. Installation
 
@@ -18,89 +18,59 @@ npm install
 
 ## 2. Environment Configuration
 
-Create a `.env` file in the root directory (copy from `.env.example`):
+The application is designed to be **Zero-Config** for end users, but developers can use a `.env` file to override defaults.
 
 ```bash
 cp .env.example .env
 ```
 
-**Required Variables:**
+**Variables:**
+- `VITE_SUPABASE_URL`: (Optional) Pre-fill Supabase URL
+- `VITE_SUPABASE_ANON_KEY`: (Optional) Pre-fill Supabase Key
+- `PORT`: (Optional) Port for the unified server (default: 3004)
 
-- `VITE_SUPABASE_URL`: Your Supabase Project URL.
-- `VITE_SUPABASE_ANON_KEY`: Your Supabase Anon/Public Key.
-- `SUPABASE_URL`: Same as above (for backend).
-- `SUPABASE_ANON_KEY`: Same as above (for backend).
-- `LLM_API_KEY`: API Key for your LLM provider (OpenAI, Anthropic, etc.).
+### LLM Configuration
+All AI keys are managed via the **RealTimeX Desktop** app or entered into the app's **Configuration** tab. You do not need to put API keys in `.env`.
 
-**Optional (for specific features):**
+## 3. Running the Application
 
-- `GMAIL_CLIENT_ID`: OAuth Client ID for Gmail.
-- `GMAIL_CLIENT_SECRET`: OAuth Client Secret for Gmail.
+This project uses a **Unified Server** architecture. The Express API serves the React frontend, allowing a single-port deployment.
 
-### Local LLM Support (Ollama / LM Studio)
-
-The system supports OpenAI-compatible local LLMs. Configure the following in your `.env`:
+### Unified Dev Server (Recommended)
+Runs both the backend API and the frontend build on port 3004.
 
 ```bash
-# Example for Ollama
-LLM_BASE_URL="http://localhost:11434/v1"
-LLM_API_KEY="ollama" # Can be any string for Ollama
-LLM_MODEL="llama3"   # Or your loaded model name
+# Build frontend and start server
+npm run serve
 ```
 
-```bash
-# Example for LM Studio
-LLM_BASE_URL="http://localhost:1234/v1"
-LLM_API_KEY="lm-studio"
-LLM_MODEL="local-model"
-```
+### Split Dev Mode (For Core Devs)
+If you need hot-reloading for both Frontend and Backend:
 
-## 3. Database Setup (Supabase)
-
-The project requires specific tables in Supabase (`email_accounts`, `emails`). You can set this up automatically using the built-in Setup Wizard.
-
-### Automatic Migration (Recommended)
-
-1.  Start the development server:
+1.  **Backend (API)**:
     ```bash
-    npm run dev -- --port 3003
+    npm run dev:api
     ```
-2.  Start the backend server (required for migration API):
+2.  **Frontend (Vite)**:
     ```bash
-    npm run serve -- --port 3002
+    npm run dev
     ```
-3.  Navigate to **http://localhost:3003**.
-4.  Enter your **Supabase URL** and **Anon Key**.
-5.  In the next step, enter your **Database Password** to apply the schema.
 
-### Manual Migration
+## 4. Database Migration
 
-You can also run the migration script manually if you have the credentials:
+The application includes an **Automated Migration Engine**.
 
-```bash
-# Using Database Password (no CLI token needed)
-export SUPABASE_PROJECT_ID="your-project-id"
-export SUPABASE_DB_PASSWORD="your-db-password"
-./scripts/migrate.sh
+1.  **Wizard Mode**: Simply start the app. If the database is empty, the **Setup Wizard** will appear and handle migrations for you using your Supabase credentials.
+2.  **Manual Mode**:
+    ```bash
+    # Requires Supabase CLI
+    npm run migrate
+    ```
 
-# OR using Supabase CLI (requires login)
-npx supabase login
-npx supabase link --project-ref your-project-id
-npx supabase db push
-```
+## 5. Troubleshooting
 
-## 4. Running the Application
-
-To run the full application, you need both the frontend (Vite) and the backend (Express) running.
-
-**Frontend (Client):**
-```bash
-npm run dev -- --port 3003
-```
-
-**Backend (Server):**
-```bash
-npm run serve -- --port 3002
-```
-
-> **Note:** The backend server handles OAuth flows, AI processing, and database migrations. The frontend communicates with it via API calls.
+**"Port already in use"**
+*   Kill the process on port 3004 or specify a different port:
+    ```bash
+    PORT=3005 npm run serve
+    ```

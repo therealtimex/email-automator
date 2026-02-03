@@ -88,6 +88,7 @@ export async function runMigration(
         projectRef: string;
         dbPassword?: string;
         accessToken: string;
+        anonKey?: string; // For knowledge base ingestion
     },
     onEvent: (event: SSEEvent) => void
 ): Promise<void> {
@@ -100,6 +101,7 @@ export async function runMigration(
             projectRef: params.projectRef,
             dbPassword: params.dbPassword,
             accessToken: params.accessToken,
+            anonKey: params.anonKey, // Pass anon key for knowledge ingestion
         }),
     });
 

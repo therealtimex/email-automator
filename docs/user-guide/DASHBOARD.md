@@ -12,13 +12,26 @@ As the agent processes your inbox, emails appear live in this list.
 
 ## 🕵️ AI Trace & Transparency
 
-One of the core philosophies of Email Automator is transparency.
+One of the core philosophies of Email Automator is radical transparency.
 
-1.  **AI Trace (Eye Icon)**: Click this on any email card to see exactly what the AI was thinking. It shows:
-    *   The exact prompt sent to the LLM.
-    *   The raw JSON response from the model.
-    *   Every granular step (Fetching → Analyzing → Acting).
-2.  **Live Agent Terminal**: Click the floating "Live Activity" button in the bottom right to see a scrolling log of the agent's current background activity.
+### Live Agent Terminal ("Matrix Mode")
+Click the floating **Live Activity** button (bottom right) to open the terminal.
+*   **Real-time Feed**: Watch the agent "think" and "act" in real-time.
+*   **Granular Logs**: See every API call, LLM prompt, and database transaction.
+*   **Error Expansion**: Click on any error to see the full stack trace.
+
+### AI Trace Modal
+Click the **Eye Icon** on any email card to view its specific processing history.
+*   **Decision Timeline**: See exactly *why* an email was categorized a certain way.
+*   **Raw Data**: View the raw JSON output from the Intelligence Engine.
+
+## 🔊 Sound & Haptic Feedback
+
+The dashboard provides subtle feedback to keep you aware of background activity without being intrusive:
+*   **Soft Chime**: Played when a new email is analyzed.
+*   **Success Tone**: Played when a sync cycle completes.
+*   **Alert**: Played when a High-Priority email is detected.
+*   *Note: You can toggle these sounds in the Account Settings.*
 
 ## ⚡ Manual Actions
 

@@ -324,6 +324,10 @@ class HybridApiClient {
         return this.expressRequest<{ success: boolean; providers: any[]; message?: string }>('/api/sdk/providers/chat');
     }
 
+    async getEmbedProviders() {
+        return this.expressRequest<{ success: boolean; providers: any[]; message?: string }>('/api/sdk/providers/embed');
+    }
+
     // ============================================================================
     // SYNC ENDPOINTS (Express API - Local App)
     // ============================================================================

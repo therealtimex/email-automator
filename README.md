@@ -178,10 +178,11 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_API_URL=http://localhost:3004
 PORT=3004
 
-# LLM
-LLM_API_KEY=your-llm-key
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=gpt-4o-mini
+# LLM Configuration
+# Managed by RealTimeX SDK - No API keys needed!
+# 1. Start RealTimeX Desktop (port 3001)
+# 2. Configure providers via Configuration UI or RealTimeX Desktop
+# The SDK automatically handles provider discovery and routing
 
 # Development
 DISABLE_AUTH=true

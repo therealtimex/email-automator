@@ -38,7 +38,7 @@ router.get('/', async (_req, res) => {
         environment: config.nodeEnv,
         services: {
             database: dbStatus,
-            llm: config.llm.apiKey ? 'configured' : 'not_configured',
+            llm: 'realtimex_sdk', // Managed by RealTimeX SDK
             gmail: config.gmail.clientId ? 'configured' : 'not_configured',
             microsoft: config.microsoft.clientId ? 'configured' : 'not_configured',
         },

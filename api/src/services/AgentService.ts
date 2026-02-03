@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SDKService } from './SDKService.js';
+import { RAGService } from './RAGService.js';
 
 export interface AgentContextPayload {
     page_id: string;
@@ -14,9 +15,16 @@ export interface AgentMessage {
 }
 
 export class AgentService {
+    private supabase: SupabaseClient;
+    private ragService: RAGService;
+
+    constructor(supabase: SupabaseClient) {
+        this.supabase = supabase;
+        this.ragService = new RAGService(supabase);
+    }
 
     /**
-     * Process a context-aware chat request
+     * Process a context-aware chat request with RAG
      */
     async chat(
         userId: string,
@@ -24,18 +32,56 @@ export class AgentService {
         context: AgentContextPayload,
         history: AgentMessage[] = []
     ) {
-        // 1. Construct System Prompt
-        const baseIdentity = "You are the Email Automator Assistant. You help the user manage their email workflows, drafts, and rules.";
-        const pageInstruction = context.system_instruction
-            ? `\nCURRENT CONTEXT: You are currently assisting on the "${context.page_id}" page. ${context.system_instruction}`
-            : "";
+        // 1. Retrieve relevant knowledge using RAG
+        console.log('[AgentService] Retrieving relevant knowledge...');
+        const ragContext = await this.ragService.retrieve(message, {
+            topK: 5,
+            similarityThreshold: 0.5  // Lowered from 0.7 to be less strict
+        });
 
-        const dataContext = context.data
-            ? `\nVISIBLE DATA:\n${JSON.stringify(context.data, null, 2)}`
-            : "";
+        console.log(`[AgentService] Retrieved ${ragContext.chunks.length} relevant chunks from: ${ragContext.sources.join(', ')}`);
 
-        // Construct Tool Instructions
-        let toolInstructions = "";
+        // 2. Construct System Prompt with RAG context
+        const baseInstruction = context.system_instruction ||
+            "You are a helpful Email Automator Assistant helping users with this page.";
+
+        let systemPrompt = `${baseInstruction}
+
+# CRITICAL: Anti-Hallucination Rules
+
+**You MUST follow these rules strictly:**
+
+1. **ONLY use information from the Retrieved Documentation below** - If information is not in the retrieved docs, say: "I don't have information about that in the available documentation"
+
+2. **Never fabricate features** - Do not invent capabilities, settings, buttons, or workflows not documented in the retrieved content
+
+3. **Be honest about limitations** - If the retrieved documentation doesn't cover the user's question, acknowledge it clearly
+
+4. **Exact references only** - Only mention page names, buttons, settings, and steps that appear in the Retrieved Documentation
+
+5. **Cite sources** - When answering, reference which documentation section you're using (e.g., "According to the Configuration guide...")
+
+---
+
+${ragContext.contextText}
+
+---
+
+# Current Context
+- **Current Page**: ${context.page_id}
+- **Page Data**: ${JSON.stringify(context.data || {}, null, 2)}
+
+# Response Instructions
+
+**When Answering:**
+- Base your answer ONLY on the Retrieved Documentation above
+- Reference the source file and section when relevant
+- Provide step-by-step instructions when they exist in the docs
+- If user asks about a different page, guide them: "Go to [Page Name] → [Section]"
+- Use tools when available on current page
+- If the retrieved documentation doesn't answer the question, say: "I don't have information about that in the documentation. The available docs cover: [list sources]"`;
+
+        // Add Tool Instructions if tools are available
         if (context.tools && context.tools.length > 0) {
             const toolDescs = context.tools.map(t => {
                 const params = t.parameters?.properties
@@ -47,7 +93,7 @@ export class AgentService {
                 return `- ${t.name}: ${t.description}\n  Parameters: {${params}}${required}`;
             }).join('\n');
 
-            toolInstructions = `\n\nAVAILABLE TOOLS:\n${toolDescs}\n\nIMPORTANT TOOL USAGE RULES:
+            systemPrompt += `\n\n# AVAILABLE TOOLS\n${toolDescs}\n\n## Tool Usage Rules:
 1. To execute a tool, output the marker <<<ACTION>>> followed by a JSON object on the same line
 2. The JSON MUST have "name" (tool name) and "args" (object with parameters)
 3. Example: <<<ACTION>>>{"name": "send_draft", "args": {"draft_id": "123"}}
@@ -55,8 +101,6 @@ export class AgentService {
 5. Always include all required parameters as specified above
 6. Provide a friendly explanation BEFORE the <<<ACTION>>> marker`;
         }
-
-        const systemPrompt = `${baseIdentity}${pageInstruction}${dataContext}${toolInstructions}\n\nBe concise and helpful.`;
 
         // 2. Prepare Messages
         // Explicitly map history to ensure role is strongly typed as 'system' | 'user' | 'assistant'
@@ -145,4 +189,5 @@ export class AgentService {
     }
 }
 
-export const agentService = new AgentService();
+// Note: AgentService now requires Supabase client for RAG
+// Instantiate in routes like: new AgentService(supabase)

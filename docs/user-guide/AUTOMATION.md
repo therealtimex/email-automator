@@ -19,19 +19,18 @@ You can create powerful, multi-condition rules based on AI analysis.
 *   **AI Category**: e.g., "Category equals `Client`"
 *   **Sentiment**: e.g., "Sentiment is `Negative`"
 *   **Priority**: e.g., "Priority is `High`"
-*   **Metadata**: Define rules based on specific senders, domains, or keywords.
+*   **Metadata Signals**: Define rules based on sender, domain, or even specific headers like `List-Unsubscribe`.
 
 ### 2. Actions
 *   **Archive/Delete/Star/Read**: Perform standard cleanup.
-*   **Draft Reply**: Automatically draft a response.
+*   **Draft Reply**: Automatically draft a personalized response.
+    *   **Contextual Control**: Specify the *Tone* (Professional, Casual) and *Additional Context* (e.g., "Tell them I'm OOO until Tuesday").
+    *   **Attachments**: Automatically attach files (e.g., resumes, pricing PDF) to the draft.
 
-### 3. Custom Instructions
-When creating a **Draft Reply** rule, you can provide **Custom Context**.
-> **Example**: "If sender is @support, draft a reply saying I'm away until next Monday but will look into it then."
-
-### 4. Retention Policies (Age-based)
-You can define rules that only trigger after an email reaches a certain age.
-> **Example**: "Automatically Archive newsletters that are older than 7 days."
+### 3. Retention Policies (Time-Based)
+Define rules that only execute after an email has aged.
+*   **Use Case**: "Trash 'Newsletters' that are older than 30 days."
+*   **Execution**: These rules run during the "Retention Phase" of every sync cycle.
 
 ---
 

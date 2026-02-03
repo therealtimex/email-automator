@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { RealtimeXSDK } from '@realtimex/sdk';
 import { z } from 'zod';
 
 // Define the schema for email analysis
@@ -20,31 +20,59 @@ export const EmailAnalysisSchema = z.object({
 
 export type EmailAnalysis = z.infer<typeof EmailAnalysisSchema>;
 
+/**
+ * IntelligenceLayer - Email analysis using RealTimeX SDK
+ *
+ * This class provides AI-powered email analysis through the RealTimeX SDK,
+ * which connects to RealTimeX Desktop for LLM provider management.
+ *
+ * No API keys required - configuration is managed through RealTimeX Desktop.
+ */
 export class IntelligenceLayer {
-    private client: OpenAI | null = null;
-    private model: string = 'gpt-4o-mini';
+    private sdk: RealtimeXSDK | null = null;
 
     constructor() {
-        if (!process.env.LLM_API_KEY) {
-            console.warn('LLM_API_KEY is missing. AI analysis will not work.');
-            return;
+        try {
+            this.sdk = new RealtimeXSDK({
+                realtimex: {
+                    // @ts-ignore - Dev Mode feature
+                    apiKey: 'SXKX93J-QSWMB04-K9E0GRE-J5DA8J0'
+                },
+                permissions: [
+                    'llm.chat',         // Chat completion
+                    'llm.providers',    // List LLM providers
+                ],
+            });
+            console.log('[IntelligenceLayer] RealTimeX SDK initialized');
+        } catch (error) {
+            console.error('[IntelligenceLayer] Failed to initialize RealTimeX SDK:', error);
+            this.sdk = null;
         }
-
-        this.client = new OpenAI({
-            apiKey: process.env.LLM_API_KEY,
-            baseURL: process.env.LLM_BASE_URL,
-        });
-
-        this.model = process.env.LLM_MODEL || 'gpt-4o-mini';
     }
 
-    async analyzeEmail(content: string, context: { subject: string; sender: string; date: string }, userSettings?: any): Promise<EmailAnalysis | null> {
-        if (!this.client) {
-            console.error('AI client not initialized');
+    async analyzeEmail(
+        content: string,
+        context: { subject: string; sender: string; date: string },
+        userSettings?: any
+    ): Promise<EmailAnalysis | null> {
+        if (!this.sdk) {
+            console.error('[IntelligenceLayer] SDK not initialized. Is RealTimeX Desktop running?');
             return null;
         }
 
         try {
+            // Resolve provider from user settings or use defaults
+            let provider = 'realtimexai';
+            let model = 'gpt-4o-mini';
+
+            if (userSettings?.llm_provider) {
+                provider = userSettings.llm_provider;
+            }
+            if (userSettings?.llm_model) {
+                model = userSettings.llm_model;
+            }
+
+            // Build system prompt with email analysis instructions
             let systemPrompt = `You are an AI Email Assistant. Analyze the provided email and extract structured information.
 Return ONLY a valid JSON object with these fields:
 {
@@ -89,17 +117,18 @@ Context:
                 }
             }
 
-            const response = await this.client.chat.completions.create({
-                model: this.model,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: content }
-                ],
-                response_format: { type: 'json_object' },
+            // Call RealTimeX SDK for chat completion
+            const response = await this.sdk.llm.chat([
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: content }
+            ], {
+                provider,
+                model,
                 temperature: 0.1,
+                response_format: { type: 'json_object' }
             });
 
-            const rawResponse = response.choices[0]?.message?.content || '';
+            const rawResponse = response.response?.content || '';
 
             // Parse and validate with Zod
             const parsed = JSON.parse(rawResponse);
@@ -117,7 +146,7 @@ Context:
 
             return validated;
         } catch (error) {
-            console.error('AI Analysis Error:', error);
+            console.error('[IntelligenceLayer] AI Analysis Error:', error);
             return null;
         }
     }

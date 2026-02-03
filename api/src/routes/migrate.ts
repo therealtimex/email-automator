@@ -13,7 +13,7 @@ const logger = createLogger('MigrateRoutes');
 router.post('/',
     validateBody(schemas.migrate),
     asyncHandler(async (req, res) => {
-        const { projectRef, accessToken } = req.body;
+        const { projectRef, accessToken, anonKey } = req.body;
 
         logger.info('Starting migration', { projectRef });
 
@@ -30,10 +30,17 @@ router.post('/',
 
             const scriptPath = join(config.scriptsDir, 'migrate.sh');
 
+            // Construct Supabase URL from project ref
+            const supabaseUrl = `https://${projectRef}.supabase.co`;
+
             const env = {
                 ...process.env,
                 SUPABASE_PROJECT_ID: projectRef,
                 SUPABASE_ACCESS_TOKEN: accessToken || '',
+                SUPABASE_URL: supabaseUrl,
+                // Note: migrate.sh will fetch SERVICE_ROLE_KEY using access token
+                // anonKey provided as fallback if API fetch fails
+                SUPABASE_ANON_KEY: anonKey || '',
                 SKIP_FUNCTIONS: '0',
             };
 

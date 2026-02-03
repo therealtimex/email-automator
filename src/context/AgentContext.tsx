@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { useTTS } from '../hooks/useTTS';
 import { getTTSFromLocalStorage } from '../lib/tts-sync';
+import { getApiConfig } from '../lib/api-config';
 
 export interface ToolDefinition {
     name: string;
@@ -78,6 +79,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             // Use localStorage token if available (simple auth)
             const token = localStorage.getItem('supabase.auth.token');
 
+            // Get Supabase config for BYOK mode
+            const config = getApiConfig();
+
             // Payload matches api/src/routes/agent.ts expectations
             // Payload: Strip callbacks from tools before sending
             const contextPayload = {
@@ -101,7 +105,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token || ''}`,
-                    // Pass user id if we had it in context, but token usually carries it
+                    // Pass Supabase config for RAG (BYOK mode)
+                    'X-Supabase-Url': config.edgeFunctionsUrl.replace('/functions/v1', ''),
+                    'X-Supabase-Anon-Key': config.anonKey,
                 },
                 body: JSON.stringify(body)
             });

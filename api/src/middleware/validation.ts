@@ -83,6 +83,7 @@ export const schemas = {
     migrate: z.object({
         projectRef: z.string().min(1, 'Project reference is required'),
         accessToken: z.string().min(1, 'Access token is required for automatic migration'),
+        anonKey: z.string().optional(), // For knowledge base ingestion during migration
     }),
 
     // Rule schemas - supports both single action (legacy) and actions array

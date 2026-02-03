@@ -199,6 +199,7 @@ export function SetupWizard({ onComplete, open = true, canClose = false }: Setup
                         projectRef: targetProjectId,
                         dbPassword: dbPassRef.current,
                         accessToken: targetToken,
+                        anonKey: targetKey, // Pass anon key for knowledge ingestion
                     },
                     (event: SSEEvent) => {
                         switch (event.type) {

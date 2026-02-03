@@ -72,27 +72,29 @@ export const config = {
     scriptsDir: join(packageRoot, 'scripts'),
 
     // Supabase
+    // Supabase Configuration
+    // Primary: BYOK via Setup Wizard (credentials passed via HTTP headers)
+    // Fallback: Environment variables (for backend development/testing only)
+    // WARNING: Env var fallback will be removed in future versions - use Setup Wizard!
     supabase: {
         url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
         anonKey: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
         serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     },
 
-    // LLM
-    llm: {
-        apiKey: process.env.LLM_API_KEY || '',
-        baseUrl: process.env.LLM_BASE_URL,
-        model: process.env.LLM_MODEL || 'gpt-4o-mini',
-    },
+    // LLM Configuration: Managed by RealTimeX SDK (no env vars needed)
+    // Users configure providers via RealTimeX Desktop or Configuration UI
 
-    // OAuth - Gmail
+    // OAuth Configuration
+    // Primary: BYOK via Setup Wizard (stored in user_settings)
+    // Fallback: Environment variables (for backend development/testing only)
+    // WARNING: Env var fallback will be removed in future versions - use Setup Wizard!
     gmail: {
         clientId: process.env.GMAIL_CLIENT_ID || '',
         clientSecret: process.env.GMAIL_CLIENT_SECRET || '',
         redirectUri: process.env.GMAIL_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob',
     },
 
-    // OAuth - Microsoft
     microsoft: {
         clientId: process.env.MS_GRAPH_CLIENT_ID || '',
         tenantId: process.env.MS_GRAPH_TENANT_ID || 'common',
