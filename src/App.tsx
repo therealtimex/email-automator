@@ -46,6 +46,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from './components/ui/dialog';
+import { VisuallyHidden } from './components/ui/visually-hidden';
 
 
 type TabType = 'dashboard' | 'drafts' | 'autopilot' | 'config' | 'analytics' | 'account';
@@ -481,6 +482,9 @@ function AppContent() {
                     setShowPersonaWizard(open);
                 }}>
                     <DialogContent className="max-w-3xl border-none bg-transparent shadow-none p-0 sm:max-w-3xl">
+                        <VisuallyHidden>
+                            <DialogTitle>Persona Setup Wizard</DialogTitle>
+                        </VisuallyHidden>
                         <PersonaWizard
                             onComplete={() => {
                                 setShowPersonaWizard(false);

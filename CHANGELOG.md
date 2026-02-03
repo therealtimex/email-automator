@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.21.7] - 2026-02-01
+
+### Removed
+- **Rule Packs**: Removed the complex "Rule Pack" system in favor of a simplified default rules approach. This change streamlines the automation configuration process by eliminating the need to manage pack lifecycles and installations.
+  - Deleted rule pack management API routes and services.
+  - Removed rule pack UI components from the Auto-Pilot dashboard.
+  - Cleaned up localization strings related to packs.
+
+### Added
+- **Accessibility**: Introduced a reusable `VisuallyHidden` component. This utility improves screen reader support by allowing content (like dialog titles) to be semantically present for assistive technologies while remaining hidden from the visual interface.
+
 ## [2.21.6] - 2026-02-01
 
 ### Improved
