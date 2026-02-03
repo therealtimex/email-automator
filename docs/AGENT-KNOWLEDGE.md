@@ -1,5 +1,5 @@
 # Email-Automator AI Agent Knowledge Base
-**Generated:** 2026-02-03T10:02:20.637Z
+**Generated:** 2026-02-03T10:14:56.813Z
 **Version:** 2.21.4
 **Sources:** User documentation (docs/user-guide/), CLAUDE.md, README.md
 
