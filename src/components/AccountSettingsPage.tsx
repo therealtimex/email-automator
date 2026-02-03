@@ -15,6 +15,7 @@ import { PersonaSettings } from './AccountSettings/PersonaSettings';
 import { sounds } from '../lib/sounds';
 import { checkMigrationStatus, type MigrationStatus } from '../lib/migration-check';
 import { useLanguage } from '../context/LanguageContext';
+import { clearTTSFromLocalStorage } from '../lib/tts-sync';
 
 type SettingsTab = 'profile' | 'security' | 'database' | 'persona';
 
@@ -68,6 +69,7 @@ export function AccountSettingsPage() {
                         <button
                             onClick={async () => {
                                 await supabase.auth.signOut();
+                                clearTTSFromLocalStorage(); // Clear TTS settings on logout
                                 toast.success(t('account.logoutSuccess'));
                                 window.location.reload();
                             }}

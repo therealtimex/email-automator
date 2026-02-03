@@ -82,12 +82,14 @@ export function TTSProvider({ children }: { children: ReactNode }) {
         setIsSpeaking(true);
         setSpeakingId(id || null);
 
+        const payload = { text, ...options };
+        console.log('[TTSContext] Sending TTS request:', payload);
 
         try {
-            const response = await fetch('http://localhost:3000/api/tts/speak', {
+            const response = await fetch('/api/tts/speak', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text, ...options })
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) throw new Error('TTS generation failed');
@@ -132,7 +134,7 @@ export function TTSProvider({ children }: { children: ReactNode }) {
 
 
         try {
-            const response = await fetch('http://localhost:3000/api/tts/stream', {
+            const response = await fetch('/api/tts/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text, ...options })

@@ -107,6 +107,12 @@ export interface UserSettings {
     intelligent_rename?: boolean;
     sync_interval_minutes: number;
     preferences?: Record<string, any>;
+    // TTS Settings
+    tts_auto_play?: boolean;
+    tts_provider?: string;
+    tts_voice?: string | null;
+    tts_speed?: number;
+    tts_quality?: number;
 }
 
 export interface Integration {
@@ -208,6 +214,12 @@ export interface UserSettings extends UserPersona {
     // Zero-Config UX
     user_role?: string | null;
     onboarding_completed?: boolean;
+    // TTS Settings
+    tts_auto_play?: boolean;
+    tts_provider?: string;
+    tts_voice?: string | null;
+    tts_speed?: number;
+    tts_quality?: number;
     // Legacy
     preferences?: Record<string, any>;
 }

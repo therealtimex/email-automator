@@ -49,6 +49,8 @@ router.post('/speak', async (req: Request, res: Response) => {
     try {
         const { text, provider, voice, speed, quality } = req.body;
 
+        console.log('[TTS API] Received TTS request:', { text: text?.substring(0, 50) + '...', provider, voice, speed, quality });
+
         if (!text || typeof text !== 'string') {
             return res.status(400).json({
                 success: false,
@@ -78,6 +80,7 @@ router.post('/speak', async (req: Request, res: Response) => {
         if (speed) options.speed = parseFloat(speed);
         if (quality) options.num_inference_steps = parseInt(quality);
 
+        console.log('[TTS API] Calling SDK with options:', options);
         const audioBuffer = await sdk.tts.speak(text, options);
 
         // Return audio as binary

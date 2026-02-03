@@ -6,6 +6,7 @@ import { getSupabaseConfig } from '../lib/supabase-config';
 import { useRealtimeEmails } from '../hooks/useRealtimeEmails';
 import { sounds } from '../lib/sounds';
 import { toast } from '../components/Toast';
+import { syncTTSToLocalStorage } from '../lib/tts-sync';
 
 // Helper to extract error message from API response error
 function getErrorMessage(error: { message?: string; code?: string } | string | undefined, fallback: string): string {
@@ -208,6 +209,8 @@ function reducer(state: AppState, action: Action): AppState {
                 rules: state.rules.filter(r => r.id !== action.payload),
             };
         case 'SET_SETTINGS':
+            // Sync TTS settings to localStorage whenever they're loaded/updated
+            syncTTSToLocalStorage(action.payload);
             return { ...state, settings: action.payload };
         case 'SET_STATS':
             return { ...state, stats: action.payload };

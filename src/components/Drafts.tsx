@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Mail, Send, Eye, X, RefreshCw, Loader2, CheckCircle2, XCircle, Clock, Filter } from 'lucide-react';
 import { Button } from './ui/button';
@@ -9,6 +9,9 @@ import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
 import { cn } from '../lib/utils';
 import { usePageAgent } from '../hooks/usePageAgent';
+import { useConfirm } from '../hooks/useConfirm';
+import { ConfirmDialog } from './ConfirmDialog';
+import { ToolDefinition } from '../context/AgentContext';
 
 interface DraftsProps {
 
@@ -22,10 +25,88 @@ export function Drafts({ onPreview }: DraftsProps) {
     const [loading, setLoading] = useState(true);
     const [selectedDrafts, setSelectedDrafts] = useState<Set<string>>(new Set());
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const { confirm, dialogState } = useConfirm();
 
     // Filters
     const [filterAccount, setFilterAccount] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<'pending' | 'sent' | 'dismissed'>('pending');
+
+    // Define Agent Tools
+    const agentTools: ToolDefinition[] = [
+        {
+            name: "send_draft",
+            description: "Sends a specific email draft by ID. The draft will be sent immediately to the recipient.",
+            parameters: {
+                type: "object",
+                properties: {
+                    draft_id: {
+                        type: "string",
+                        description: "The unique ID of the draft to send"
+                    }
+                },
+                required: ["draft_id"]
+            },
+            callback: async (args: { draft_id: string }) => {
+                await handleSend(args.draft_id, true); // Skip confirmation for AI actions
+                return { success: true, message: "Draft sent successfully" };
+            }
+        },
+        {
+            name: "dismiss_draft",
+            description: "Dismisses/discards a specific email draft by ID. This is a destructive action.",
+            parameters: {
+                type: "object",
+                properties: {
+                    draft_id: {
+                        type: "string",
+                        description: "The unique ID of the draft to dismiss"
+                    }
+                },
+                required: ["draft_id"]
+            },
+            callback: async (args: { draft_id: string }) => {
+                // For destructive actions, still require confirmation even from AI
+                await handleDismiss(args.draft_id, false);
+                return { success: true, message: "Draft dismissed" };
+            }
+        },
+        {
+            name: "preview_draft",
+            description: "Opens a preview of a specific draft to show the user its full content.",
+            parameters: {
+                type: "object",
+                properties: {
+                    draft_id: {
+                        type: "string",
+                        description: "The unique ID of the draft to preview"
+                    }
+                },
+                required: ["draft_id"]
+            },
+            callback: async (args: { draft_id: string }) => {
+                const draft = drafts.find(d => d.id === args.draft_id);
+                if (draft) {
+                    onPreview(draft);
+                    return { success: true, message: "Preview opened" };
+                }
+                throw new Error("Draft not found");
+            }
+        },
+        {
+            name: "summarize_drafts",
+            description: "Provides a summary of all pending drafts to help the user triage them.",
+            parameters: {},
+            callback: async () => {
+                const summary = drafts.slice(0, 5).map((d, i) =>
+                    `${i + 1}. "${d.subject || 'No Subject'}" from ${d.sender} - ${(d.ai_analysis as any)?.summary || 'No summary'}`
+                ).join('\n');
+                return {
+                    success: true,
+                    summary: `You have ${drafts.length} pending drafts. Here are the first 5:\n${summary}`
+                };
+            }
+        }
+    ];
 
     // Agent Context Injection
     usePageAgent({
@@ -41,7 +122,8 @@ export function Drafts({ onPreview }: DraftsProps) {
                 ai_summary: (d.ai_analysis as any)?.summary || 'No summary'
             })),
             filters: { account: filterAccount, status: filterStatus }
-        }
+        },
+        tools: agentTools
     });
 
     useEffect(() => {
@@ -50,7 +132,7 @@ export function Drafts({ onPreview }: DraftsProps) {
     }, [filterAccount, filterStatus]);
 
 
-    const fetchAccounts = async () => {
+    const fetchAccounts = useCallback(async () => {
         try {
             const response = await api.getAccounts();
             if (response.data) {
@@ -59,9 +141,9 @@ export function Drafts({ onPreview }: DraftsProps) {
         } catch (error) {
             console.error('Failed to fetch accounts:', error);
         }
-    };
+    }, []);
 
-    const fetchDrafts = async () => {
+    const fetchDrafts = useCallback(async () => {
         setLoading(true);
         try {
             const response = await api.getDrafts({
@@ -81,9 +163,25 @@ export function Drafts({ onPreview }: DraftsProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filterStatus, filterAccount, t]);
 
-    const handleSend = async (emailId: string) => {
+    const handleSend = useCallback(async (emailId: string, skipConfirm = false) => {
+        // Find draft for confirmation message
+        const draft = drafts.find(d => d.id === emailId);
+        const draftSubject = draft?.subject || 'this draft';
+
+        // Confirm before sending
+        if (!skipConfirm) {
+            const confirmed = await confirm({
+                title: 'Send Draft?',
+                description: `Are you sure you want to send the draft: "${draftSubject}"?`,
+                confirmText: 'Send',
+                cancelText: 'Cancel',
+                destructive: false
+            });
+            if (!confirmed) return;
+        }
+
         setActionLoading(emailId);
         try {
             const response = await api.sendDraft(emailId);
@@ -97,12 +195,29 @@ export function Drafts({ onPreview }: DraftsProps) {
         } catch (error) {
             console.error('Failed to send draft:', error);
             toast.error(t('drafts.sendError') || 'Failed to send draft');
+            throw error; // Re-throw for tool execution error handling
         } finally {
             setActionLoading(null);
         }
-    };
+    }, [drafts, confirm, t]);
 
-    const handleDismiss = async (emailId: string) => {
+    const handleDismiss = useCallback(async (emailId: string, skipConfirm = false) => {
+        // Find draft for confirmation message
+        const draft = drafts.find(d => d.id === emailId);
+        const draftSubject = draft?.subject || 'this draft';
+
+        // Confirm before dismissing (destructive action)
+        if (!skipConfirm) {
+            const confirmed = await confirm({
+                title: 'Dismiss Draft?',
+                description: `Are you sure you want to dismiss the draft: "${draftSubject}"? This action cannot be undone.`,
+                confirmText: 'Dismiss',
+                cancelText: 'Cancel',
+                destructive: true
+            });
+            if (!confirmed) return;
+        }
+
         setActionLoading(emailId);
         try {
             const response = await api.dismissDraft(emailId);
@@ -116,10 +231,11 @@ export function Drafts({ onPreview }: DraftsProps) {
         } catch (error) {
             console.error('Failed to dismiss draft:', error);
             toast.error('Failed to dismiss draft');
+            throw error; // Re-throw for tool execution error handling
         } finally {
             setActionLoading(null);
         }
-    };
+    }, [drafts, confirm, t]);
 
     const handleSelectAll = () => {
         if (selectedDrafts.size === drafts.length) {
@@ -129,21 +245,43 @@ export function Drafts({ onPreview }: DraftsProps) {
         }
     };
 
-    const handleBulkSend = async () => {
+    const handleBulkSend = useCallback(async () => {
         const draftIds = Array.from(selectedDrafts);
-        for (const id of draftIds) {
-            await handleSend(id);
-        }
-        setSelectedDrafts(new Set());
-    };
 
-    const handleBulkDismiss = async () => {
-        const draftIds = Array.from(selectedDrafts);
+        const confirmed = await confirm({
+            title: 'Send Multiple Drafts?',
+            description: `Are you sure you want to send ${draftIds.length} draft(s)?`,
+            confirmText: `Send ${draftIds.length} Draft(s)`,
+            cancelText: 'Cancel',
+            destructive: false
+        });
+
+        if (!confirmed) return;
+
         for (const id of draftIds) {
-            await handleDismiss(id);
+            await handleSend(id, true); // Skip individual confirmations
         }
         setSelectedDrafts(new Set());
-    };
+    }, [selectedDrafts, confirm, handleSend]);
+
+    const handleBulkDismiss = useCallback(async () => {
+        const draftIds = Array.from(selectedDrafts);
+
+        const confirmed = await confirm({
+            title: 'Dismiss Multiple Drafts?',
+            description: `Are you sure you want to dismiss ${draftIds.length} draft(s)? This action cannot be undone.`,
+            confirmText: `Dismiss ${draftIds.length} Draft(s)`,
+            cancelText: 'Cancel',
+            destructive: true
+        });
+
+        if (!confirmed) return;
+
+        for (const id of draftIds) {
+            await handleDismiss(id, true); // Skip individual confirmations
+        }
+        setSelectedDrafts(new Set());
+    }, [selectedDrafts, confirm, handleDismiss]);
 
     if (loading) {
         return (
@@ -154,9 +292,11 @@ export function Drafts({ onPreview }: DraftsProps) {
     }
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+        <>
+            <ConfirmDialog state={dialogState} />
+            <div className="space-y-6 animate-in fade-in duration-500">
+                {/* Header */}
+                <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold flex items-center gap-2">
                         <Mail className="w-6 h-6 text-primary" />
@@ -271,7 +411,8 @@ export function Drafts({ onPreview }: DraftsProps) {
                     ))}
                 </div>
             )}
-        </div>
+            </div>
+        </>
     );
 }
 

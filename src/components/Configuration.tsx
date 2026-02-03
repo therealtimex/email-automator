@@ -11,6 +11,7 @@ import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
 import { EmailAccount, Rule, UserSettings, RuleAttachment } from '../lib/types';
 import { usePageAgent } from '../hooks/usePageAgent';
+import { TTSSettings } from './TTSSettings';
 import {
     Dialog,
 
@@ -1434,6 +1435,9 @@ export function Configuration() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Voice & Speech Settings */}
+            <TTSSettings />
 
             {/* Provider Credentials (BYOK) Section */}
             <div ref={credentialsRef}>

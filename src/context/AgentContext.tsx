@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { useTTS } from '../hooks/useTTS';
+import { getTTSFromLocalStorage } from '../lib/tts-sync';
 
 export interface ToolDefinition {
     name: string;
@@ -36,6 +37,13 @@ const DEFAULT_CONFIG: AgentConfig = {
     page_id: 'global',
     system_instruction: "You are a helpful Email Assistant. Use general knowledge to help the user."
 };
+
+// Helper to get TTS auto-play setting from localStorage
+// Falls back to true if not set (default enabled)
+function getTTSAutoPlayEnabled(): boolean {
+    const settings = getTTSFromLocalStorage();
+    return settings.autoPlay;
+}
 
 export function AgentProvider({ children }: { children: ReactNode }) {
     const [currentConfig, setCurrentConfig] = useState<AgentConfig>(DEFAULT_CONFIG);
@@ -98,6 +106,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
                 body: JSON.stringify(body)
             });
 
+            if (!res.ok) {
+                throw new Error(`API request failed: ${res.status} ${res.statusText}`);
+            }
+
             const data = await res.json();
 
             if (data.success && data.response) {
@@ -107,39 +119,88 @@ export function AgentProvider({ children }: { children: ReactNode }) {
                 const aiMsg: ChatMessage = { role: 'assistant', content: aiContent };
                 setChatHistory(prev => [...prev, aiMsg]);
 
-                // Speak response
-                if (aiContent) {
+                // Speak response (if auto-speak is enabled)
+                if (aiContent && getTTSAutoPlayEnabled()) {
                     setAgentState('speaking');
-                    await speak(aiContent, undefined, { speed: 1.1 });
+                    await speak(aiContent, undefined, getTTSFromLocalStorage());
                 }
 
                 // Execute Action
                 if (aiAction && currentConfig.tools) {
                     console.log(`[AgentContext] Executing tool: ${aiAction.name}`, aiAction.args);
                     const tool = currentConfig.tools.find(t => t.name === aiAction.name);
+
                     if (tool) {
                         try {
+                            // Validate that required parameters are present
+                            if (tool.parameters?.required) {
+                                const missing = tool.parameters.required.filter(
+                                    (param: string) => !(param in (aiAction.args || {}))
+                                );
+                                if (missing.length > 0) {
+                                    throw new Error(`Missing required parameters: ${missing.join(', ')}`);
+                                }
+                            }
+
                             // Execute callback
-                            await tool.callback(aiAction.args);
-                            // Optional: provide feedback to chat?
-                        } catch (err) {
+                            const result = await tool.callback(aiAction.args);
+
+                            // Provide success feedback
+                            const successMsg = result?.message || `✓ Action completed: ${aiAction.name}`;
+                            setChatHistory(prev => [...prev, {
+                                role: 'system',
+                                content: successMsg
+                            }]);
+
+                            console.log(`[AgentContext] Tool executed successfully:`, result);
+                        } catch (err: any) {
                             console.error(`[AgentContext] Tool execution failed:`, err);
-                            setChatHistory(prev => [...prev, { role: 'system', content: `Error executing ${aiAction.name}` }]);
+                            const errorMsg = err?.message || 'Unknown error occurred';
+                            setChatHistory(prev => [...prev, {
+                                role: 'system',
+                                content: `⚠️ Error: ${errorMsg}`
+                            }]);
+
+                            // Speak error message (if auto-speak is enabled)
+                            if (getTTSAutoPlayEnabled()) {
+                                await speak(`Error: ${errorMsg}`, undefined, getTTSFromLocalStorage());
+                            }
                         }
                     } else {
-                        console.warn(`[AgentContext] Tool not found: ${aiAction.name}`);
+                        const errorMsg = `Tool "${aiAction.name}" not found. Available tools: ${currentConfig.tools.map(t => t.name).join(', ')}`;
+                        console.warn(`[AgentContext] ${errorMsg}`);
+                        setChatHistory(prev => [...prev, {
+                            role: 'system',
+                            content: `⚠️ ${errorMsg}`
+                        }]);
                     }
                 }
 
                 setAgentState('idle');
             } else {
-                setChatHistory(prev => [...prev, { role: 'assistant', content: "Sorry, I encountered an error." }]);
+                const errorMsg = data.error || "Sorry, I encountered an error processing your request.";
+                console.error('[AgentContext] API error:', data.error);
+                setChatHistory(prev => [...prev, {
+                    role: 'assistant',
+                    content: `⚠️ ${errorMsg}`
+                }]);
                 setAgentState('idle');
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('[AgentContext] Chat failed:', error);
-            setChatHistory(prev => [...prev, { role: 'assistant', content: "Network error. Please try again." }]);
+            let errorMessage = "Network error. Please try again.";
+
+            if (error.message?.includes('Failed to fetch')) {
+                errorMessage = "Cannot connect to the AI service. Please ensure the API server is running.";
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
+            setChatHistory(prev => [...prev, {
+                role: 'system',
+                content: `⚠️ ${errorMessage}`
+            }]);
             setAgentState('idle');
         }
     }, [currentConfig, chatHistory, speak]);
