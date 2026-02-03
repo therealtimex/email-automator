@@ -76,11 +76,11 @@ export function TTSSettings() {
                     }
                 } else {
                     console.error('Failed to fetch TTS providers:', response.statusText);
-                    toast.error('Failed to load TTS providers. Ensure RealTimeX Desktop is running.');
+                    toast.error(t('config.voice.toast.providersFailed'));
                 }
             } catch (error) {
                 console.error('Error fetching TTS providers:', error);
-                toast.error('Failed to connect to TTS service');
+                toast.error(t('config.voice.toast.serviceFailed'));
             } finally {
                 setIsLoadingProviders(false);
             }
@@ -106,7 +106,7 @@ export function TTSSettings() {
     const handleTest = async () => {
         setIsTesting(true);
         try {
-            const testText = "Hello! This is a test of the text-to-speech system.";
+            const testText = t('config.voice.testText');
             await speak(testText, undefined, {
                 provider: ttsProvider,
                 voice: ttsVoice || undefined,
@@ -115,7 +115,7 @@ export function TTSSettings() {
             });
         } catch (error) {
             console.error('TTS test failed:', error);
-            toast.error('Failed to test text-to-speech');
+            toast.error(t('config.voice.toast.testFailed'));
         } finally {
             setIsTesting(false);
         }
@@ -133,9 +133,9 @@ export function TTSSettings() {
 
         if (success) {
             // AppContext will automatically sync to localStorage via SET_SETTINGS action
-            toast.success('Voice & Speech settings saved');
+            toast.success(t('config.voice.toast.saved'));
         } else {
-            toast.error('Failed to save settings');
+            toast.error(t('config.voice.toast.saveFailed'));
         }
         setIsSaving(false);
     };
@@ -148,14 +148,14 @@ export function TTSSettings() {
         const success = await actions.updateSettings({ tts_auto_play: next } as any);
         if (success) {
             if (next) {
-                toast.success('Auto-speak AI responses enabled');
+                toast.success(t('config.voice.toast.autoOn'));
             } else {
-                toast.info('Auto-speak AI responses disabled');
+                toast.info(t('config.voice.toast.autoOff'));
             }
         } else {
             // Revert on error
             setTtsAutoPlay(!next);
-            toast.error('Failed to update setting');
+            toast.error(t('config.voice.toast.updateFailed'));
         }
     };
 
@@ -164,19 +164,19 @@ export function TTSSettings() {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Volume2 className="w-5 h-5 text-purple-500" />
-                    Voice & Speech
+                    {t('config.voice.title')}
                 </CardTitle>
                 <CardDescription>
-                    Configure text-to-speech for AI responses
+                    {t('config.voice.desc')}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 {/* Auto-Play Toggle */}
                 <div className="flex items-center justify-between pb-4 border-b">
                     <div className="space-y-0.5">
-                        <label className="text-sm font-medium">Auto-Speak AI Responses</label>
+                        <label className="text-sm font-medium">{t('config.voice.autoTitle')}</label>
                         <p className="text-xs text-muted-foreground">
-                            Automatically read AI responses aloud using text-to-speech
+                            {t('config.voice.autoHelp')}
                         </p>
                     </div>
                     <Button
@@ -190,102 +190,106 @@ export function TTSSettings() {
                     </Button>
                 </div>
 
-                {/* Provider Selection */}
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">TTS Provider</label>
-                    {isLoadingProviders ? (
-                        <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
-                            <LoadingSpinner size="sm" className="mr-2" />
-                            <span className="text-xs text-muted-foreground italic">Loading providers...</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Provider Selection */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">{t('config.voice.provider')}</label>
+                        {isLoadingProviders ? (
+                            <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
+                                <LoadingSpinner size="sm" className="mr-2" />
+                                <span className="text-xs text-muted-foreground italic">{t('config.voice.loadingProviders')}</span>
+                            </div>
+                        ) : (
+                            <select
+                                className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                value={ttsProvider}
+                                onChange={(e) => handleProviderChange(e.target.value)}
+                                disabled={isLoadingProviders}
+                            >
+                                {providers.length === 0 && (
+                                    <option value="piper_local">{t('config.voice.piperLocal')}</option>
+                                )}
+                                {providers.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                        <p className="text-[10px] text-muted-foreground italic">
+                            {t('config.voice.providerHelp')}
+                        </p>
+                    </div>
+
+                    {/* Voice Selection */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">{t('config.voice.voice')}</label>
+                        {availableVoices.length > 0 ? (
+                            <select
+                                className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                value={ttsVoice || ''}
+                                onChange={(e) => setTtsVoice(e.target.value)}
+                                disabled={isLoadingProviders}
+                            >
+                                {!ttsVoice && <option value="">{t('config.voice.selectVoice')}</option>}
+                                {availableVoices.map(voice => (
+                                    <option key={voice} value={voice}>
+                                        {voice}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20 text-xs text-muted-foreground">
+                                {isLoadingProviders ? t('config.voice.loadingProviders') : t('config.voice.noVoices')}
+                            </div>
+                        )}
+                        <p className="text-[10px] text-muted-foreground italic">
+                            {t('config.voice.voiceHelp')}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Speed Slider */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium">{t('config.voice.speed')}</label>
+                            <span className="text-xs text-muted-foreground">{ttsSpeed.toFixed(1)}x</span>
                         </div>
-                    ) : (
-                        <select
-                            className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                            value={ttsProvider}
-                            onChange={(e) => handleProviderChange(e.target.value)}
-                            disabled={isLoadingProviders}
-                        >
-                            {providers.length === 0 && (
-                                <option value="piper_local">Piper (Local)</option>
-                            )}
-                            {providers.map(p => (
-                                <option key={p.id} value={p.id}>
-                                    {p.name}
-                                </option>
-                            ))}
-                        </select>
-                    )}
-                    <p className="text-[10px] text-muted-foreground italic">
-                        Select the text-to-speech provider
-                    </p>
-                </div>
-
-                {/* Voice Selection */}
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Voice</label>
-                    {availableVoices.length > 0 ? (
-                        <select
-                            className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                            value={ttsVoice || ''}
-                            onChange={(e) => setTtsVoice(e.target.value)}
-                            disabled={isLoadingProviders}
-                        >
-                            {!ttsVoice && <option value="">Select a voice</option>}
-                            {availableVoices.map(voice => (
-                                <option key={voice} value={voice}>
-                                    {voice}
-                                </option>
-                            ))}
-                        </select>
-                    ) : (
-                        <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20 text-xs text-muted-foreground">
-                            {isLoadingProviders ? 'Loading...' : 'No voices available'}
+                        <input
+                            type="range"
+                            min="0.5"
+                            max="2.0"
+                            step="0.1"
+                            value={ttsSpeed}
+                            onChange={(e) => setTtsSpeed(parseFloat(e.target.value))}
+                            className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                            <span>{t('config.voice.speedSlow')}</span>
+                            <span>{t('config.voice.speedFast')}</span>
                         </div>
-                    )}
-                    <p className="text-[10px] text-muted-foreground italic">
-                        Choose the voice personality for speech synthesis
-                    </p>
-                </div>
+                    </div>
 
-                {/* Speed Slider */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium">Speed</label>
-                        <span className="text-xs text-muted-foreground">{ttsSpeed.toFixed(1)}x</span>
-                    </div>
-                    <input
-                        type="range"
-                        min="0.5"
-                        max="2.0"
-                        step="0.1"
-                        value={ttsSpeed}
-                        onChange={(e) => setTtsSpeed(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                    />
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>0.5x (Slower)</span>
-                        <span>2.0x (Faster)</span>
-                    </div>
-                </div>
-
-                {/* Quality Slider */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium">Quality</label>
-                        <span className="text-xs text-muted-foreground">{ttsQuality}/20</span>
-                    </div>
-                    <input
-                        type="range"
-                        min="1"
-                        max="20"
-                        step="1"
-                        value={ttsQuality}
-                        onChange={(e) => setTtsQuality(parseInt(e.target.value, 10))}
-                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                    />
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>1 (Lower quality, faster)</span>
-                        <span>20 (Higher quality, slower)</span>
+                    {/* Quality Slider */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium">{t('config.voice.quality')}</label>
+                            <span className="text-xs text-muted-foreground">{ttsQuality}/20</span>
+                        </div>
+                        <input
+                            type="range"
+                            min="1"
+                            max="20"
+                            step="1"
+                            value={ttsQuality}
+                            onChange={(e) => setTtsQuality(parseInt(e.target.value, 10))}
+                            className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                            <span>{t('config.voice.qualityLow')}</span>
+                            <span>{t('config.voice.qualityHigh')}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -301,7 +305,7 @@ export function TTSSettings() {
                         ) : (
                             <TestTube className="w-4 h-4 mr-2" />
                         )}
-                        Test
+                        {t('config.voice.test')}
                     </Button>
                     <Button
                         onClick={handleSave}
@@ -312,7 +316,7 @@ export function TTSSettings() {
                         ) : (
                             <RefreshCw className="w-4 h-4 mr-2" />
                         )}
-                        Save Settings
+                        {t('config.voice.save')}
                     </Button>
                 </div>
             </CardContent>

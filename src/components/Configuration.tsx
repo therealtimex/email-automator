@@ -60,7 +60,7 @@ export function Configuration() {
 
     usePageAgent({
         page_id: 'configuration_wizard',
-        system_instruction: "You are the Configuration Wizard. Guide the user through setting up their accounts, rules, and system preferences. Explain what each setting does and help them troubleshoot connections.",
+        system_instruction: t('config.agent.systemInstruction'),
         data: {
             accounts_count: state.accounts.length,
             connected_providers: state.accounts.map(a => a.provider),
@@ -120,11 +120,11 @@ export function Configuration() {
                 if (response.data?.success) {
                     setChatProviders(response.data.providers || []);
                 } else {
-                    setProviderError(response.data?.message || 'Failed to load providers');
+                    setProviderError(response.data?.message || t('config.toast.providersFailed'));
                 }
             } catch (error) {
                 console.error('Failed to fetch providers:', error);
-                setProviderError('Failed to load providers. Using defaults.');
+                setProviderError(t('config.toast.providersFailedFallback'));
             } finally {
                 setIsLoadingProviders(false);
             }
@@ -139,11 +139,11 @@ export function Configuration() {
                 if (response.data?.success) {
                     setEmbedProviders(response.data.providers || []);
                 } else {
-                    setEmbedProviderError(response.data?.message || 'Failed to load embedding providers');
+                    setEmbedProviderError(response.data?.message || t('config.toast.embedProvidersFailed'));
                 }
             } catch (error) {
                 console.error('Failed to fetch embedding providers:', error);
-                setEmbedProviderError('Failed to load embedding providers. Using defaults.');
+                setEmbedProviderError(t('config.toast.embedProvidersFailedFallback'));
             } finally {
                 setIsLoadingEmbedProviders(false);
             }
@@ -243,10 +243,10 @@ export function Configuration() {
             if (response.data?.success) {
                 toast.success(response.data.message);
             } else {
-                toast.error(response.data?.message || 'Connection failed');
+                toast.error(response.data?.message || t('config.toast.connectionFailed'));
             }
         } catch (error: any) {
-            toast.error(error.response?.data?.message || 'Connection failed');
+            toast.error(error.response?.data?.message || t('config.toast.connectionFailed'));
         } finally {
             setTestingLlm(false);
         }
@@ -270,7 +270,7 @@ export function Configuration() {
     const handleToggleSpam = async () => {
         const rule = state.rules.find(r => r.name === 'Auto-Trash Spam');
         if (!rule) {
-            toast.error('System rule not found. Please sync your database.');
+            toast.error(t('config.toast.systemRuleMissing'));
             return;
         }
         setLoadingSetting('auto_trash_spam');
@@ -281,7 +281,7 @@ export function Configuration() {
     const handleToggleDrafts = async () => {
         const rule = state.rules.find(r => r.name === 'Smart Drafts');
         if (!rule) {
-            toast.error('System rule not found. Please sync your database.');
+            toast.error(t('config.toast.systemRuleMissing'));
             return;
         }
         setLoadingSetting('smart_drafts');
@@ -337,11 +337,11 @@ export function Configuration() {
             } else if (response.error) {
                 const errMsg = typeof response.error === 'string' ? response.error : response.error.message;
                 console.error('[Configuration] Gmail auth error:', response.error);
-                toast.error(errMsg || 'Failed to start connection. Please ensure you are logged in.');
+                toast.error(errMsg || t('config.toast.startConnectionFailed'));
                 setIsConnecting(false);
             }
         } catch (error) {
-            toast.error('Failed to start Gmail connection');
+            toast.error(t('config.toast.startGmailFailed'));
             setIsConnecting(false);
         }
     };
@@ -372,9 +372,9 @@ export function Configuration() {
             }
             // Also show the app type for user awareness
             if (parsed.installed) {
-                toast.success('Detected Desktop app credentials');
+                toast.success(t('config.toast.detectedDesktopCreds'));
             } else if (parsed.web) {
-                toast.info('Detected Web app - make sure redirect URI is configured in Google Cloud Console');
+                toast.info(t('config.toast.detectedWebCreds'));
             }
         } catch {
             // Invalid JSON, ignore - user might be typing
@@ -384,7 +384,7 @@ export function Configuration() {
     // Save credentials and start OAuth
     const handleSaveAndConnect = async () => {
         if (!gmailClientId || !gmailClientSecret) {
-            toast.error('Please provide both Client ID and Client Secret');
+            toast.error(t('config.toast.missingGmailCreds'));
             return;
         }
 
@@ -413,16 +413,16 @@ export function Configuration() {
 
                     // Move to step 2 - paste code
                     setGmailModalStep('code');
-                    toast.success('Please authorize in the opened tab, then paste the code here');
+                    toast.success(t('config.toast.authorizeAndPaste'));
                 } else {
                     const errMsg = typeof response.error === 'string' ? response.error : response.error?.message;
-                    toast.error(errMsg || 'Failed to get OAuth URL');
+                    toast.error(errMsg || t('config.toast.oauthUrlFailed'));
                 }
             } else {
-                toast.error('Failed to save credentials');
+                toast.error(t('config.toast.saveCredsFailed'));
             }
         } catch (error) {
-            toast.error('Failed to save credentials');
+            toast.error(t('config.toast.saveCredsFailed'));
         } finally {
             setSavingCredentials(false);
         }
@@ -431,7 +431,7 @@ export function Configuration() {
     // Submit authorization code to complete Gmail connection
     const handleSubmitAuthCode = async () => {
         if (!gmailAuthCode.trim()) {
-            toast.error('Please paste the authorization code');
+            toast.error(t('config.toast.missingAuthCode'));
             return;
         }
 
@@ -439,15 +439,15 @@ export function Configuration() {
         try {
             const response = await api.connectGmail(gmailAuthCode.trim());
             if (response.data?.success) {
-                toast.success('Gmail account connected successfully!');
+                toast.success(t('config.toast.gmailConnected'));
                 setShowGmailModal(false);
                 actions.fetchAccounts();
             } else {
                 const errMsg = typeof response.error === 'string' ? response.error : response.error?.message;
-                toast.error(errMsg || 'Failed to connect Gmail');
+                toast.error(errMsg || t('config.toast.gmailConnectFailed'));
             }
         } catch (error) {
-            toast.error('Failed to connect Gmail');
+            toast.error(t('config.toast.gmailConnectFailed'));
         } finally {
             setConnectingGmail(false);
         }
@@ -465,7 +465,7 @@ export function Configuration() {
     // Save Outlook credentials and start device flow
     const handleSaveOutlookAndConnect = async () => {
         if (!outlookClientId) {
-            toast.error('Please provide the Client ID');
+            toast.error(t('config.toast.missingOutlookClientId'));
             return;
         }
 
@@ -494,13 +494,13 @@ export function Configuration() {
                     pollOutlookLogin(response.data.deviceCode, response.data.interval);
                 } else {
                     const errMsg = typeof response.error === 'string' ? response.error : response.error?.message;
-                    toast.error(errMsg || 'Failed to start device flow');
+                    toast.error(errMsg || t('config.toast.deviceFlowFailed'));
                 }
             } else {
-                toast.error('Failed to save credentials');
+                toast.error(t('config.toast.saveCredsFailed'));
             }
         } catch (error) {
-            toast.error('Failed to save credentials');
+            toast.error(t('config.toast.saveCredsFailed'));
         } finally {
             setSavingOutlookCredentials(false);
         }
@@ -515,11 +515,11 @@ export function Configuration() {
                 setOutlookDeviceCode(response.data);
                 pollOutlookLogin(response.data.deviceCode, response.data.interval);
             } else {
-                toast.error('Failed to start Outlook connection');
+                toast.error(t('config.toast.outlookStartFailed'));
                 setIsOutlookConnecting(false);
             }
         } catch (error) {
-            toast.error('Failed to start Outlook connection');
+            toast.error(t('config.toast.outlookStartFailed'));
             setIsOutlookConnecting(false);
         }
     };
@@ -533,7 +533,7 @@ export function Configuration() {
                     setOutlookDeviceCode(null);
                     setIsOutlookConnecting(false);
                     setShowOutlookModal(false); // Close modal on success
-                    toast.success('Outlook account connected');
+                    toast.success(t('config.toast.outlookConnected'));
                     actions.fetchAccounts();
                 } else if (response.error) {
                     if (typeof response.error === 'object' && response.error.code !== 'authorization_pending') {
@@ -552,19 +552,19 @@ export function Configuration() {
                 setOutlookDeviceCode(null);
                 setIsOutlookConnecting(false);
                 setShowOutlookModal(false);
-                toast.error('Connection timed out. Please try again.');
+                toast.error(t('config.toast.connectionTimedOut'));
             }
         }, 15 * 60 * 1000);
     };
 
     const handleSaveRule = async () => {
         if (!newRuleName) {
-            toast.error('Please name your rule');
+            toast.error(t('config.toast.ruleNameRequired'));
             return;
         }
 
         if (newRuleActions.length === 0) {
-            toast.error('Please select at least one action');
+            toast.error(t('config.toast.ruleActionRequired'));
             return;
         }
 
@@ -596,7 +596,7 @@ export function Configuration() {
             }
 
             if (success) {
-                toast.success(editingRule ? 'Rule updated' : 'Rule created');
+                toast.success(editingRule ? t('config.toast.ruleUpdated') : t('config.toast.ruleCreated'));
                 setShowRuleModal(false);
                 setEditingRule(null);
                 setNewRuleName('');
@@ -608,21 +608,21 @@ export function Configuration() {
                 setNewRuleAttachments([]);
                 actions.fetchRules();
             } else {
-                toast.error(`Failed to ${editingRule ? 'update' : 'create'} rule`);
+                toast.error(editingRule ? t('config.toast.ruleUpdateFailed') : t('config.toast.ruleCreateFailed'));
             }
         } catch (error) {
-            toast.error('An error occurred while saving the rule');
+            toast.error(t('config.toast.ruleSaveError'));
         } finally {
             setSavingRule(false);
         }
     };
 
     const handleDisconnect = async (accountId: string) => {
-        if (!confirm('Are you sure you want to disconnect this account?')) return;
+        if (!confirm(t('config.toast.disconnectConfirm'))) return;
 
         const success = await actions.disconnectAccount(accountId);
         if (success) {
-            toast.success('Account disconnected');
+            toast.success(t('config.toast.accountDisconnected'));
         }
     };
 
@@ -632,7 +632,7 @@ export function Configuration() {
         setSavingSettings(false);
 
         if (success) {
-            toast.success('Settings saved');
+            toast.success(t('config.toast.settingsSaved'));
         }
     };
 
@@ -666,10 +666,10 @@ export function Configuration() {
             };
 
             setNewRuleAttachments(prev => [...prev, newAttachment]);
-            toast.success('File uploaded');
+            toast.success(t('config.toast.fileUploaded'));
         } catch (error) {
             console.error('Upload error:', error);
-            toast.error('Failed to upload file');
+            toast.error(t('config.toast.fileUploadFailed'));
         } finally {
             setIsUploading(false);
             // Reset input
@@ -747,21 +747,21 @@ export function Configuration() {
                                 {/* Manual entry */}
                                 <div className="space-y-3">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Client ID</label>
-                                        <Input
-                                            placeholder="xxx.apps.googleusercontent.com"
-                                            value={gmailClientId}
-                                            onChange={(e) => setGmailClientId(e.target.value)}
-                                        />
+                                    <label className="text-sm font-medium">{t('config.byok.clientId')}</label>
+                                    <Input
+                                        placeholder={t('config.gmail.clientIdPlaceholder')}
+                                        value={gmailClientId}
+                                        onChange={(e) => setGmailClientId(e.target.value)}
+                                    />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Client Secret</label>
-                                        <Input
-                                            type="password"
-                                            placeholder="GOCSPX-..."
-                                            value={gmailClientSecret}
-                                            onChange={(e) => setGmailClientSecret(e.target.value)}
-                                        />
+                                    <label className="text-sm font-medium">{t('config.byok.clientSecret')}</label>
+                                    <Input
+                                        type="password"
+                                        placeholder={t('config.gmail.clientSecretPlaceholder')}
+                                        value={gmailClientSecret}
+                                        onChange={(e) => setGmailClientSecret(e.target.value)}
+                                    />
                                     </div>
                                 </div>
                             </div>
@@ -788,18 +788,15 @@ export function Configuration() {
                             {/* Step 2: Paste Authorization Code */}
                             <div className="space-y-4 py-4">
                                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                                        1. A new tab opened with Google Sign-In<br />
-                                        2. Sign in and authorize the app<br />
-                                        3. Copy the authorization code shown<br />
-                                        4. Paste it below
-                                    </p>
+                                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                                            {t('config.gmail.authSteps')}
+                                        </p>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Authorization Code</label>
+                                    <label className="text-sm font-medium">{t('config.gmail.authCode')}</label>
                                     <Input
-                                        placeholder="4/0AQlEd8x..."
+                                        placeholder={t('config.gmail.authCodePlaceholder')}
                                         value={gmailAuthCode}
                                         onChange={(e) => setGmailAuthCode(e.target.value)}
                                         className="font-mono"
@@ -850,13 +847,13 @@ export function Configuration() {
                             <div className="space-y-4 py-4">
                                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                                     <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                                        Note: You need an Azure App Registration for this to work.
+                                        {t('config.outlook.note')}
                                     </p>
                                 </div>
 
                                 <div className="space-y-3">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Client ID (Application ID)</label>
+                                        <label className="text-sm font-medium">{t('config.outlook.clientId')}</label>
                                         <Input
                                             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                                             value={outlookClientId}
@@ -864,14 +861,14 @@ export function Configuration() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Tenant ID (Optional)</label>
+                                        <label className="text-sm font-medium">{t('config.outlook.tenantIdOptional')}</label>
                                         <Input
-                                            placeholder="common"
+                                            placeholder={t('config.outlook.tenantPlaceholder')}
                                             value={outlookTenantId}
                                             onChange={(e) => setOutlookTenantId(e.target.value)}
                                         />
                                         <p className="text-[10px] text-muted-foreground">
-                                            Default is "common". Use your specific Tenant ID for organization accounts.
+                                            {t('config.outlook.tenantHelp')}
                                         </p>
                                     </div>
                                 </div>
@@ -879,7 +876,7 @@ export function Configuration() {
 
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setShowOutlookModal(false)}>
-                                    Cancel
+                                    {t('common.cancel')}
                                 </Button>
                                 <Button
                                     onClick={handleSaveOutlookAndConnect}
@@ -890,7 +887,7 @@ export function Configuration() {
                                     ) : (
                                         <Check className="w-4 h-4 mr-2" />
                                     )}
-                                    Save & Connect
+                                    {t('config.outlook.saveConnect')}
                                 </Button>
                             </DialogFooter>
                         </>
@@ -900,7 +897,7 @@ export function Configuration() {
                                 <div className="space-y-4 py-4">
                                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                                         <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                                            Action Required
+                                            {t('config.outlook.actionRequired')}
                                         </h4>
                                         <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
                                             {outlookDeviceCode.message}
@@ -924,7 +921,7 @@ export function Configuration() {
                                     <div className="flex justify-center">
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                             <LoadingSpinner size="sm" />
-                                            Waiting for authorization...
+                                            {t('config.outlook.waitingAuth')}
                                         </div>
                                     </div>
                                 </div>
@@ -932,7 +929,7 @@ export function Configuration() {
 
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setShowOutlookModal(false)}>
-                                    Cancel
+                                    {t('common.cancel')}
                                 </Button>
                             </DialogFooter>
                         </>
@@ -1025,16 +1022,16 @@ export function Configuration() {
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
                                     >
-                                        <option value="newsletter">Newsletter</option>
-                                        <option value="spam">Spam</option>
-                                        <option value="promotional">Promotional</option>
-                                        <option value="transactional">Transactional</option>
-                                        <option value="social">Social</option>
-                                        <option value="support">Support</option>
-                                        <option value="client">Client</option>
-                                        <option value="internal">Internal</option>
-                                        <option value="personal">Personal</option>
-                                        <option value="other">Other</option>
+                                        <option value="newsletter">{t('config.rules.category.newsletter')}</option>
+                                        <option value="spam">{t('config.rules.category.spam')}</option>
+                                        <option value="promotional">{t('config.rules.category.promotional')}</option>
+                                        <option value="transactional">{t('config.rules.category.transactional')}</option>
+                                        <option value="social">{t('config.rules.category.social')}</option>
+                                        <option value="support">{t('config.rules.category.support')}</option>
+                                        <option value="client">{t('config.rules.category.client')}</option>
+                                        <option value="internal">{t('config.rules.category.internal')}</option>
+                                        <option value="personal">{t('config.rules.category.personal')}</option>
+                                        <option value="other">{t('config.rules.category.other')}</option>
                                     </select>
                                 ) : newRuleKey === 'sentiment' ? (
                                     <select
@@ -1042,9 +1039,9 @@ export function Configuration() {
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
                                     >
-                                        <option value="Positive">Positive</option>
-                                        <option value="Neutral">Neutral</option>
-                                        <option value="Negative">Negative</option>
+                                        <option value="Positive">{t('config.rules.sentiment.positive')}</option>
+                                        <option value="Neutral">{t('config.rules.sentiment.neutral')}</option>
+                                        <option value="Negative">{t('config.rules.sentiment.negative')}</option>
                                     </select>
                                 ) : newRuleKey === 'priority' ? (
                                     <select
@@ -1052,15 +1049,15 @@ export function Configuration() {
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
                                     >
-                                        <option value="High">High</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="Low">Low</option>
+                                        <option value="High">{t('config.rules.priority.high')}</option>
+                                        <option value="Medium">{t('config.rules.priority.medium')}</option>
+                                        <option value="Low">{t('config.rules.priority.low')}</option>
                                     </select>
                                 ) : (
                                     <Input
                                         placeholder={
-                                            newRuleKey === 'sender_domain' ? 'rta.vn' :
-                                                newRuleKey === 'sender_email' ? 'john@example.com' :
+                                            newRuleKey === 'sender_domain' ? t('config.rules.placeholder.domain') :
+                                                newRuleKey === 'sender_email' ? t('config.rules.placeholder.email') :
                                                     t('config.rules.keywordsPlaceholder')
                                         }
                                         value={newRuleValue}
@@ -1084,7 +1081,7 @@ export function Configuration() {
                                     value={newRuleOlderThan}
                                     onChange={(e) => setNewRuleOlderThan(e.target.value)}
                                 />
-                                <span className="text-sm text-muted-foreground">days</span>
+                                <span className="text-sm text-muted-foreground">{t('config.rules.days')}</span>
                             </div>
                             <p className="text-[10px] text-muted-foreground">
                                 {t('config.rules.olderThanHelp')}
@@ -1094,7 +1091,7 @@ export function Configuration() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium">{t('config.rules.performActions')}</label>
                             <p className="text-xs text-muted-foreground mb-2">
-                                Select one or more actions to execute when the rule matches
+                                {t('config.rules.actionsHelp')}
                             </p>
                             <div className="grid grid-cols-2 gap-2">
                                 {[
@@ -1134,7 +1131,7 @@ export function Configuration() {
                                     <label className="text-sm font-medium">{t('config.rules.draftInstructions')}</label>
                                     <textarea
                                         className="w-full p-2 border rounded-md bg-background min-h-[80px] text-sm"
-                                        placeholder="e.g. Tell them I'm busy until Friday, but interested in the proposal."
+                                        placeholder={t('config.rules.instructionsPlaceholder')}
                                         value={newRuleInstructions}
                                         onChange={(e) => setNewRuleInstructions(e.target.value)}
                                     />
@@ -1146,7 +1143,7 @@ export function Configuration() {
                                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
                                     <label className="text-sm font-medium flex items-center gap-2">
                                         <Paperclip className="w-4 h-4" />
-                                        Attachments (Optional)
+                                        {t('config.rules.attachmentsOptional')}
                                     </label>
 
                                     <div className="flex flex-col gap-2">
@@ -1206,6 +1203,93 @@ export function Configuration() {
                 </DialogContent>
             </Dialog>
 
+            {/* Bring Your Own Key (BYOK) */}
+            <div ref={credentialsRef}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <ShieldCheck className="w-5 h-5 text-orange-500" />
+                            {t('config.byok.title')}
+                        </CardTitle>
+                        <CardDescription>
+                            {t('config.byok.desc')} {t('config.byok.systemDefault')}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        {/* Google */}
+                        <div className="space-y-4 border-b pb-4">
+                            <h4 className="font-medium flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-500" /> {t('config.byok.googleTitle')}
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('config.byok.clientId')}</label>
+                                    <Input
+                                        type="password"
+                                        placeholder={t('config.gmail.clientIdPlaceholder')}
+                                        value={localSettings.google_client_id || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, google_client_id: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('config.byok.clientSecret')}</label>
+                                    <Input
+                                        type="password"
+                                        placeholder={t('config.gmail.clientSecretPlaceholder')}
+                                        value={localSettings.google_client_secret || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, google_client_secret: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Microsoft */}
+                        <div className="space-y-4">
+                            <h4 className="font-medium flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" /> {t('config.byok.microsoftTitle')}
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('config.byok.clientId')}</label>
+                                    <Input
+                                        type="password"
+                                        value={localSettings.microsoft_client_id || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_client_id: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('config.byok.clientSecretOptional')}</label>
+                                    <Input
+                                        type="password"
+                                        value={localSettings.microsoft_client_secret || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_client_secret: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('config.byok.tenantId')}</label>
+                                    <Input
+                                        placeholder={t('config.outlook.tenantPlaceholder')}
+                                        value={localSettings.microsoft_tenant_id || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_tenant_id: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end mt-4">
+                            <Button onClick={handleSaveSettings} disabled={savingSettings} variant="secondary">
+                                {savingSettings ? (
+                                    <LoadingSpinner size="sm" className="mr-2" />
+                                ) : (
+                                    <Check className="w-4 h-4 mr-2" />
+                                )}
+                                {t('config.byok.save')}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
             {/* Email Accounts Section - Full Width Split Layout */}
             <Card>
                 <CardHeader>
@@ -1233,7 +1317,7 @@ export function Configuration() {
                                                 G
                                             </div>
                                             <div className="flex-1 text-left">
-                                                <div className="font-medium">Gmail</div>
+                                                <div className="font-medium">{t('config.providers.gmail')}</div>
                                                 <div className="text-xs text-muted-foreground">{t('config.gmail.connectDesc')}</div>
                                             </div>
                                             {isConnecting ? (
@@ -1255,7 +1339,7 @@ export function Configuration() {
                                                 O
                                             </div>
                                             <div className="flex-1 text-left">
-                                                <div className="font-medium">Outlook</div>
+                                                <div className="font-medium">{t('config.providers.outlook')}</div>
                                                 <div className="text-xs text-muted-foreground">{t('config.outlook.connectDesc')}</div>
                                             </div>
                                             {isOutlookConnecting && !outlookDeviceCode ? (
@@ -1287,7 +1371,7 @@ export function Configuration() {
                                             className="w-full bg-blue-600 hover:bg-blue-700"
                                             onClick={() => window.open(outlookDeviceCode.verificationUri, '_blank')}
                                         >
-                                            Open Microsoft Login
+                                            {t('config.outlook.openLogin')}
                                             <ExternalLink className="w-4 h-4 ml-2" />
                                         </Button>
                                         <p className="text-xs text-center text-muted-foreground mt-2">
@@ -1356,7 +1440,78 @@ export function Configuration() {
                 </CardContent>
             </Card>
 
-            {/* LLM Settings Section */}
+            {/* Storage Path */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Database className="w-5 h-5 text-primary" />
+                        {t('config.storage.title')}
+                    </CardTitle>
+                    <CardDescription>{t('config.storage.desc')}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                    <label className="text-sm font-medium">{t('config.storage.label')}</label>
+                    <Input
+                        placeholder={t('config.storage.placeholder')}
+                        value={localSettings.storage_path || ''}
+                        onChange={(e) => setLocalSettings(s => ({ ...s, storage_path: e.target.value }))}
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">
+                        {t('config.storage.help')}
+                    </p>
+                </CardContent>
+            </Card>
+
+            {/* Intelligent Rename */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Power className="w-5 h-5 text-indigo-500" />
+                        {t('config.rename.title')}
+                    </CardTitle>
+                    <CardDescription>{t('config.rename.desc')}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between">
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium">{t('config.rename.label')}</p>
+                        <p className="text-xs text-muted-foreground">{t('config.rename.help')}</p>
+                    </div>
+                    <Button
+                        variant={localSettings.intelligent_rename ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setLocalSettings(s => ({ ...s, intelligent_rename: !s.intelligent_rename }))}
+                    >
+                        <Power className="w-4 h-4 mr-1" />
+                        {localSettings.intelligent_rename ? t('common.enabled') : t('common.disabled')}
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {/* Sync Interval */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-primary" />
+                        {t('config.sync.title')}
+                    </CardTitle>
+                    <CardDescription>{t('config.sync.desc')}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                    <label className="text-sm font-medium">{t('config.sync.label')}</label>
+                    <Input
+                        type="number"
+                        min={1}
+                        max={1440}
+                        value={localSettings.sync_interval_minutes || 5}
+                        onChange={(e) => setLocalSettings(s => ({ ...s, sync_interval_minutes: parseInt(e.target.value, 10) || 5 }))}
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">
+                        {t('config.sync.help')}
+                    </p>
+                </CardContent>
+            </Card>
+
+            {/* AI Model Configuration */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -1365,112 +1520,128 @@ export function Configuration() {
                     </CardTitle>
                     <CardDescription>{t('config.model.desc')}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('config.model.provider')}</label>
-                            {isLoadingProviders ? (
-                                <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
-                                    <LoadingSpinner size="sm" className="mr-2" />
-                                    <span className="text-xs text-muted-foreground italic">Discovering...</span>
-                                </div>
-                            ) : (
-                                <>
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div className="text-sm font-semibold">{t('config.llm.title')}</div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('config.model.provider')}</label>
+                                {isLoadingProviders ? (
+                                    <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
+                                        <LoadingSpinner size="sm" className="mr-2" />
+                                        <span className="text-xs text-muted-foreground italic">{t('config.model.discovering')}</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <select
+                                            className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                            value={localSettings.llm_provider || DEFAULT_PROVIDER}
+                                            onChange={(e) => handleProviderChange(e.target.value)}
+                                            disabled={isLoadingProviders}
+                                        >
+                                            <option value={DEFAULT_PROVIDER}>{t('config.model.defaultProvider')}</option>
+                                            {providersWithSaved.filter(p => p.provider !== DEFAULT_PROVIDER).map(p => (
+                                                <option key={p.provider} value={p.provider}>
+                                                    {p.name || p.provider}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {providerError && (
+                                            <div className="text-[10px] text-amber-500 mt-1 px-1 bg-amber-50/50 rounded">
+                                                ⚠️ {providerError}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('config.model.name')}</label>
+                                {modelsWithSaved.length > 0 || isLoadingProviders ? (
                                     <select
                                         className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                        value={localSettings.llm_provider || DEFAULT_PROVIDER}
-                                        onChange={(e) => handleProviderChange(e.target.value)}
+                                        value={localSettings.llm_model || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
                                         disabled={isLoadingProviders}
                                     >
-                                        <option value={DEFAULT_PROVIDER}>RealTimeX AI (Default)</option>
-                                        {providersWithSaved.filter(p => p.provider !== DEFAULT_PROVIDER).map(p => (
-                                            <option key={p.provider} value={p.provider}>
-                                                {p.name || p.provider}
+                                        {!localSettings.llm_model && <option value="">{t('config.model.selectModel')}</option>}
+                                        {modelsWithSaved.map((m: LLMModel) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name || m.id}
                                             </option>
                                         ))}
                                     </select>
-                                    {providerError && (
-                                        <div className="text-[10px] text-amber-500 mt-1 px-1 bg-amber-50/50 rounded">
-                                            ⚠️ {providerError}
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('config.model.name')}</label>
-                            {modelsWithSaved.length > 0 || isLoadingProviders ? (
-                                <select
-                                    className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                    value={localSettings.llm_model || ''}
-                                    onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
-                                    disabled={isLoadingProviders}
-                                >
-                                    {!localSettings.llm_model && <option value="">{t('config.model.selectModel')}</option>}
-                                    {modelsWithSaved.map((m: LLMModel) => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.name || m.id}
-                                        </option>
-                                    ))}
-                                </select>
-                            ) : (
+                                ) : (
                                 <Input
-                                    placeholder="e.g. gpt-4o-mini"
-                                    value={localSettings.llm_model || ''}
-                                    onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
-                                />
-                            )}
+                                        placeholder={t('config.model.modelPlaceholder')}
+                                        value={localSettings.llm_model || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
+                                    />
+                                )}
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="space-y-2 pt-2 border-t border-border/50">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                            <Database className="w-4 h-4" />
-                            {t('config.model.storagePath')}
-                        </label>
-                        <Input
-                            placeholder={t('config.model.storagePlaceholder')}
-                            value={localSettings.storage_path || ''}
-                            onChange={(e) => setLocalSettings(s => ({ ...s, storage_path: e.target.value }))}
-                        />
-                        <p className="text-[10px] text-muted-foreground italic">
-                            {t('config.model.storageHelp')}
-                        </p>
-                    </div>
+                        <div className="space-y-4">
+                            <div className="text-sm font-semibold">{t('config.embed.title')}</div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('config.embed.provider')}</label>
+                                {isLoadingEmbedProviders ? (
+                                    <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
+                                        <LoadingSpinner size="sm" className="mr-2" />
+                                        <span className="text-xs text-muted-foreground italic">{t('config.embed.discovering')}</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <select
+                                            className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                            value={localSettings.embedding_provider || DEFAULT_PROVIDER}
+                                            onChange={(e) => handleEmbedProviderChange(e.target.value)}
+                                            disabled={isLoadingEmbedProviders}
+                                        >
+                                            <option value={DEFAULT_PROVIDER}>{t('config.embed.defaultProvider')}</option>
+                                            {embedProvidersWithSaved.filter(p => p.provider !== DEFAULT_PROVIDER).map(p => (
+                                                <option key={p.provider} value={p.provider}>
+                                                    {p.name || p.provider}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {embedProviderError && (
+                                            <div className="text-[10px] text-amber-500 mt-1 px-1 bg-amber-50/50 rounded">
+                                                ⚠️ {embedProviderError}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
 
-                    <div className="flex justify-between items-center py-3 border-t border-border/50">
-                        <div>
-                            <h4 className="font-medium text-sm">{t('config.model.intelligentRename')}</h4>
-                            <p className="text-xs text-muted-foreground">
-                                {t('config.model.renameHelp')}
-                            </p>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('config.embed.model')}</label>
+                                {embedModelsWithSaved.length > 0 || isLoadingEmbedProviders ? (
+                                    <select
+                                        className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                        value={localSettings.embedding_model || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, embedding_model: e.target.value }))}
+                                        disabled={isLoadingEmbedProviders}
+                                    >
+                                        {!localSettings.embedding_model && <option value="">{t('config.embed.autoModel')}</option>}
+                                        {embedModelsWithSaved.map((m: LLMModel) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name || m.id}
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                <Input
+                                        placeholder={t('config.embed.modelPlaceholder')}
+                                        value={localSettings.embedding_model || ''}
+                                        onChange={(e) => setLocalSettings(s => ({ ...s, embedding_model: e.target.value }))}
+                                    />
+                                )}
+                                <p className="text-[10px] text-muted-foreground italic">
+                                    {t('config.embed.help')}
+                                </p>
+                            </div>
                         </div>
-                        <Button
-                            variant={localSettings.intelligent_rename ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setLocalSettings(s => ({ ...s, intelligent_rename: !s.intelligent_rename }))}
-                        >
-                            <Power className="w-4 h-4 mr-1" />
-                            {localSettings.intelligent_rename ? t('common.enabled') : t('common.disabled')}
-                        </Button>
-                    </div>
-
-                    <div className="space-y-2 pt-2 border-t border-border/50">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            {t('config.model.syncInterval')}
-                        </label>
-                        <Input
-                            type="number"
-                            min={1}
-                            max={1440}
-                            value={localSettings.sync_interval_minutes || 5}
-                            onChange={(e) => setLocalSettings(s => ({ ...s, sync_interval_minutes: parseInt(e.target.value, 10) || 5 }))}
-                        />
-                        <p className="text-[10px] text-muted-foreground italic">
-                            {t('config.model.syncHelp')}
-                        </p>
                     </div>
 
                     <div className="flex justify-end mt-4 gap-2">
@@ -1498,183 +1669,8 @@ export function Configuration() {
                 </CardContent>
             </Card>
 
-            {/* Embedding Provider Settings (for RAG) */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Database className="w-5 h-5 text-purple-500" />
-                        {t('config.embed.title') || 'Embedding Provider (RAG)'}
-                    </CardTitle>
-                    <CardDescription>
-                        {t('config.embed.desc') || 'Configure the embedding model for knowledge base search and RAG (Retrieval-Augmented Generation). Defaults to realtimexai/text-embedding-3-small if not specified.'}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Embedding Provider</label>
-                            {isLoadingEmbedProviders ? (
-                                <div className="h-10 border rounded-md flex items-center px-3 bg-muted/20">
-                                    <LoadingSpinner size="sm" className="mr-2" />
-                                    <span className="text-xs text-muted-foreground italic">Discovering...</span>
-                                </div>
-                            ) : (
-                                <>
-                                    <select
-                                        className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                        value={localSettings.embedding_provider || DEFAULT_PROVIDER}
-                                        onChange={(e) => handleEmbedProviderChange(e.target.value)}
-                                        disabled={isLoadingEmbedProviders}
-                                    >
-                                        <option value={DEFAULT_PROVIDER}>RealTimeX AI (Default)</option>
-                                        {embedProvidersWithSaved.filter(p => p.provider !== DEFAULT_PROVIDER).map(p => (
-                                            <option key={p.provider} value={p.provider}>
-                                                {p.name || p.provider}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {embedProviderError && (
-                                        <div className="text-[10px] text-amber-500 mt-1 px-1 bg-amber-50/50 rounded">
-                                            ⚠️ {embedProviderError}
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Embedding Model</label>
-                            {embedModelsWithSaved.length > 0 || isLoadingEmbedProviders ? (
-                                <select
-                                    className="w-full h-10 px-3 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                    value={localSettings.embedding_model || ''}
-                                    onChange={(e) => setLocalSettings(s => ({ ...s, embedding_model: e.target.value }))}
-                                    disabled={isLoadingEmbedProviders}
-                                >
-                                    {!localSettings.embedding_model && <option value="">Auto (text-embedding-3-small)</option>}
-                                    {embedModelsWithSaved.map((m: LLMModel) => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.name || m.id}
-                                        </option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <Input
-                                    placeholder="e.g. text-embedding-3-small"
-                                    value={localSettings.embedding_model || ''}
-                                    onChange={(e) => setLocalSettings(s => ({ ...s, embedding_model: e.target.value }))}
-                                />
-                            )}
-                            <p className="text-[10px] text-muted-foreground italic">
-                                Used for semantic search in knowledge base. Leave empty to use default (text-embedding-3-small).
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end mt-4">
-                        <Button onClick={handleSaveSettings} disabled={savingSettings}>
-                            {savingSettings ? (
-                                <LoadingSpinner size="sm" className="mr-2" />
-                            ) : (
-                                <Check className="w-4 h-4 mr-2" />
-                            )}
-                            {t('config.embed.save') || 'Save Embedding Settings'}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-
             {/* Voice & Speech Settings */}
             <TTSSettings />
-
-            {/* Provider Credentials (BYOK) Section */}
-            <div ref={credentialsRef}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <ShieldCheck className="w-5 h-5 text-orange-500" />
-                            {t('config.byok.title')}
-                        </CardTitle>
-                        <CardDescription>
-                            {t('config.byok.desc')}
-                            {t('config.byok.systemDefault')}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {/* Google */}
-                        <div className="space-y-4 border-b pb-4">
-                            <h4 className="font-medium flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-red-500" /> Google / Gmail
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Client ID</label>
-                                    <Input
-                                        type="password"
-                                        placeholder="...apps.googleusercontent.com"
-                                        value={localSettings.google_client_id || ''}
-                                        onChange={(e) => setLocalSettings(s => ({ ...s, google_client_id: e.target.value }))}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Client Secret</label>
-                                    <Input
-                                        type="password"
-                                        placeholder="GOCSPX-..."
-                                        value={localSettings.google_client_secret || ''}
-                                        onChange={(e) => setLocalSettings(s => ({ ...s, google_client_secret: e.target.value }))}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Microsoft */}
-                        <div className="space-y-4">
-                            <h4 className="font-medium flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-blue-500" /> Microsoft / Outlook
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Client ID</label>
-                                    <Input
-                                        type="password"
-                                        value={localSettings.microsoft_client_id || ''}
-                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_client_id: e.target.value }))}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Client Secret (Optional)</label>
-                                    <Input
-                                        type="password"
-                                        value={localSettings.microsoft_client_secret || ''}
-                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_client_secret: e.target.value }))}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Tenant ID</label>
-                                    <Input
-                                        placeholder="common"
-                                        value={localSettings.microsoft_tenant_id || ''}
-                                        onChange={(e) => setLocalSettings(s => ({ ...s, microsoft_tenant_id: e.target.value }))}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end mt-4">
-                            <Button onClick={handleSaveSettings} disabled={savingSettings} variant="secondary">
-                                {savingSettings ? (
-                                    <LoadingSpinner size="sm" className="mr-2" />
-                                ) : (
-                                    <Check className="w-4 h-4 mr-2" />
-                                )}
-                                {t('config.byok.save')}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
         </div>
     );
 }
-

@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.21.5] - 2026-02-01
+
+### Added
+- **UI UX**: Added a new `AutoPilotBadge` component to visually distinguish system-managed automation rules from user-created ones in the dashboard. This improves clarity when managing complex rule sets.
+
 ## [2.21.4] - 2026-02-01
 
 ### Added
