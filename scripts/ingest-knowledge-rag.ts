@@ -58,7 +58,14 @@ function chunkMarkdown(content: string, sourceFile: string, docType: string = 'u
 
         // Extract section title
         const titleMatch = trimmed.match(/^##\s+(.+)/);
-        const sectionTitle = titleMatch ? titleMatch[1].replace(/[🔑📡🛠️🚀📊🕵️⚡🤖💾🛡️🏗️📡🔐🗄️]/g, '').trim() : undefined;
+        const normalizedTitle = titleMatch
+            ? titleMatch[1]
+                // Strip non-ASCII to avoid lone surrogate issues in JSON payloads.
+                .replace(/[^\x20-\x7E]/g, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim()
+            : '';
+        const sectionTitle = normalizedTitle.length > 0 ? normalizedTitle : undefined;
 
         // Clean content
         const cleanedContent = trimmed

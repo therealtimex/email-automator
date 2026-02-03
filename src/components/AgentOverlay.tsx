@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, X, MessageSquare, Loader2, Volume2, VolumeX } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAgentContext } from '../context/AgentContext';
 import { useApp } from '../context/AppContext';
 import { useTTS } from '../hooks/useTTS';
@@ -173,6 +175,56 @@ export function AgentOverlay() {
         await speak(message, messageId, ttsOptions);
     };
 
+    const markdownComponents = {
+        p: ({ children }: { children: React.ReactNode }) => (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{children}</p>
+        ),
+        ul: ({ children }: { children: React.ReactNode }) => (
+            <ul className="list-disc pl-4 space-y-1 text-sm">{children}</ul>
+        ),
+        ol: ({ children }: { children: React.ReactNode }) => (
+            <ol className="list-decimal pl-4 space-y-1 text-sm">{children}</ol>
+        ),
+        li: ({ children }: { children: React.ReactNode }) => (
+            <li className="text-sm">{children}</li>
+        ),
+        a: ({ href, children }: { href?: string; children: React.ReactNode }) => (
+            <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline underline-offset-2"
+            >
+                {children}
+            </a>
+        ),
+        code: ({ inline, children }: { inline?: boolean; children: React.ReactNode }) => (
+            inline ? (
+                <code className="px-1 py-0.5 rounded bg-background/60 text-[12px] font-mono">
+                    {children}
+                </code>
+            ) : (
+                <code className="text-[12px] font-mono">{children}</code>
+            )
+        ),
+        pre: ({ children }: { children: React.ReactNode }) => (
+            <pre className="mt-2 overflow-x-auto rounded bg-background/60 p-2 text-[12px] font-mono">
+                {children}
+            </pre>
+        ),
+        blockquote: ({ children }: { children: React.ReactNode }) => (
+            <blockquote className="border-l-2 border-border pl-3 text-sm text-muted-foreground">
+                {children}
+            </blockquote>
+        ),
+        strong: ({ children }: { children: React.ReactNode }) => (
+            <strong className="font-semibold">{children}</strong>
+        ),
+        em: ({ children }: { children: React.ReactNode }) => (
+            <em className="italic">{children}</em>
+        )
+    };
+
     return (
         <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2">
 
@@ -219,7 +271,15 @@ export function AgentOverlay() {
                                         : "self-start bg-secondary text-secondary-foreground"
                                 )}>
                                     <div className="flex items-start gap-2">
-                                        <div className="flex-1">{msg.content}</div>
+                                        <div className="flex-1">
+                                            {msg.role === 'user' ? (
+                                                msg.content
+                                            ) : (
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                                                    {msg.content}
+                                                </ReactMarkdown>
+                                            )}
+                                        </div>
                                         {showSpeaker && (
                                             <button
                                                 onClick={() => handleSpeakMessage(msg.content, i)}
