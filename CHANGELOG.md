@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.21.6] - 2026-02-01
+
+### Improved
+- **Agent Overlay UI**: Enhanced the visual design and responsiveness of the floating assistant chat.
+  - Added smooth entrance animations for the chat window.
+  - Refined the floating toggle button with hover/active states and focus rings for better accessibility.
+  - Updated message bubble styling for better readability and visual hierarchy.
+  - Added a pulsing animation to the toggle button when the agent is speaking, providing better visual feedback when the chat is closed.
+
 ## [2.21.5] - 2026-02-01
 
 ### Added

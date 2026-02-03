@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, X, MessageSquare, Loader2, Volume2, VolumeX } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAgentContext } from '../context/AgentContext';
 import { useApp } from '../context/AppContext';
@@ -175,20 +176,20 @@ export function AgentOverlay() {
         await speak(message, messageId, ttsOptions);
     };
 
-    const markdownComponents = {
-        p: ({ children }: { children: React.ReactNode }) => (
+    const markdownComponents: Components = {
+        p: ({ children }) => (
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{children}</p>
         ),
-        ul: ({ children }: { children: React.ReactNode }) => (
+        ul: ({ children }) => (
             <ul className="list-disc pl-4 space-y-1 text-sm">{children}</ul>
         ),
-        ol: ({ children }: { children: React.ReactNode }) => (
+        ol: ({ children }) => (
             <ol className="list-decimal pl-4 space-y-1 text-sm">{children}</ol>
         ),
-        li: ({ children }: { children: React.ReactNode }) => (
+        li: ({ children }) => (
             <li className="text-sm">{children}</li>
         ),
-        a: ({ href, children }: { href?: string; children: React.ReactNode }) => (
+        a: ({ href, children }) => (
             <a
                 href={href}
                 target="_blank"
@@ -198,29 +199,30 @@ export function AgentOverlay() {
                 {children}
             </a>
         ),
-        code: ({ inline, children }: { inline?: boolean; children: React.ReactNode }) => (
-            inline ? (
+        code: (props) => {
+            const { inline, children } = props as { inline?: boolean; children?: React.ReactNode };
+            return inline ? (
                 <code className="px-1 py-0.5 rounded bg-background/60 text-[12px] font-mono">
                     {children}
                 </code>
             ) : (
                 <code className="text-[12px] font-mono">{children}</code>
-            )
-        ),
-        pre: ({ children }: { children: React.ReactNode }) => (
+            );
+        },
+        pre: ({ children }) => (
             <pre className="mt-2 overflow-x-auto rounded bg-background/60 p-2 text-[12px] font-mono">
                 {children}
             </pre>
         ),
-        blockquote: ({ children }: { children: React.ReactNode }) => (
+        blockquote: ({ children }) => (
             <blockquote className="border-l-2 border-border pl-3 text-sm text-muted-foreground">
                 {children}
             </blockquote>
         ),
-        strong: ({ children }: { children: React.ReactNode }) => (
+        strong: ({ children }) => (
             <strong className="font-semibold">{children}</strong>
         ),
-        em: ({ children }: { children: React.ReactNode }) => (
+        em: ({ children }) => (
             <em className="italic">{children}</em>
         )
     };
