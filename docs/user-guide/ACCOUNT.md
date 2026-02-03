@@ -1,39 +1,52 @@
-# Account Management
+# Account & Privacy
 
-Manage your profile, persona, security, and Supabase connection in **Account Settings** (profile icon, top right).
-
-## 👤 Profile
-*   **Name**: Update your first and last name.
-*   **Avatar**: Upload a custom profile picture.
-*   **Sound & Haptic Feedback**: Toggle audio cues and haptics (if supported).
-
-## 🧬 Persona
-Define how the AI represents you:
-*   Role, industry, and work style
-*   Preferred tone and response length
-*   VIP senders and trusted domains
-*   Automation preferences (what to avoid)
-
-## 🔐 Security
-*   **Password**: Update your account password.
-*   **Sessions**: Managed via Supabase Auth; log out to end the session.
-
-## 🗄️ Supabase Connection (BYOK)
-Manage the database connection used for auth, sync logs, and AI data:
-*   **Connection Status**: Shows the current Supabase URL and schema version.
-*   **Change Connection**: Launches the Setup Wizard to reconfigure.
-*   **Clear Configuration**: Disconnects and logs you out (only available for UI-configured connections).
-
-> Provider credentials (Gmail/Outlook) are managed in **Configuration → Email Accounts**.
+Manage your profile, AI persona, and security settings within the **Account Settings** page (accessed via the profile icon in the top right corner).
 
 ---
 
-## 💾 Where is my data?
-*   **Email Metadata + AI Logs**: Stored in your Supabase project.
-*   **Raw Email Files (.eml)**: Stored locally on your machine (see **Storage Path** in Configuration).
-*   **Rule Attachments**: Stored in your Supabase Storage bucket.
-*   **Credentials**: Encrypted and stored in your Supabase project.
+## 👤 Profile & Experience
+Personalize your interaction with the application:
+*   **Identity**: Update your display name and upload a custom avatar.
+*   **Sensory Feedback**: Toggle **Sound Effects** and **Haptic Feedback** for background activities (like new email analysis or sync completion).
 
-**Email Automator never stores your data on its own servers.**
+---
 
-Next step: [**Troubleshooting**](./TROUBLESHOOTING.md)
+## 🧬 Your AI Persona
+The **Persona** is the most critical setting for high-quality **Smart Drafts**. It acts as the "Identity" the AI uses when ghostwriting replies.
+
+*   **Role & Context**: Define your professional title and the industry you work in.
+*   **Tone of Voice**: Specify how you want to sound (e.g., "Professional but friendly," "Concise and direct").
+*   **Response Style**: Set preferences for response length and signature usage.
+*   **Trusted Entities**: List VIP senders and trusted domains to help the AI prioritize correctly.
+
+---
+
+## 🗄️ Supabase Connection (BYOK)
+As part of the **"Bring Your Own Key"** model, you can monitor and manage your connection to your dedicated database:
+*   **Status**: View your current Supabase Project URL and Schema version.
+*   **Migration Center**: Check if your database schema is up to date.
+*   **Disconnect**: If you need to switch projects, you can clear your configuration here (this will log you out and reset the local app state).
+
+---
+
+## 🔐 Security
+*   **Password Management**: Update your local account password at any time.
+*   **Encryption**: All email provider credentials (Gmail/Outlook tokens) are encrypted before being stored in your Supabase project.
+
+---
+
+## 🛡️ Privacy & Data Sovereignty
+Email Automator is designed with a **privacy-first** architecture. Your data is distributed as follows:
+
+| Data Type | Location | Access |
+| :--- | :--- | :--- |
+| **Email Metadata & Logs** | Your Supabase Project | Private to You |
+| **Raw Email Files (.eml)** | Your Local Machine | Offline Access Only |
+| **Rule Attachments** | Your Supabase Storage | Private to You |
+| **AI Processing** | RealTimeX Desktop | Local/API direct |
+
+**Important**: Email Automator (the company) never has access to your emails, your credentials, or your AI logs. Everything stays within your own private infrastructure.
+
+---
+
+**Next Step:** [Troubleshooting & Support](./TROUBLESHOOTING.md)

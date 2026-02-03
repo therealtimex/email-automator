@@ -4,30 +4,30 @@ Welcome to the documentation for **Email Automator**, your personal AI-powered e
 
 ## 📖 User Guide
 
-Complete guide for setting up and using the application.
+A comprehensive guide to setting up and mastering your AI email agent.
 
-1.  [**Getting Started**](./user-guide/GETTING-STARTED.md) - Installation, prerequisites, and first run.
-2.  [**Configuration**](./user-guide/CONFIGURATION.md) - Setting up Gmail/Outlook (BYOK) and Sync Scope.
-3.  [**Dashboard & Live Activity**](./user-guide/DASHBOARD.md) - Monitoring syncs, AI Trace, and manual actions.
-4.  [**Automation Rules**](./user-guide/AUTOMATION.md) - Creating custom AI rules and retention policies.
-5.  [**Account Management**](./user-guide/ACCOUNT.md) - Managing your profile, security, and Supabase connection.
-6.  [**Troubleshooting**](./user-guide/TROUBLESHOOTING.md) - Common issues and solutions.
+1.  [**Getting Started**](./user-guide/GETTING-STARTED.md) - Prerequisites, installation, and the Setup Wizard.
+2.  [**Configuration**](./user-guide/CONFIGURATION.md) - Connecting Gmail/Outlook (BYOK) and setting sync boundaries.
+3.  [**Dashboard & Live Activity**](./user-guide/DASHBOARD.md) - Monitoring the AI, using the Live Terminal, and AI Trace.
+4.  [**Auto-Pilot & Rules**](./user-guide/AUTOMATION.md) - Building AI-driven rules, ghostwriting, and retention policies.
+5.  [**Account & Privacy**](./user-guide/ACCOUNT.md) - Managing your persona, security, and data sovereignty.
+6.  [**Troubleshooting & Support**](./user-guide/TROUBLESHOOTING.md) - Common issues and how to resolve them.
 
 ## 💻 Developer Documentation
 
-Information for contributing to or extending the project.
+Technical details for contributing to or extending the project.
 
 *   [**Architecture Overview**](../docs-dev/ARCHITECTURE.md) - Hybrid architecture and component responsibilities.
-*   [**NPX Deployment**](../docs-dev/NPX-USAGE.md) - How to run the app via `npx`.
+*   [**NPX Implementation**](../docs-dev/NPX-IMPLEMENTATION.md) - Deep dive into the `npx` execution model.
 *   [**Local Development**](../docs-dev/SETUP.md) - Setting up the development environment.
-*   [**RealTimeX Integration**](../docs-dev/REALTIMEX-INTEGRATION.md) - Ecosystem integration guide.
+*   [**RealTimeX Integration**](../docs-dev/REALTIMEX-INTEGRATION.md) - Integrating with the RealTimeX ecosystem.
 
 ---
 
 ## 🚀 Key Features
 
-*   **Privacy First**: AI processing happens locally on your hardware.
+*   **Privacy First**: Your emails never touch our servers. Processing is local or via your own AI keys.
 *   **Intelligent Analysis**: Automatic categorization, sentiment analysis, and summarization.
-*   **Auto-Pilot Rules**: "If This Then That" rules driven by AI insights.
-*   **Real-time Transparency**: Live terminal showing every agent "thought" and action.
-*   **Unified Deployment**: Both API and UI run on a single port for simplicity.
+*   **"Glass Box" AI**: Complete transparency via the Live Terminal and AI Trace modals.
+*   **Auto-Pilot**: Centralized management for AI-driven "If This Then That" rules.
+*   **Multi-Sensory Feedback**: High-quality audio and haptic cues for background activity.

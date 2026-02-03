@@ -1,75 +1,61 @@
 # Configuration
 
-The **Configuration** tab is where you connect email providers, define automation rules, and tune AI + sync behavior.
+The **Configuration** tab is the command center of Email Automator. Here, you connect your email providers, define your AI's behavior, and set up the rules that drive automation.
 
 ---
 
-## 🔑 Email Accounts (Gmail & Outlook)
+## 📧 Email Accounts (BYOK)
 
-Email Automator uses **BYOK** credentials. You connect your own Gmail/Outlook apps to keep control of your data.
+Email Automator follows a **"Bring Your Own Key" (BYOK)** model. You provide your own OAuth credentials, ensuring that your data access remains entirely under your control.
 
-### Gmail Setup (OAuth)
-1.  In **Google Cloud Console**, create a project and enable the **Gmail API**.
-2.  Configure the OAuth consent screen and add your account as a test user.
-3.  Create an **OAuth 2.0 Client ID (Web Application)**.
+### 🔴 Gmail Setup (OAuth 2.0)
+1.  **Google Cloud Console**: Create a project and enable the **Gmail API**.
+2.  **Consent Screen**: Configure the OAuth consent screen and add your email as a **Test User**.
+3.  **Credentials**: Create an **OAuth 2.0 Client ID** (Type: Web Application).
     *   **Authorized Redirect URI**: `https://<your-project-ref>.supabase.co/functions/v1/auth-gmail/callback`
-4.  In **Configuration → Email Accounts**, click **Connect Gmail**.
-5.  Paste the **credentials JSON** (or enter Client ID + Secret manually).
-6.  Complete the browser authorization and paste the **authorization code**.
+4.  **Connect**: In Email Automator, click **Connect Gmail**.
+5.  **Authorize**: Paste your Client ID and Secret (or upload the JSON), then follow the link to authorize your account.
 
-### Outlook Setup (Device Code)
-1.  In **Azure App Registrations**, register a new application.
-2.  Supported account types: **organizational + personal Microsoft accounts**.
-3.  Copy the **Application (client) ID** and (optional) **Tenant ID**.
-4.  In **Configuration → Email Accounts**, click **Connect Outlook**.
-5.  Follow the **Device Code** prompt and complete sign-in.
-
----
-
-## 🤖 Automation Rules
-
-### System Rules (Quick Toggles)
-*   **Auto-Trash Spam**: Deletes emails categorized as spam.
-*   **Smart Drafts**: Generates draft replies when a rule requests drafting.
-
-### Custom Rules
-Create rules with one or more actions:
-*   **Conditions**:
-    *   **AI Analysis**: Category, Sentiment, Priority
-    *   **Metadata**: Sender Email, Sender Domain, Sender Contains, Subject Contains, Body Contains
-    *   **Age Filter**: “Older than X days”
-*   **Actions**: Archive, Delete, Draft, Star
-*   **Draft Instructions**: Provide extra context if your rule includes Draft
-*   **Attachments**: Upload files to include in drafted replies
-
-> Tip: The **Auto-Pilot** tab provides a grouped view of all rules (system + custom) and quick enable/disable controls.
+### 🔵 Outlook Setup (Device Code)
+1.  **Azure Portal**: Register a new application in **App Registrations**.
+2.  **Account Type**: Select "Accounts in any organizational directory and personal Microsoft accounts".
+3.  **Authentication**: Ensure "Allow public client flows" is set to **Yes**.
+4.  **Connect**: In Email Automator, click **Connect Outlook** and enter your **Client ID**.
+5.  **Authorize**: Follow the **Device Code** prompt in your browser to complete the sign-in.
 
 ---
 
-## 🧠 AI Model Configuration
+## 📅 Sync Scope & Limits
 
-Use this section to control AI routing and local storage behavior:
-*   **Provider + Model**: Discovered via **RealTimeX Desktop**
-*   **Storage Path**: Where raw `.eml` files are stored locally (must be writable)
-*   **Intelligent Rename**: Slugifies and timestamps filenames for cleaner archives
-*   **Sync Interval (minutes)**: How often the background scheduler syncs accounts
-*   **Test Connection**: Validate provider access
+Before starting your first sync, configure the boundaries to ensure performance and cost-efficiency:
 
----
+*   **Sync From**: Choose the starting date (e.g., "From Now" or a specific historical date).
+*   **Max Emails**: Set the maximum number of emails to process in a single batch (Default: 50).
+*   **Sync Interval**: Define how often the background scheduler should check for new mail (e.g., every 15 minutes).
 
-## 🧩 Embedding Provider (RAG)
-
-Configure the embedding model used for the documentation knowledge base (RAG).
-*   Default: **RealTimeX AI / text-embedding-3-small**
-*   Choose a different provider/model if needed
+> [!TIP]
+> **Start Small**: For your first run, we recommend setting "Sync From" to "Now" and "Max Emails" to 10-20 to verify your rules are working as expected.
 
 ---
 
-## 🔊 Voice & Speech (TTS)
+## 🤖 Automation & Auto-Pilot
 
-Control text-to-speech for AI responses:
-*   **Auto-Speak** toggle
-*   **Provider + Voice**
-*   **Speed + Quality**
+Management of your AI's behavior—including building custom rules, toggling system automations, and setting retention policies—has been consolidated into the **[Auto-Pilot](./AUTOMATION.md)** tab.
 
-Next step: [**Using the Dashboard**](./DASHBOARD.md)
+---
+
+## 🧠 AI & System Settings
+
+### Provider Configuration
+Email Automator detects available models via **RealTimeX Desktop**.
+*   **LLM Provider**: Choose your preferred AI engine (e.g., OpenAI, Anthropic, or local models).
+*   **Embedding Model**: Used for the RAG (Retrieval-Augmented Generation) system to help the AI understand your specific context.
+
+### Voice & Accessibility (TTS)
+Enable **Text-to-Speech** to have the AI read summaries or important alerts aloud.
+*   **Auto-Speak**: Automatically read high-priority notifications.
+*   **Voice Profile**: Choose from various high-quality voices available through RealTimeX.
+
+---
+
+**Next Step:** [Monitoring the Dashboard](./DASHBOARD.md)

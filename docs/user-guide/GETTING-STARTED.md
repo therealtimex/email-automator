@@ -1,79 +1,60 @@
 # Getting Started
 
-Welcome to **Email Automator**. The app runs locally, connects to your own Supabase project (BYOK), and uses RealTimeX Desktop to access AI providers.
+Welcome to **Email Automator**, your AI-powered personal email assistant. This guide will help you set up the application using the **"Bring Your Own Key" (BYOK)** model, which ensures your data remains under your control within your own Supabase infrastructure.
 
-## ✅ Quick Setup with the Setup Wizard (Recommended)
+## 🛠 Prerequisites
 
-1.  **Install & launch RealTimeX Desktop** (required for AI + TTS providers).
-2.  **Open Email Automator** and proceed through the **Setup Wizard**.
-3.  **Choose a setup path**:
-    *   **Managed Provisioning (optional)**: Provide a Supabase Access Token, select an organization + region, and pick a project name. The wizard will create the project, run migrations, deploy Edge Functions, and ingest the knowledge base automatically.
-    *   **Connect Existing Project**: Paste your **Supabase Project URL** and **Anon Key**. You can also provide an Access Token to run migrations inside the wizard.
-4.  **Create or sign in** to your account to open the Dashboard.
+Before you begin, ensure you have the following:
+
+1.  **RealTimeX Desktop**: Installed and running. This is required for AI processing (LLMs) and Text-to-Speech (TTS) capabilities.
+2.  **Supabase Account**: A free or paid account at [supabase.com](https://supabase.com).
 
 ---
 
-## 🔍 Finding your Supabase Credentials (Existing Project)
+## 🚀 Quick Setup with the Wizard
 
-1.  Go to your **Supabase Dashboard**.
-2.  Open the project you want to use.
-3.  Go to **Settings → API**.
-4.  Copy **Project URL**.
-5.  Copy the **anon** key under **Project API keys**.
+The built-in **Setup Wizard** is the recommended way to get started. It automates the technical heavy lifting.
+
+### 1. Purchase & Launch
+*   Open **RealTimeX Desktop**.
+*   Go to the **Marketplace** tab → **Local Apps**.
+*   Search for **"Email Automator"** and purchase it (or activate if already owned).
+*   Once purchased, click **Launch** from your Local Apps list.
+
+### 2. Run the Setup Wizard
+Upon first launch, the app will guide you through the initial configuration:
+
+*   **Choose a Setup Path**:
+    *   **Managed Provisioning (Recommended)**: Provide a **Supabase Access Token**. The wizard will automatically create a new project, run database migrations, deploy Edge Functions, and ingest the initial knowledge base.
+    *   **Connect Existing Project**: Use an existing Supabase project by providing your **Project URL** and **Anon Key**. You can optionally provide an Access Token here to have the wizard run migrations for you.
+
+### 3. Create Your Account
+Once the database is ready, you will be prompted to create your local user account and sign in to access the **Dashboard**.
+
+---
+
+## 🔍 Finding Your Supabase Credentials
+
+If you choose to connect an existing project manually, you can find your credentials in the [Supabase Dashboard](https://supabase.com/dashboard):
+
+1.  Select your project.
+2.  Navigate to **Settings** → **API**.
+3.  **Project URL**: Copy the URL found under "Project URL".
+4.  **API Key**: Copy the **anon (public)** key under "Project API keys".
 
 > [!WARNING]
-> **Do NOT** use the `service_role` key. It has admin access and is not safe for the client application.
-
-## 🪪 Supabase Access Token (for provisioning/migrations)
-
-The Setup Wizard can run migrations and deploy Edge Functions if you provide an Access Token.
-
-1.  In Supabase, go to **Account → Access Tokens**.
-2.  Create a new token and copy it.
-3.  Paste it into the Setup Wizard when prompted.
+> **Security Note**: Never use the `service_role` key. It has full administrative bypass privileges and should never be exposed in client-side applications.
 
 ---
 
-## 🛠️ Manual Installation (Advanced)
+## 🪪 Generating an Access Token
 
-If you prefer to run from source:
+An Access Token allows the Setup Wizard to manage your Supabase projects (creation, migrations, function deployment) on your behalf.
 
-### Prerequisites
-*   **Node.js** v20+
-*   **Git**
-*   **Docker** (for local Supabase)
-*   **Supabase CLI** (optional, for migrations)
+1.  In your Supabase Dashboard, go to **Account** → **Access Tokens**.
+2.  Click **Generate new token**, give it a name (e.g., "Email Automator"), and copy the result.
+3.  Paste this token into the Setup Wizard when prompted.
 
-### Steps
+---
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/therealtimex/email-automator.git
-    cd email-automator
-    ```
-
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    ```
-
-3.  **(Optional) Start local Supabase**:
-    ```bash
-    npx supabase start
-    ```
-
-4.  **Start the backend API**:
-    ```bash
-    npm run dev:api
-    ```
-
-5.  **Start the frontend**:
-    ```bash
-    npm run dev
-    ```
-
-6.  **Open the app** at `http://localhost:3000` and complete the **Setup Wizard**.
-
-> Tip: If you skip migrations in the wizard, you can run them manually with `./scripts/migrate.sh`.
-
-Next step: [**Configuration**](./CONFIGURATION.md)
+**Next Step:** [Configure your Email Accounts](./CONFIGURATION.md)

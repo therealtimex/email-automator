@@ -1,77 +1,71 @@
 # Dashboard & Live Activity
 
-The Dashboard is your command center for monitoring the AI agent and acting on analyzed emails.
-
-## 📊 Recent Analysis
-
-As the agent processes your inbox, emails appear in the feed with live status badges.
-
-*   **Search + Filters**: Search by keyword and filter by category.
-*   **Sorting**: Toggle between *received time* and *processed time*.
-*   **Pagination**: Navigate large inboxes in batches.
-
-## 📌 Email Details Sidebar
-
-Click any email card to open its detail panel:
-*   **AI Summary + Key Points**
-*   **Draft Preview** (if generated)
-*   **Sender + Subject** at a glance
-
-## 🕵️ AI Trace & Transparency
-
-### Live Activity Terminal
-Click the floating **Live Activity** button (bottom right).
-*   **Real-time Feed**: Watch analysis + actions stream in.
-*   **Status Indicators**: See when sync is live vs idle.
-*   **Stop Sync**: Cancel an in-progress sync from the terminal.
-
-### AI Trace Modal
-Click the **Eye icon** on an email card.
-*   **Decision Timeline**: Why the email was categorized the way it was.
-*   **Prompts + Raw Output**: View the model’s raw response and usage stats.
-*   **Retry**: Re-run processing when a failure occurs.
-
-### Feedback
-Use the **speech bubble** icon to report mistakes or improve analysis quality.
-
-## 🔊 Sound & Haptic Feedback
-
-The app provides subtle feedback for background activity:
-*   **Soft Chime** for new analysis
-*   **Success Tone** after sync completes
-*   **Alert Tone** for high-priority detections
-
-> You can toggle sound (and haptics on supported devices) in **Account Settings → Profile**.
-
-## ⚡ Manual Actions
-
-Each email card includes quick actions:
-*   🗑️ **Delete**
-*   📦 **Archive**
-*   🚩 **Flag/Star**
-*   🔗 **Open in Gmail/Outlook**
-*   🕵️ **AI Trace** and **Feedback** shortcuts
+The **Dashboard** is your primary interface for monitoring your AI agent’s activity and managing your analyzed inbox. It is designed to provide complete transparency into how the AI thinks and acts.
 
 ---
 
-## ⏱️ Sync Scope (Per Account)
+## 📊 The Analysis Feed
 
-Use the **Sync Scope** card in the sidebar:
-*   **Sync From**: Start date/time for processing
-*   **Max Emails**: Batch size per sync run (default 50)
-*   **Reset Checkpoint**: Force a full re-scan from the start date
+As the AI processes your inbox, emails appear in the feed with real-time status updates and intelligent insights.
 
-## 🧾 Sync History & Stats
+*   **Smart Search**: Quickly find emails by keyword or sender.
+*   **AI Filters**: Filter your view by Category (e.g., Newsletter, Personal), Sentiment, or Priority.
+*   **Dynamic Sorting**: Toggle between the time an email was *received* and the time it was *processed* by the AI.
 
-*   **Recent Syncs** show processed + actioned counts and runtime.
-*   **Quick Stats** show totals, connected accounts, and enabled rules.
+### 📌 Email Detail Sidebar
+Clicking any email card opens a detailed side panel containing:
+*   **AI Summary**: A concise overview of the email's content.
+*   **Key Points**: Bulleted highlights extracted by the AI.
+*   **Draft Preview**: If a draft reply was generated, you can review it here before it's sent.
+*   **Quick Links**: Jump directly to the original email in your Gmail or Outlook web interface.
 
 ---
 
-## 🤖 Smart Drafts
+## 🛡️ Trust & Transparency
 
-When a rule requests drafting, the AI generates a reply:
-*   Preview drafts in the **Email Details** sidebar.
-*   Drafts are saved to your provider’s **Drafts** folder.
+Email Automator is built on the principle of **"Glass Box AI."** You should always know *why* an action was taken.
 
-Next step: [**Automation Rules**](./AUTOMATION.md)
+### 📟 Live Activity Terminal
+Click the **Live Activity** button in the bottom-right corner to open the real-time processing feed.
+*   **Thinking Logs**: Watch the AI analyze content, evaluate rules, and decide on actions.
+*   **Technical Details**: See raw API calls, processing durations, and background sync statuses.
+*   **Control**: You can manually stop an active sync directly from the terminal.
+
+### 🕵️ AI Trace
+Click the **Eye icon** on any email card to open the **AI Trace Modal**.
+*   **Decision Logic**: View a step-by-step breakdown of why the AI assigned a specific category or priority.
+*   **Raw Data**: See the exact prompt sent to the LLM and the raw JSON response it returned.
+*   **Performance Stats**: Review token usage and processing time for that specific email.
+
+---
+
+## ⚡ Quick Actions
+
+Take control with one-click actions available on every email card:
+*   🗑️ **Delete / 📦 Archive**: Instant cleanup.
+*   ⭐ **Star / Flag**: Mark important items for later.
+*   🔄 **Reprocess**: If you’ve updated your rules, you can ask the AI to analyze an email again.
+*   💬 **Feedback**: Help the AI learn by reporting incorrect categorizations or sentiment analysis.
+
+---
+
+## 🔔 Notifications & Feedback
+
+The app uses multi-sensory feedback to keep you informed of background activity:
+*   **Visual**: Live status badges and toast notifications.
+*   **Audio**: Subtle, high-quality chimes for new emails, high-priority alerts, and sync completion.
+*   **Haptic**: Physical feedback on supported devices.
+
+> **Note**: Sound and Haptic settings can be customized in [**Account Settings**](./ACCOUNT.md).
+
+---
+
+## 📈 Analytics & History
+
+Stay informed about your agent's performance:
+*   **Sync History**: View a log of recent sync runs, including the number of emails processed and any actions taken.
+*   **Efficiency Stats**: See totals for automated deletions, archives, and drafts over time.
+
+---
+
+**Next Step:** [Creating Automation Rules](./AUTOMATION.md)

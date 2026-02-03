@@ -1,20 +1,18 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { ShieldCheck, Database, RefreshCw, Plus, Check, Trash2, Power, ExternalLink, Upload, Paperclip, X, Clock, Edit2 } from 'lucide-react';
+import { ShieldCheck, Database, RefreshCw, Check, Trash2, Power, ExternalLink, Upload, X, Plus, Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useApp } from '../context/AppContext';
 import { api } from '../lib/api';
-import { supabase } from '../lib/supabase';
 import { toast } from './Toast';
 import { LoadingSpinner } from './LoadingSpinner';
-import { EmailAccount, Rule, UserSettings, RuleAttachment } from '../lib/types';
+import { EmailAccount, UserSettings } from '../lib/types';
 import { usePageAgent } from '../hooks/usePageAgent';
 import { TTSSettings } from './TTSSettings';
 import {
     Dialog,
-
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -75,7 +73,6 @@ export function Configuration() {
 
     // Gmail credentials modal state
     const [showGmailModal, setShowGmailModal] = useState(false);
-
     const [gmailModalStep, setGmailModalStep] = useState<'credentials' | 'code'>('credentials');
     const [credentialsJson, setCredentialsJson] = useState('');
     const [gmailClientId, setGmailClientId] = useState('');
@@ -91,19 +88,6 @@ export function Configuration() {
     const [outlookTenantId, setOutlookTenantId] = useState('');
     const [savingOutlookCredentials, setSavingOutlookCredentials] = useState(false);
 
-    // Rule creation state
-    const [showRuleModal, setShowRuleModal] = useState(false);
-    const [newRuleName, setNewRuleName] = useState('');
-    const [newRuleKey, setNewRuleKey] = useState('category');
-    const [newRuleValue, setNewRuleValue] = useState('newsletter');
-    const [newRuleActions, setNewRuleActions] = useState<string[]>(['archive']);
-    const [newRuleOlderThan, setNewRuleOlderThan] = useState('');
-    const [newRuleInstructions, setNewRuleInstructions] = useState('');
-    const [newRuleDescription, setNewRuleDescription] = useState('');
-    const [newRuleIntent, setNewRuleIntent] = useState('');
-    const [newRuleAttachments, setNewRuleAttachments] = useState<RuleAttachment[]>([]);
-    const [isUploading, setIsUploading] = useState(false);
-    const [savingRule, setSavingRule] = useState(false);
     const [chatProviders, setChatProviders] = useState<LLMProvider[]>([]);
     const [isLoadingProviders, setIsLoadingProviders] = useState(false);
     const [providerError, setProviderError] = useState<string | null>(null);
@@ -252,9 +236,6 @@ export function Configuration() {
         }
     };
 
-    const [loadingSetting, setLoadingSetting] = useState<string | null>(null);
-    const [editingRule, setEditingRule] = useState<Rule | null>(null);
-
     useEffect(() => {
         actions.fetchAccounts();
         actions.fetchRules();
@@ -267,84 +248,8 @@ export function Configuration() {
         }
     }, [state.settings]);
 
-    const handleToggleSpam = async () => {
-        const rule = state.rules.find(r => r.name === 'Auto-Trash Spam');
-        if (!rule) {
-            toast.error(t('config.toast.systemRuleMissing'));
-            return;
-        }
-        setLoadingSetting('auto_trash_spam');
-        await actions.toggleRule(rule.id);
-        setLoadingSetting(null);
-    };
-
-    const handleToggleDrafts = async () => {
-        const rule = state.rules.find(r => r.name === 'Smart Drafts');
-        if (!rule) {
-            toast.error(t('config.toast.systemRuleMissing'));
-            return;
-        }
-        setLoadingSetting('smart_drafts');
-        await actions.toggleRule(rule.id);
-        setLoadingSetting(null);
-    };
-
-    const handleEditClick = (rule: Rule) => {
-        setEditingRule(rule);
-        setNewRuleName(rule.name);
-
-        // Extract condition details
-        const condition = rule.condition as any;
-        const keys = Object.keys(condition).filter(k => k !== 'older_than_days');
-        const mainKey = keys[0] || 'category';
-        setNewRuleKey(mainKey);
-        setNewRuleValue(condition[mainKey] || '');
-        setNewRuleOlderThan(condition.older_than_days?.toString() || '');
-
-        // Actions
-        const ruleActions = rule.actions && rule.actions.length > 0
-            ? rule.actions
-            : (rule.action ? [rule.action] : ['archive']);
-        setNewRuleActions(ruleActions);
-
-        setNewRuleInstructions(rule.instructions || '');
-        setNewRuleDescription(rule.description || '');
-        setNewRuleIntent(rule.intent || '');
-        setNewRuleAttachments(rule.attachments || []);
-        setShowRuleModal(true);
-    };
-
     // Ref for scrolling
     const credentialsRef = useRef<HTMLDivElement>(null);
-
-    // Start OAuth flow (called after credentials are saved)
-    const startGmailOAuth = async () => {
-        setIsConnecting(true);
-        try {
-            const response = await api.getGmailAuthUrl();
-            if (response.data?.url) {
-                // Open OAuth popup
-                const popup = window.open(response.data.url, 'gmail-auth', 'width=600,height=700');
-
-                // Listen for callback
-                const checkPopup = setInterval(() => {
-                    if (popup?.closed) {
-                        clearInterval(checkPopup);
-                        setIsConnecting(false);
-                        actions.fetchAccounts();
-                    }
-                }, 1000);
-            } else if (response.error) {
-                const errMsg = typeof response.error === 'string' ? response.error : response.error.message;
-                console.error('[Configuration] Gmail auth error:', response.error);
-                toast.error(errMsg || t('config.toast.startConnectionFailed'));
-                setIsConnecting(false);
-            }
-        } catch (error) {
-            toast.error(t('config.toast.startGmailFailed'));
-            setIsConnecting(false);
-        }
-    };
 
     // Handle "Connect Gmail" button click - show modal
     const handleConnectGmail = () => {
@@ -506,24 +411,6 @@ export function Configuration() {
         }
     };
 
-    // Original device flow start (used after credentials saved)
-    const startOutlookDeviceFlow = async () => {
-        setIsOutlookConnecting(true);
-        try {
-            const response = await api.startMicrosoftDeviceFlow();
-            if (response.data) {
-                setOutlookDeviceCode(response.data);
-                pollOutlookLogin(response.data.deviceCode, response.data.interval);
-            } else {
-                toast.error(t('config.toast.outlookStartFailed'));
-                setIsOutlookConnecting(false);
-            }
-        } catch (error) {
-            toast.error(t('config.toast.outlookStartFailed'));
-            setIsOutlookConnecting(false);
-        }
-    };
-
     const pollOutlookLogin = async (deviceCode: string, interval: number) => {
         const pollInterval = setInterval(async () => {
             try {
@@ -557,66 +444,6 @@ export function Configuration() {
         }, 15 * 60 * 1000);
     };
 
-    const handleSaveRule = async () => {
-        if (!newRuleName) {
-            toast.error(t('config.toast.ruleNameRequired'));
-            return;
-        }
-
-        if (newRuleActions.length === 0) {
-            toast.error(t('config.toast.ruleActionRequired'));
-            return;
-        }
-
-        setSavingRule(true);
-        try {
-            const condition: Record<string, any> = { [newRuleKey]: newRuleValue };
-            if (newRuleOlderThan) {
-                condition.older_than_days = parseInt(newRuleOlderThan, 10);
-            }
-
-            const hasDraftAction = newRuleActions.includes('draft');
-
-            const ruleData = {
-                name: newRuleName,
-                description: newRuleDescription || undefined,
-                intent: newRuleIntent || undefined,
-                condition,
-                actions: newRuleActions as any[],
-                instructions: hasDraftAction ? newRuleInstructions : undefined,
-                attachments: hasDraftAction ? newRuleAttachments : [],
-                is_enabled: true
-            };
-
-            let success = false;
-            if (editingRule) {
-                success = await actions.updateRule(editingRule.id, ruleData);
-            } else {
-                success = await actions.createRule(ruleData);
-            }
-
-            if (success) {
-                toast.success(editingRule ? t('config.toast.ruleUpdated') : t('config.toast.ruleCreated'));
-                setShowRuleModal(false);
-                setEditingRule(null);
-                setNewRuleName('');
-                setNewRuleActions(['archive']);
-                setNewRuleOlderThan('');
-                setNewRuleInstructions('');
-                setNewRuleDescription('');
-                setNewRuleIntent('');
-                setNewRuleAttachments([]);
-                actions.fetchRules();
-            } else {
-                toast.error(editingRule ? t('config.toast.ruleUpdateFailed') : t('config.toast.ruleCreateFailed'));
-            }
-        } catch (error) {
-            toast.error(t('config.toast.ruleSaveError'));
-        } finally {
-            setSavingRule(false);
-        }
-    };
-
     const handleDisconnect = async (accountId: string) => {
         if (!confirm(t('config.toast.disconnectConfirm'))) return;
 
@@ -634,51 +461,6 @@ export function Configuration() {
         if (success) {
             toast.success(t('config.toast.settingsSaved'));
         }
-    };
-
-
-    const handleToggleRule = async (ruleId: string) => {
-        await actions.toggleRule(ruleId);
-    };
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-
-        setIsUploading(true);
-        const file = files[0];
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${state.user.id}/${fileName}`;
-
-        try {
-            const { error: uploadError } = await supabase.storage
-                .from('rule-attachments')
-                .upload(filePath, file);
-
-            if (uploadError) throw uploadError;
-
-            const newAttachment: RuleAttachment = {
-                name: file.name,
-                path: filePath,
-                type: file.type,
-                size: file.size
-            };
-
-            setNewRuleAttachments(prev => [...prev, newAttachment]);
-            toast.success(t('config.toast.fileUploaded'));
-        } catch (error) {
-            console.error('Upload error:', error);
-            toast.error(t('config.toast.fileUploadFailed'));
-        } finally {
-            setIsUploading(false);
-            // Reset input
-            e.target.value = '';
-        }
-    };
-
-    const removeAttachment = (path: string) => {
-        setNewRuleAttachments(prev => prev.filter(a => a.path !== path));
     };
 
     const getProviderIcon = (provider: string) => {
@@ -934,272 +716,6 @@ export function Configuration() {
                             </DialogFooter>
                         </>
                     )}
-                </DialogContent>
-            </Dialog>
-
-            {/* Create Rule Modal */}
-            <Dialog open={showRuleModal} onOpenChange={(open) => {
-                setShowRuleModal(open);
-                if (!open) setEditingRule(null);
-            }}>
-                <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0">
-                    <DialogHeader className="p-6 border-b">
-                        <DialogTitle>{editingRule ? t('config.rules.edit') : t('config.rules.create')}</DialogTitle>
-                        <DialogDescription>
-                            {t('config.rules.desc')}
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('config.rules.name')}</label>
-                            <Input
-                                placeholder={t('config.rules.namePlaceholder')}
-                                value={newRuleName}
-                                onChange={(e) => setNewRuleName(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('config.rules.description')}</label>
-                            <textarea
-                                className="w-full p-2 border rounded-md bg-background min-h-[60px] text-sm"
-                                placeholder={t('config.rules.descriptionPlaceholder')}
-                                value={newRuleDescription}
-                                onChange={(e) => setNewRuleDescription(e.target.value)}
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                                {t('config.rules.semanticHelp')}
-                            </p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('config.rules.intent')}</label>
-                            <Input
-                                placeholder={t('config.rules.intentPlaceholder')}
-                                value={newRuleIntent}
-                                onChange={(e) => setNewRuleIntent(e.target.value)}
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                                {t('config.rules.intentHelp')}
-                            </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">{t('config.rules.conditionField')}</label>
-                                <select
-                                    className="w-full p-2 border rounded-md bg-background text-sm"
-                                    value={newRuleKey}
-                                    onChange={(e) => {
-                                        setNewRuleKey(e.target.value);
-                                        // Set default values for certain keys
-                                        if (e.target.value === 'category') setNewRuleValue('newsletter');
-                                        else if (e.target.value === 'sentiment') setNewRuleValue('Positive');
-                                        else if (e.target.value === 'priority') setNewRuleValue('High');
-                                        else setNewRuleValue('');
-                                    }}
-                                >
-                                    <optgroup label={t('config.rules.aiAnalysis')}>
-                                        <option value="category">{t('config.rules.category')}</option>
-                                        <option value="sentiment">{t('config.rules.sentiment')}</option>
-                                        <option value="priority">{t('config.rules.priority')}</option>
-                                    </optgroup>
-                                    <optgroup label={t('config.rules.metadata')}>
-                                        <option value="sender_email">{t('config.rules.senderEmail')}</option>
-                                        <option value="sender_domain">{t('config.rules.senderDomain')}</option>
-                                        <option value="sender_contains">{t('config.rules.senderContains')}</option>
-                                        <option value="subject_contains">{t('config.rules.subjectContains')}</option>
-                                        <option value="body_contains">{t('config.rules.bodyContains')}</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">{t('config.rules.equalsValue')}</label>
-                                {newRuleKey === 'category' ? (
-                                    <select
-                                        className="w-full p-2 border rounded-md bg-background text-sm"
-                                        value={newRuleValue}
-                                        onChange={(e) => setNewRuleValue(e.target.value)}
-                                    >
-                                        <option value="newsletter">{t('config.rules.category.newsletter')}</option>
-                                        <option value="spam">{t('config.rules.category.spam')}</option>
-                                        <option value="promotional">{t('config.rules.category.promotional')}</option>
-                                        <option value="transactional">{t('config.rules.category.transactional')}</option>
-                                        <option value="social">{t('config.rules.category.social')}</option>
-                                        <option value="support">{t('config.rules.category.support')}</option>
-                                        <option value="client">{t('config.rules.category.client')}</option>
-                                        <option value="internal">{t('config.rules.category.internal')}</option>
-                                        <option value="personal">{t('config.rules.category.personal')}</option>
-                                        <option value="other">{t('config.rules.category.other')}</option>
-                                    </select>
-                                ) : newRuleKey === 'sentiment' ? (
-                                    <select
-                                        className="w-full p-2 border rounded-md bg-background text-sm"
-                                        value={newRuleValue}
-                                        onChange={(e) => setNewRuleValue(e.target.value)}
-                                    >
-                                        <option value="Positive">{t('config.rules.sentiment.positive')}</option>
-                                        <option value="Neutral">{t('config.rules.sentiment.neutral')}</option>
-                                        <option value="Negative">{t('config.rules.sentiment.negative')}</option>
-                                    </select>
-                                ) : newRuleKey === 'priority' ? (
-                                    <select
-                                        className="w-full p-2 border rounded-md bg-background text-sm"
-                                        value={newRuleValue}
-                                        onChange={(e) => setNewRuleValue(e.target.value)}
-                                    >
-                                        <option value="High">{t('config.rules.priority.high')}</option>
-                                        <option value="Medium">{t('config.rules.priority.medium')}</option>
-                                        <option value="Low">{t('config.rules.priority.low')}</option>
-                                    </select>
-                                ) : (
-                                    <Input
-                                        placeholder={
-                                            newRuleKey === 'sender_domain' ? t('config.rules.placeholder.domain') :
-                                                newRuleKey === 'sender_email' ? t('config.rules.placeholder.email') :
-                                                    t('config.rules.keywordsPlaceholder')
-                                        }
-                                        value={newRuleValue}
-                                        onChange={(e) => setNewRuleValue(e.target.value)}
-                                    />
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium flex items-center gap-2">
-                                <Clock className="w-4 h-4" />
-                                {t('config.rules.olderThan')}
-                            </label>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    className="w-24"
-                                    value={newRuleOlderThan}
-                                    onChange={(e) => setNewRuleOlderThan(e.target.value)}
-                                />
-                                <span className="text-sm text-muted-foreground">{t('config.rules.days')}</span>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground">
-                                {t('config.rules.olderThanHelp')}
-                            </p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('config.rules.performActions')}</label>
-                            <p className="text-xs text-muted-foreground mb-2">
-                                {t('config.rules.actionsHelp')}
-                            </p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {[
-                                    { value: 'archive', label: t('common.archive') },
-                                    { value: 'delete', label: t('common.delete') },
-                                    { value: 'draft', label: t('common.draft') },
-                                    { value: 'star', label: t('common.star') },
-                                ].map((option) => (
-                                    <label
-                                        key={option.value}
-                                        className={`flex items-center gap-2 p-2 border rounded-md cursor-pointer transition-colors ${newRuleActions.includes(option.value)
-                                            ? 'bg-primary/10 border-primary'
-                                            : 'bg-background hover:bg-secondary/50'
-                                            }`}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={newRuleActions.includes(option.value)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) {
-                                                    setNewRuleActions([...newRuleActions, option.value]);
-                                                } else {
-                                                    setNewRuleActions(newRuleActions.filter(a => a !== option.value));
-                                                }
-                                            }}
-                                            className="rounded border-gray-300"
-                                        />
-                                        <span className="text-sm">{option.label}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        {newRuleActions.includes('draft') && (
-                            <>
-                                <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                                    <label className="text-sm font-medium">{t('config.rules.draftInstructions')}</label>
-                                    <textarea
-                                        className="w-full p-2 border rounded-md bg-background min-h-[80px] text-sm"
-                                        placeholder={t('config.rules.instructionsPlaceholder')}
-                                        value={newRuleInstructions}
-                                        onChange={(e) => setNewRuleInstructions(e.target.value)}
-                                    />
-                                    <p className="text-[10px] text-muted-foreground">
-                                        {t('config.rules.contextHelp')}
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                                    <label className="text-sm font-medium flex items-center gap-2">
-                                        <Paperclip className="w-4 h-4" />
-                                        {t('config.rules.attachmentsOptional')}
-                                    </label>
-
-                                    <div className="flex flex-col gap-2">
-                                        {newRuleAttachments.map(file => (
-                                            <div key={file.path} className="flex items-center justify-between p-2 bg-secondary/50 rounded border text-xs">
-                                                <span className="truncate max-w-[200px]">{file.name}</span>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-6 w-6 p-0 text-destructive"
-                                                    onClick={() => removeAttachment(file.path)}
-                                                >
-                                                    <X className="w-3 h-3" />
-                                                </Button>
-                                            </div>
-                                        ))}
-
-                                        <div className="relative">
-                                            <input
-                                                type="file"
-                                                className="absolute inset-0 opacity-0 cursor-pointer"
-                                                onChange={handleFileUpload}
-                                                disabled={isUploading}
-                                            />
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="w-full border-dashed"
-                                                disabled={isUploading}
-                                            >
-                                                {isUploading ? (
-                                                    <LoadingSpinner size="sm" className="mr-2" />
-                                                ) : (
-                                                    <Plus className="w-3 h-3 mr-2" />
-                                                )}
-                                                {isUploading ? t('config.rules.uploading') : t('config.rules.addAttachment')}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] text-muted-foreground">
-                                        {t('config.rules.attachmentHelp')}
-                                    </p>
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    <DialogFooter className="p-6 border-t bg-secondary/5">
-                        <Button variant="outline" onClick={() => setShowRuleModal(false)}>
-                            {t('common.cancel')}
-                        </Button>
-                        <Button onClick={handleSaveRule} disabled={savingRule}>
-                            {savingRule ? <LoadingSpinner size="sm" className="mr-2" /> : (editingRule ? <Check className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />)}
-                            {editingRule ? t('config.rules.saveChanges') : t('config.rules.createRule')}
-                        </Button>
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
