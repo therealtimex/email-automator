@@ -30,9 +30,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:api": "npm run build:docs && tsx watch api/server.ts",
-    "build": "npm run build:docs && npm run build:ui && npm run build:api",
-    "build:docs": "tsx scripts/generate-agent-docs.ts",
+    "dev:api": "tsx watch api/server.ts",
+    "build": "npm run build:ui && npm run build:api",
     "build:ui": "vite build",
     "build:api": "tsc -p tsconfig.api.json",
     "ingest:knowledge": "tsx scripts/ingest-knowledge-rag.ts",
