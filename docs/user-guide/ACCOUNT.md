@@ -1,35 +1,38 @@
 # Account Management
 
-Manage your profile, security, and the core database connection through the **Account Settings** page (accessed via the profile icon in the top right).
+Manage your profile, persona, security, and Supabase connection in **Account Settings** (profile icon, top right).
 
 ## 👤 Profile
-*   **Name**: Update your first and last name as displayed in the application.
+*   **Name**: Update your first and last name.
 *   **Avatar**: Upload a custom profile picture.
-*   **Sound & Haptics**: Toggle synthesized audio chimes and tactile feedback for AI activities.
+*   **Sound & Haptic Feedback**: Toggle audio cues and haptics (if supported).
+
+## 🧬 Persona
+Define how the AI represents you:
+*   Role, industry, and work style
+*   Preferred tone and response length
+*   VIP senders and trusted domains
+*   Automation preferences (what to avoid)
 
 ## 🔐 Security
-*   **Password**: Update your local application password.
-*   **Persistence**: Your login is managed via Supabase Auth and will remain active across sessions unless you manually log out.
+*   **Password**: Update your account password.
+*   **Sessions**: Managed via Supabase Auth; log out to end the session.
 
 ## 🗄️ Supabase Connection (BYOK)
-As part of the **Bring Your Own Key** model, you can manage the underlying database connection at any time. This connects the local application running on your machine to your private cloud database (for Auth, Storage, and Sync Logs).
+Manage the database connection used for auth, sync logs, and AI data:
+*   **Connection Status**: Shows the current Supabase URL and schema version.
+*   **Change Connection**: Launches the Setup Wizard to reconfigure.
+*   **Clear Configuration**: Disconnects and logs you out (only available for UI-configured connections).
 
-*   **Change Connection**: If you migrate your project or need to update keys, use the "Change Connection" button to restart the Setup Wizard.
-*   **Clear Configuration**: Disconnect the application from your current Supabase project. This will log you out and remove all local keys.
-
-## 🔌 Integrations (Provider Credentials)
-Manage your connected email providers (Gmail, Outlook) in the **Integrations** list.
-*   **Transparency**: View exactly which credentials (Client ID, Secret) are stored.
-*   **Security**: All provider secrets are encrypted at rest in the `integrations` table.
-*   **Management**: Delete or update credentials directly from this table.
+> Provider credentials (Gmail/Outlook) are managed in **Configuration → Email Accounts**.
 
 ---
 
 ## 💾 Where is my data?
-*   **Email Metadata**: Stored in your personal Supabase project.
-*   **AI Logs**: Stored in your personal Supabase project.
-*   **Attachments**: Stored in your personal Supabase storage buckets.
-*   **Credentials**: Encrypted and stored in your personal Supabase project.
+*   **Email Metadata + AI Logs**: Stored in your Supabase project.
+*   **Raw Email Files (.eml)**: Stored locally on your machine (see **Storage Path** in Configuration).
+*   **Rule Attachments**: Stored in your Supabase Storage bucket.
+*   **Credentials**: Encrypted and stored in your Supabase project.
 
 **Email Automator never stores your data on its own servers.**
 

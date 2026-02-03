@@ -1,41 +1,75 @@
 # Configuration
 
-Before the AI agent can process your emails, you must configure your provider credentials and define your synchronization scope.
-
-## 🔑 Provider Credentials (BYOK)
-
-Email Automator uses a **"Bring Your Own Key"** architecture. You provide your own OAuth credentials to ensure you maintain full control over your data connection.
-
-### Gmail Setup
-1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2.  Create a new Project and enable the **Gmail API**.
-3.  Configure the OAuth Consent Screen (User Type: External) and add your email as a test user.
-4.  Create **OAuth 2.0 Client IDs** (Web Application).
-    *   **Authorized Redirect URI**: `https://<your-project-ref>.supabase.co/functions/v1/auth-gmail/callback`
-5.  Enter the **Client ID** and **Client Secret** into the **Configuration** tab of the app.
-
-### Outlook Setup
-1.  Go to the [Azure App Registrations](https://portal.azure.com/).
-2.  Register a new application.
-    *   **Supported Account Types**: "Accounts in any organizational directory and personal Microsoft accounts".
-3.  Copy the **Application (client) ID** and **Directory (tenant) ID** into the **Configuration** tab.
-4.  Follow the **Device Code** flow prompted in the app to authorize access.
+The **Configuration** tab is where you connect email providers, define automation rules, and tune AI + sync behavior.
 
 ---
 
-## 📡 Sync Scope & Performance
+## 🔑 Email Accounts (Gmail & Outlook)
 
-Use the **Sync Scope** card on the Dashboard sidebar to manage background activity.
+Email Automator uses **BYOK** credentials. You connect your own Gmail/Outlook apps to keep control of your data.
 
-### Global Controls
-*   **Sync Interval (min)**: Defines how often the background agent wakes up to check for new emails. (Default: 5 minutes).
-*   **Stop Sync**: You can pause synchronization at any time.
+### Gmail Setup (OAuth)
+1.  In **Google Cloud Console**, create a project and enable the **Gmail API**.
+2.  Configure the OAuth consent screen and add your account as a test user.
+3.  Create an **OAuth 2.0 Client ID (Web Application)**.
+    *   **Authorized Redirect URI**: `https://<your-project-ref>.supabase.co/functions/v1/auth-gmail/callback`
+4.  In **Configuration → Email Accounts**, click **Connect Gmail**.
+5.  Paste the **credentials JSON** (or enter Client ID + Secret manually).
+6.  Complete the browser authorization and paste the **authorization code**.
 
-### Per-Account Controls
-*   **Sync From**: Set a specific starting date. The agent will ignore all emails received before this timestamp.
-    > **Priority**: This setting takes **priority** over the internal checkpoint. If you move this date backwards, the system will automatically reset the checkpoint to ensure historical emails are processed.
-*   **Max Emails**: Limits the batch size for each sync run (Default: 50). This prevents overwhelming your local machine during the first sync.
-    > **Safety**: New accounts default to "Sync From = Now" and "Max Emails = 50" to ensure a safe initial run.
-*   **Reset Checkpoint**: Use the "Rotate" icon to clear the internal memory and force a full re-scan.
+### Outlook Setup (Device Code)
+1.  In **Azure App Registrations**, register a new application.
+2.  Supported account types: **organizational + personal Microsoft accounts**.
+3.  Copy the **Application (client) ID** and (optional) **Tenant ID**.
+4.  In **Configuration → Email Accounts**, click **Connect Outlook**.
+5.  Follow the **Device Code** prompt and complete sign-in.
+
+---
+
+## 🤖 Automation Rules
+
+### System Rules (Quick Toggles)
+*   **Auto-Trash Spam**: Deletes emails categorized as spam.
+*   **Smart Drafts**: Generates draft replies when a rule requests drafting.
+
+### Custom Rules
+Create rules with one or more actions:
+*   **Conditions**:
+    *   **AI Analysis**: Category, Sentiment, Priority
+    *   **Metadata**: Sender Email, Sender Domain, Sender Contains, Subject Contains, Body Contains
+    *   **Age Filter**: “Older than X days”
+*   **Actions**: Archive, Delete, Draft, Star
+*   **Draft Instructions**: Provide extra context if your rule includes Draft
+*   **Attachments**: Upload files to include in drafted replies
+
+> Tip: The **Auto-Pilot** tab provides a grouped view of all rules (system + custom) and quick enable/disable controls.
+
+---
+
+## 🧠 AI Model Configuration
+
+Use this section to control AI routing and local storage behavior:
+*   **Provider + Model**: Discovered via **RealTimeX Desktop**
+*   **Storage Path**: Where raw `.eml` files are stored locally (must be writable)
+*   **Intelligent Rename**: Slugifies and timestamps filenames for cleaner archives
+*   **Sync Interval (minutes)**: How often the background scheduler syncs accounts
+*   **Test Connection**: Validate provider access
+
+---
+
+## 🧩 Embedding Provider (RAG)
+
+Configure the embedding model used for the documentation knowledge base (RAG).
+*   Default: **RealTimeX AI / text-embedding-3-small**
+*   Choose a different provider/model if needed
+
+---
+
+## 🔊 Voice & Speech (TTS)
+
+Control text-to-speech for AI responses:
+*   **Auto-Speak** toggle
+*   **Provider + Voice**
+*   **Speed + Quality**
 
 Next step: [**Using the Dashboard**](./DASHBOARD.md)
