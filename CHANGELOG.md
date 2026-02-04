@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.22.5] - 2026-02-03
+
+### Fixed
+- **Localization**: Resolved missing translations in the Live Terminal component. Agent states (Thinking, Acting, Speaking) and detailed technical logs are now correctly localized across all supported languages.
+
 ## [2.22.4] - 2026-02-03
 
 ### Improved

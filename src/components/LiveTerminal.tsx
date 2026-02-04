@@ -106,6 +106,13 @@ export function LiveTerminal() {
         return new Date(isoString).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     };
 
+    const translateAgentState = (state: string): string => {
+        const key = `terminal.state.${state.toLowerCase().replace(/\s+/g, '_')}`;
+        const translated = t(key);
+        // Fallback to original state if translation key not found
+        return translated.startsWith('terminal.state.') ? state : translated;
+    };
+
     if (!isExpanded) {
         return (
             <div className="fixed bottom-4 right-4 z-50">
@@ -213,7 +220,7 @@ export function LiveTerminal() {
                                         event.event_type === 'action' && "text-emerald-600 dark:text-emerald-400",
                                         event.event_type === 'error' && "text-red-600 dark:text-red-400",
                                     )}>
-                                        {event.agent_state}
+                                        {translateAgentState(event.agent_state)}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground/60">{formatTime(event.created_at)}</span>
                                 </div>
