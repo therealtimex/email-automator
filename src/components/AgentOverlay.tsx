@@ -13,40 +13,42 @@ import { useLanguage } from '../context/LanguageContext';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 
 // Get friendly page title
-const getPageTitle = (pageId: string): string => {
-    const titles: Record<string, string> = {
-        'setup_wizard': 'Setup Wizard',
-        'configuration_wizard': 'Configuration Helper',
-        'draft_review': 'Draft Assistant',
-        'explainer': 'Translation Helper',
-        'global': 'AI Assistant'
+const getPageTitle = (pageId: string, t: (key: string) => string): string => {
+    const titleKeys: Record<string, string> = {
+        'setup_wizard': 'agent.title.setup',
+        'configuration_wizard': 'agent.title.configuration',
+        'draft_review': 'agent.title.drafts',
+        'explainer': 'agent.title.explainer',
+        'global': 'agent.title.global'
     };
-    return titles[pageId] || `${pageId.replace(/_/g, ' ')} Assistant`;
+    return titleKeys[pageId] ? t(titleKeys[pageId]) : t('agent.title.default').replace('{page}', pageId.replace(/_/g, ' '));
 };
 
 // Context-aware intro messages based on page_id
-const getContextualIntro = (pageId: string, data?: any): string => {
+const getContextualIntro = (pageId: string, t: (key: string) => string, data?: any): string => {
     switch (pageId) {
         case 'setup_wizard':
-            return `👋 Welcome to Setup! I can help you:\n• Choose Quick Start or Manual setup\n• Connect your Supabase project\n• Run database migrations\n• Troubleshoot connection issues\n\nTell me what you want to do or say "help me set up".`;
+            return t('agent.intro.setup');
 
         case 'configuration_wizard':
-            const accountsCount = data?.accounts_count || 0;
-            const rulesCount = data?.rules_count || 0;
-            return `👋 Welcome to Configuration! I can help you:\n• Connect email accounts (${accountsCount} connected)\n• Set up automation rules (${rulesCount} active)\n• Configure LLM & TTS settings\n• Troubleshoot connection issues\n\nWhat would you like to set up?`;
+            return t('agent.intro.configuration')
+                .replace('{accountsCount}', String(data?.accounts_count || 0))
+                .replace('{rulesCount}', String(data?.rules_count || 0));
 
-        case 'draft_review':
-            const draftsCount = data?.count || 0;
-            return `📧 I'm your Draft Review Assistant!\n\nYou have ${draftsCount} pending draft${draftsCount !== 1 ? 's' : ''}.\n\nI can help you:\n• Summarize all drafts\n• Send or dismiss specific drafts\n• Preview draft content\n• Review recipients and subjects\n\nTry: "Summarize my drafts" or "Send the draft to John"`;
+        case 'draft_review': {
+            const count = data?.count || 0;
+            return t(count === 1 ? 'agent.intro.drafts.one' : 'agent.intro.drafts.other')
+                .replace('{count}', String(count));
+        }
 
         case 'explainer':
-            return `🌐 Translation & Explanation Helper\n\nI can help you understand:\n• What automation rules mean\n• How settings affect your workflow\n• Technical terms in plain language\n\nAsk me anything about what you're seeing!`;
+            return t('agent.intro.explainer');
 
         case 'global':
-            return `👋 Hi! I'm your AI Assistant.\n\nI can help you navigate and understand any part of the Email Automator.\n\nWhat would you like to know?`;
+            return t('agent.intro.global');
 
         default:
-            return `👋 Hi! I'm here to help with ${pageId.replace(/_/g, ' ')}.\n\nWhat can I assist you with?`;
+            return t('agent.intro.default').replace('{page}', pageId.replace(/_/g, ' '));
     }
 };
 
@@ -93,7 +95,7 @@ export function AgentOverlay({ className }: { className?: string }) {
         const pageChanged = currentConfig.page_id !== prevPageIdRef.current;
 
         if (shouldSpeak || (isOpen && pageChanged && chatHistory.length === 0)) {
-            const introMessage = getContextualIntro(currentConfig.page_id, currentConfig.data);
+            const introMessage = getContextualIntro(currentConfig.page_id, t, currentConfig.data);
 
             // Use user's configured TTS settings from Configuration
             const ttsOptions = {
@@ -263,10 +265,10 @@ export function AgentOverlay({ className }: { className?: string }) {
                             )} />
                             <div className="flex flex-col">
                                 <span className="font-semibold text-sm leading-tight">
-                                    {isListening ? 'Listening...' : getPageTitle(currentConfig.page_id)}
+                                    {isListening ? t('agent.status.listening') : getPageTitle(currentConfig.page_id, t)}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground">
-                                    {agentState === 'thinking' ? 'Analyzing' : agentState === 'speaking' ? 'Speaking' : 'Ready'}
+                                    {agentState === 'thinking' ? t('agent.status.analyzing') : agentState === 'speaking' ? t('agent.status.speaking') : t('agent.status.ready')}
                                 </span>
                             </div>
                         </div>
@@ -297,7 +299,7 @@ export function AgentOverlay({ className }: { className?: string }) {
                     <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
                         {chatHistory.length === 0 && (
                             <div className="text-center text-muted-foreground text-xs mt-10 whitespace-pre-line">
-                                {getContextualIntro(currentConfig.page_id, currentConfig.data)}
+                                {getContextualIntro(currentConfig.page_id, t, currentConfig.data)}
                             </div>
                         )}
                         {chatHistory.map((msg, i) => {
@@ -354,7 +356,7 @@ export function AgentOverlay({ className }: { className?: string }) {
                             <div className="self-start bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex flex-col gap-2 animate-pulse">
                                 <div className="flex items-center gap-2">
                                     <Mic className="w-4 h-4 text-red-500 animate-pulse" />
-                                    <span className="text-xs font-semibold text-red-500">Recording...</span>
+                                    <span className="text-xs font-semibold text-red-500">{t('agent.recording')}</span>
                                 </div>
                                 {/* Waveform Visualization */}
                                 <div className="flex items-center justify-center gap-1 h-8">
@@ -383,7 +385,7 @@ export function AgentOverlay({ className }: { className?: string }) {
                     <div className="p-3 border-t bg-background flex gap-2">
                         <input
                             className="flex-1 bg-secondary/40 border border-border/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 outline-none"
-                            placeholder={isListening ? "Listening..." : "Ask a question, or click the mic..."}
+                            placeholder={isListening ? t('agent.composer.listening') : t('agent.composer.placeholder')}
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyDown={handleKeyDown}

@@ -15,7 +15,8 @@
       "Bash(npm:*)",
       "Bash(npx:*)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(tree:*)"
     ]
   }
 }

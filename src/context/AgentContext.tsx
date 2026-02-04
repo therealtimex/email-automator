@@ -86,6 +86,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             // Payload: Strip callbacks from tools before sending
             const contextPayload = {
                 ...currentConfig,
+                lang: localStorage.getItem('app_language') || 'en',
                 tools: currentConfig.tools?.map(t => ({
                     name: t.name,
                     description: t.description,

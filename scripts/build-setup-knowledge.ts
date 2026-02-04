@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Paths
-const DOCS_DIR = join(__dirname, '../docs/user-guide');
+const DOCS_DIR = join(__dirname, '../docs/en/user-guide');
 const OUTPUT_FILE = join(__dirname, '../api/src/lib/setup-knowledge.generated.ts');
 
 function buildSetupKnowledge() {

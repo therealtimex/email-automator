@@ -104,6 +104,7 @@ router.post('/chat', async (req: Request, res: Response) => {
 # Current Context
 - **Current Page**: ${context?.page_id || 'global'}
 - **Page Data**: ${JSON.stringify(context?.data || {}, null, 2)}
+- **User Language**: ${context?.lang || 'en'} — respond in this language
 
 # Response Instructions
 **When Answering:**

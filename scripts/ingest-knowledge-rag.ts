@@ -14,9 +14,11 @@ import { SDKService } from '../api/src/services/SDKService.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.join(__dirname, '..');
-
-const USER_GUIDE_DIR = path.join(ROOT_DIR, 'docs/user-guide');
+const DOCS_ROOT = path.join(ROOT_DIR, 'docs');
 const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf-8'));
+
+// Supported languages for RAG
+const SUPPORTED_LANGUAGES = ['en', 'fr', 'es', 'ja', 'ko', 'vi'];
 
 // Initialize Supabase client
 // Prefer SERVICE_ROLE_KEY for admin operations (bypasses RLS)
@@ -41,12 +43,13 @@ interface Chunk {
     source_file: string;
     section_title?: string;
     doc_type: string;
+    lang: string;
 }
 
 /**
  * Split markdown content into chunks by sections
  */
-function chunkMarkdown(content: string, sourceFile: string, docType: string = 'user_guide'): Chunk[] {
+function chunkMarkdown(content: string, sourceFile: string, docType: string = 'user_guide', lang: string): Chunk[] {
     const chunks: Chunk[] = [];
 
     // Split by H2 headers (##)
@@ -61,7 +64,8 @@ function chunkMarkdown(content: string, sourceFile: string, docType: string = 'u
         const normalizedTitle = titleMatch
             ? titleMatch[1]
                 // Strip non-ASCII to avoid lone surrogate issues in JSON payloads.
-                .replace(/[^\x20-\x7E]/g, '')
+                // EXCEPTION: Keep non-ASCII for non-English languages to preserve meaning
+                // .replace(/[^\x20-\x7E]/g, '')
                 .replace(/\s{2,}/g, ' ')
                 .trim()
             : '';
@@ -79,7 +83,8 @@ function chunkMarkdown(content: string, sourceFile: string, docType: string = 'u
             content: cleanedContent,
             source_file: sourceFile,
             section_title: sectionTitle,
-            doc_type: docType
+            doc_type: docType,
+            lang: lang
         });
     }
 
@@ -130,9 +135,9 @@ async function generateEmbedding(text: string): Promise<number[]> {
  * Main ingestion function
  */
 async function ingestKnowledge() {
-    console.log('📚 Starting knowledge base ingestion...');
+    console.log('📚 Starting multilingual knowledge base ingestion...');
     console.log(`   Version: ${packageJson.version}`);
-    console.log(`   Source: ${USER_GUIDE_DIR}`);
+    console.log(`   Languages: ${SUPPORTED_LANGUAGES.join(', ')}`);
 
     // Initialize SDK
     try {
@@ -147,29 +152,39 @@ async function ingestKnowledge() {
         process.exit(1);
     }
 
-    // Read all user guide files
-    const files = fs.readdirSync(USER_GUIDE_DIR).filter(f => f.endsWith('.md'));
-    console.log(`\n📖 Found ${files.length} user guide files`);
-
     const allChunks: Array<Chunk & { content_hash: string; version: string }> = [];
 
-    // Chunk all files
-    for (const file of files) {
-        const content = fs.readFileSync(path.join(USER_GUIDE_DIR, file), 'utf-8');
-        const chunks = chunkMarkdown(content, file, 'user_guide');
+    // Process each language
+    for (const lang of SUPPORTED_LANGUAGES) {
+        const langDir = path.join(DOCS_ROOT, lang, 'user-guide');
+        
+        if (!fs.existsSync(langDir)) {
+            console.warn(`⚠️ Warning: Documentation directory not found for language: ${lang} (${langDir})`);
+            continue;
+        }
 
-        console.log(`   ${file}: ${chunks.length} chunks`);
+        // Read all user guide files for this language
+        const files = fs.readdirSync(langDir).filter(f => f.endsWith('.md'));
+        console.log(`\n📖 Processing [${lang}]: Found ${files.length} user guide files`);
 
-        for (const chunk of chunks) {
-            allChunks.push({
-                ...chunk,
-                content_hash: hashContent(chunk.content),
-                version: packageJson.version
-            });
+        // Chunk all files
+        for (const file of files) {
+            const content = fs.readFileSync(path.join(langDir, file), 'utf-8');
+            const chunks = chunkMarkdown(content, file, 'user_guide', lang);
+
+            console.log(`   [${lang}] ${file}: ${chunks.length} chunks`);
+
+            for (const chunk of chunks) {
+                allChunks.push({
+                    ...chunk,
+                    content_hash: hashContent(chunk.content),
+                    version: packageJson.version
+                });
+            }
         }
     }
 
-    console.log(`\n📦 Total chunks: ${allChunks.length}`);
+    console.log(`\n📦 Total chunks across all languages: ${allChunks.length}`);
 
     // Clear existing chunks for this version
     console.log('\n🧹 Clearing old chunks...');
@@ -206,19 +221,20 @@ async function ingestKnowledge() {
                     source_file: chunk.source_file,
                     section_title: chunk.section_title,
                     doc_type: chunk.doc_type,
+                    lang: chunk.lang,
                     embedding: embedding,
                     version: chunk.version
                 });
 
             if (insertError) {
-                console.error(`${progress} ❌ ${chunk.source_file} - ${chunk.section_title || 'Untitled'}:`, insertError.message);
+                console.error(`${progress} ❌ [${chunk.lang}] ${chunk.source_file}:`, insertError.message);
                 errorCount++;
             } else {
-                console.log(`${progress} ✓ ${chunk.source_file} - ${chunk.section_title || 'Untitled'}`);
+                console.log(`${progress} ✓ [${chunk.lang}] ${chunk.source_file} - ${chunk.section_title || 'Untitled'}`);
                 successCount++;
             }
         } catch (error: any) {
-            console.error(`${progress} ❌ ${chunk.source_file}:`, error.message);
+            console.error(`${progress} ❌ [${chunk.lang}] ${chunk.source_file}:`, error.message);
             errorCount++;
         }
 

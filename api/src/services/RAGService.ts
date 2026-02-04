@@ -74,6 +74,7 @@ export class RAGService {
             topK?: number;
             similarityThreshold?: number;
             sourceFilter?: string[];
+            lang?: string;
             settings?: { embedding_provider?: string; embedding_model?: string };
         } = {}
     ): Promise<RAGContext> {
@@ -81,6 +82,7 @@ export class RAGService {
             topK = 5,
             similarityThreshold = 0.7,
             sourceFilter,
+            lang = 'en',
             settings
         } = options;
 
@@ -89,14 +91,35 @@ export class RAGService {
         const queryEmbedding = await this.embedQuery(query, settings);
 
         // 2. Search knowledge base
-        console.log(`[RAGService] Searching knowledge base (topK=${topK}, threshold=${similarityThreshold})...`);
+        console.log(`[RAGService] Searching knowledge base (topK=${topK}, threshold=${similarityThreshold}, lang=${lang})...`);
         console.log(`[RAGService] Query embedding dimensions: ${queryEmbedding.length}`);
 
-        const { data, error } = await this.supabase.rpc('search_knowledge', {
+        // Try searching with language filter
+        let { data, error } = await this.supabase.rpc('search_knowledge', {
             query_embedding: queryEmbedding,
             match_threshold: similarityThreshold,
-            match_count: topK
+            match_count: topK,
+            model_filter: null,
+            lang_filter: lang
         });
+
+        // Fallback: If no results found with language filter (or if lang is invalid), try without filter (only if lang wasn't 'en')
+        // This handles cases where a specific language might not have content yet, falling back to English (default)
+        if (!error && (!data || data.length === 0) && lang !== 'en') {
+            console.log(`[RAGService] No results for lang='${lang}', falling back to 'en'...`);
+            const fallbackResult = await this.supabase.rpc('search_knowledge', {
+                query_embedding: queryEmbedding,
+                match_threshold: similarityThreshold,
+                match_count: topK,
+                model_filter: null,
+                lang_filter: 'en'
+            });
+            
+            if (!fallbackResult.error) {
+                data = fallbackResult.data;
+                error = null;
+            }
+        }
 
         if (error) {
             console.error('[RAGService] Search failed:', error);

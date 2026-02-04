@@ -8,6 +8,7 @@ export interface AgentContextPayload {
     system_instruction?: string;
     data?: any;
     tools?: any[];
+    lang?: string;
 }
 
 export interface AgentMessage {
@@ -58,6 +59,7 @@ export class AgentService {
 # Current Context
 - **Current Page**: ${context.page_id}
 - **Page Data**: ${JSON.stringify(context.data || {}, null, 2)}
+- **User Language**: ${context.lang || 'en'} — respond in this language
 `;
 
         if (hasRAGContent) {

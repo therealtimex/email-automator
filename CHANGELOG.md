@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.22.2] - 2026-02-03
+
+### Added
+- **Multilingual RAG**: The AI Assistant now supports knowledge retrieval in 6 languages (English, French, Spanish, Japanese, Korean, Vietnamese).
+  - Updated the database schema to include a `lang` column in `knowledge_chunks`.
+  - Enhanced the `ingest:knowledge` script to process documentation for all supported languages.
+  - Updated the Agent Service to prioritize retrieving documentation in the user's current language, falling back to English if necessary.
+  - The AI prompt now explicitly instructs the model to respond in the user's selected language.
+
 ## [2.22.1] - 2026-02-01
 
 ### Fixed
