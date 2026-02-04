@@ -113,6 +113,51 @@ export function LiveTerminal() {
         return translated.startsWith('terminal.state.') ? state : translated;
     };
 
+    const translateMessage = (message: string | undefined): string => {
+        if (!message) return '';
+
+        // Pattern: "Background processing: <subject>"
+        if (message.startsWith('Background processing: ')) {
+            const subject = message.replace('Background processing: ', '');
+            return t('terminal.message.background_processing').replace('{subject}', subject);
+        }
+
+        // Pattern: "<count> rule(s) apply: <rules>"
+        const rulesMatch = message.match(/^(\d+) rule\(s\) apply: (.+)$/);
+        if (rulesMatch) {
+            const [, count, rules] = rulesMatch;
+            return t('terminal.message.rules_apply')
+                .replace('{count}', count)
+                .replace('{rules}', rules);
+        }
+
+        // Pattern: "After conflict resolution: <actions>"
+        if (message.startsWith('After conflict resolution: ')) {
+            const actions = message.replace('After conflict resolution: ', '');
+            return t('terminal.message.conflict_resolution').replace('{actions}', actions);
+        }
+
+        // Pattern: "Analyzing email: <subject>"
+        if (message.startsWith('Analyzing email: ')) {
+            const subject = message.replace('Analyzing email: ', '');
+            return t('terminal.message.analyzing_email').replace('{subject}', subject);
+        }
+
+        // Pattern: "Context-aware analysis: <subject>"
+        if (message.startsWith('Context-aware analysis: ')) {
+            const subject = message.replace('Context-aware analysis: ', '');
+            return t('terminal.message.context_aware_analysis').replace('{subject}', subject);
+        }
+
+        // Pattern: "Generating customized draft based on rule"
+        if (message === 'Generating customized draft based on rule') {
+            return t('terminal.message.generating_draft');
+        }
+
+        // Fallback: return original message
+        return message;
+    };
+
     if (!isExpanded) {
         return (
             <div className="fixed bottom-4 right-4 z-50">
@@ -317,7 +362,7 @@ export function LiveTerminal() {
                                 </div>
                             ) : (
                                 <p className="text-muted-foreground leading-relaxed">
-                                    {event.details?.message || JSON.stringify(event.details)}
+                                    {translateMessage(event.details?.message) || JSON.stringify(event.details)}
                                 </p>
                             )}
 
