@@ -1,15 +1,15 @@
-# AI Email Automator v2.0
+# AI Email Automator - RealTimeX Local App
 
-An agentic, AI-powered email management platform that learns to handle your inbox. Categorize, archive, delete, and draft responses automatically using LLMs and Supabase.
+A private, agentic email management application designed specifically for the **RealTimeX** ecosystem. Automate your inbox with local AI, categorize communications, and generate smart drafts while maintaining 100% data sovereignty.
 
 ## 🚀 Vision: "Own Your Inbox"
 
-The AI Email Automator is designed as a standalone "Agent" for the RealTimeX ecosystem. It follows the **Own Your Data** philosophy:
+Email Automator is a dedicated **Local App** for RealTimeX Desktop. It follows the **Own Your Data** philosophy by turning your email into a managed task list powered by your own infrastructure:
 
-- **Zero Cloud Costs**: Runs on your infrastructure using Supabase
-- **Privacy First**: Your emails are processed on your private infrastructure
-- **Agentic Intelligence**: An assistant that suggests "Winning Responses"
-- **Production Ready**: Full security, testing, and DevOps infrastructure
+- **RealTimeX Integration**: Seamlessly connects with RealTimeX Desktop for LLM and TTS services.
+- **Zero Cloud Costs**: Runs entirely on your own Supabase instance and local machine.
+- **Privacy First**: Your emails are processed locally; no third-party data mining.
+- **Agentic Intelligence**: A context-aware assistant that suggests "Winning Responses".
 
 ## ✨ Features
 
@@ -41,92 +41,32 @@ The AI Email Automator is designed as a standalone "Agent" for the RealTimeX eco
 | **Database** | Supabase (PostgreSQL) with RLS |
 | **Testing** | Vitest, Testing Library |
 
-## 🏁 Quick Start
+## 🏁 Getting Started
 
-For detailed instructions on installation, configuration, and usage, please see the [**Email Automator Documentation Hub**](docs/README.md).
+Email Automator uses the **"Bring Your Own Key" (BYOK)** model, ensuring your data remains under your control within your own Supabase infrastructure.
 
 ### Prerequisites
-- Node.js v20+
-- Supabase project with CLI access
-- LLM API key (OpenAI, Anthropic, or local)
+1.  **RealTimeX Desktop**: Installed and running. Required for AI processing (LLMs) and Text-to-Speech (TTS).
+2.  **Supabase Account**: A free or paid account at [supabase.com](https://supabase.com).
 
-### Option 1: Using npx (Recommended)
+### 🚀 Quick Setup with the Wizard
+The built-in **Setup Wizard** is the recommended way to get started. It automates the technical heavy lifting.
 
-```bash
-# Interactive setup
-npx @realtimex/email-automator-setup
+1.  **Purchase & Launch**: Open **RealTimeX Desktop** → **Marketplace** → Search for **"Email Automator"** and click **Launch**.
+2.  **Run the Setup Wizard**: Choose **Managed Provisioning** and provide a **Supabase Access Token**. The wizard will automatically create your project, run migrations, and deploy Edge Functions.
+3.  **Create Your Account**: Once ready, create your local user account and sign in to access the **Dashboard**.
 
-# Deploy Edge Functions
-npx @realtimex/email-automator-deploy
+For more detailed guides, visit the [**Documentation Hub**](docs/README.md).
 
-# Start Email Automator
-npx @realtimex/email-automator --port 3004
-```
+## 🛠 Tech Stack
 
-### Option 1b: Global Install
-
-```bash
-# Install globally
-npm install -g @realtimex/email-automator
-
-# Then run directly
-email-automator --port 3004
-```
-
-### Option 2: Clone and Install
-
-```bash
-git clone https://github.com/therealtimex/email-automator.git
-cd email-automator
-npm install
-```
-
-### Setup
-
-1. **Deploy Edge Functions to Supabase:**
-```bash
-supabase login
-./scripts/deploy-functions.sh
-```
-
-2. **Configure Edge Function Secrets in Supabase Dashboard:**
-   - Settings → Edge Functions → Add secrets
-   - Required: `TOKEN_ENCRYPTION_KEY`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, etc.
-
-3. **Configure Local Environment:**
-```bash
-cp .env.example .env
-# Edit .env with your credentials
-```
-
-### Development
-
-```bash
-# Terminal 1: Local API (Email Sync & AI Processing)
-# Default port: 3004 (RealTimeX Desktop uses 3001/3002)
-npm run dev:api
-
-# Terminal 2: Frontend
-npm run dev
-
-# Optional: Specify custom ports
-npm run dev:api -- --port 3005
-npm run dev -- --port 5174
-```
-
-**Note:** Email Automator uses port **3004** by default to avoid conflicts with RealTimeX Desktop (ports 3001/3002). You can change ports via command line arguments or environment variables.
-
-### Using npx
-
-```bash
-# Start with default port (3004)
-npx @realtimex/email-automator
-
-# Start with custom port
-npx @realtimex/email-automator --port 3005
-```
-
-See [NPX Usage Guide](docs-dev/NPX-USAGE.md) for complete documentation.
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React 19, Vite 7, TailwindCSS 4, Lucide Icons |
+| **Edge Functions** | Deno, Supabase Functions (OAuth, DB proxy) |
+| **Local API** | Node.js, Express 5, TypeScript (Sync, AI) |
+| **AI Services** | Powered by **RealTimeX Desktop** (Ollama, LM Studio, OpenAI, Anthropic) |
+| **Database** | Supabase (PostgreSQL) with RLS |
 
 ## 📂 Project Structure
 
@@ -134,104 +74,35 @@ See [NPX Usage Guide](docs-dev/NPX-USAGE.md) for complete documentation.
 ├── api/                       # Local App (Express)
 │   ├── server.ts              # Express entry point
 │   └── src/
-│       ├── routes/            # Sync & Actions endpoints
 │       ├── services/          # Email sync, AI processing
-│       └── utils/             # Logger, crypto, helpers
+├── docs/                      # Documentation (Multi-language)
 ├── src/                       # Frontend (React)
-│   ├── components/            # React components
-│   ├── context/               # App state management
-│   ├── hooks/                 # Custom hooks (realtime)
-│   └── lib/                   # Hybrid API client, types
 ├── supabase/                  # Supabase Configuration
 │   ├── functions/             # Edge Functions (OAuth, DB)
-│   │   ├── _shared/           # Shared utilities
-│   │   ├── auth-gmail/        # Gmail OAuth
-│   │   ├── auth-microsoft/    # Microsoft OAuth
-│   │   ├── api-v1-accounts/   # Account management
-│   │   ├── api-v1-emails/     # Email operations
-│   │   ├── api-v1-rules/      # Rules CRUD
-│   │   └── api-v1-settings/   # Settings & stats
 │   └── migrations/            # Database schema
-├── scripts/
-│   └── deploy-functions.sh    # Deploy Edge Functions
-└── tests/                     # Unit & integration tests
 ```
 
-## 🔐 Environment Variables
+## 🧪 Development & Testing
 
-### Edge Functions (Supabase Dashboard)
-```bash
-TOKEN_ENCRYPTION_KEY=32-char-key
-GMAIL_CLIENT_ID=xxx
-GMAIL_CLIENT_SECRET=xxx
-MS_GRAPH_CLIENT_ID=xxx
-MS_GRAPH_CLIENT_SECRET=xxx
-```
-
-### Local App (.env file)
-```bash
-# Supabase
-VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-
-# API Configuration (default port: 3004)
-VITE_API_URL=http://localhost:3004
-PORT=3004
-
-# LLM Configuration
-# Managed by RealTimeX SDK - No API keys needed!
-# 1. Start RealTimeX Desktop (port 3001)
-# 2. Configure providers via Configuration UI or RealTimeX Desktop
-# The SDK automatically handles provider discovery and routing
-
-# Development
-DISABLE_AUTH=true
-```
-
-## 🧪 Testing
+If you are a developer looking to contribute or run from source:
 
 ```bash
-npm run test           # Watch mode
-npm run test:run       # Single run
-npm run test:coverage  # With coverage
+# Install dependencies
+npm install
+
+# Terminal 1: Local API (Default port: 3004)
+npm run dev:api
+
+# Terminal 2: Frontend
+npm run dev
+
+# Run Tests
+npm run test:run
 ```
 
-## 📡 API Architecture
+**Note:** Email Automator uses port **3004** by default to avoid conflicts with RealTimeX Desktop (ports 3001/3002).
 
-### Edge Functions (Supabase)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/auth-gmail?action=url` | Get Gmail OAuth URL |
-| POST | `/auth-gmail` | Complete Gmail OAuth |
-| POST | `/auth-microsoft?action=device-flow` | Start Microsoft device flow |
-| GET | `/api-v1-accounts` | List connected accounts |
-| GET | `/api-v1-emails` | List processed emails |
-| GET | `/api-v1-rules` | List automation rules |
-| GET | `/api-v1-settings` | Get user settings |
-
-### Local App (Express)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/sync` | Trigger email sync |
-| POST | `/api/actions/execute` | Execute email action |
-| POST | `/api/actions/draft/:id` | Generate draft reply |
-| GET | `/api/health` | Health check |
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: `npm run test:run`
-5. Submit a Pull Request
-
-## 📄 License
-
-MIT License - Copyright (c) 2026 RealTimeX Team
-
-## 📦 NPX Commands
-
-Email Automator is fully compatible with npx for easy installation and execution:
+## 📦 NPX Commands (Advanced)
 
 | Command | Description |
 |---------|-------------|
@@ -239,20 +110,7 @@ Email Automator is fully compatible with npx for easy installation and execution
 | `npx @realtimex/email-automator-setup` | Interactive setup wizard |
 | `npx @realtimex/email-automator-deploy` | Deploy Edge Functions to Supabase |
 
-### Examples
+## 📄 License
 
-```bash
-# First time setup
-npx @realtimex/email-automator-setup
-npx @realtimex/email-automator-deploy
-npx @realtimex/email-automator
-
-# Daily usage
-npx @realtimex/email-automator
-
-# Custom port
-npx @realtimex/email-automator --port 3005
-```
-
-See [NPX Usage Guide](docs-dev/NPX-USAGE.md) for complete documentation.
+MIT License - Copyright (c) 2026 RealTimeX Team
 
