@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.22.4] - 2026-02-03
+
+### Improved
+- **Localization**: Enhanced internationalization across all components. Added complete translation strings for Agent Overlay, Configuration, and Setup Wizard in 6 languages (English, Spanish, French, Japanese, Korean, Vietnamese) to ensure a seamless multilingual experience.
+
 ## [2.22.3] - 2026-02-03
 
 ### Changed

@@ -259,7 +259,7 @@ export function LiveTerminal() {
                                     )}
                                     {event.details.usage && (
                                         <div className="pt-1.5 flex items-center gap-3 text-[9px] text-muted-foreground/70 border-t border-purple-500/10 mt-1">
-                                            <span>Tokens: {event.details.usage.prompt_tokens} (in) + {event.details.usage.completion_tokens} (out) = <span className="text-purple-500 font-bold">{event.details.usage.total_tokens}</span></span>
+                                            <span>{t('terminal.tokens').replace('{promptTokens}', String(event.details.usage.prompt_tokens)).replace('{completionTokens}', String(event.details.usage.completion_tokens))} = <span className="text-purple-500 font-bold">{event.details.usage.total_tokens}</span></span>
                                         </div>
                                     )}
                                 </div>
@@ -304,7 +304,7 @@ export function LiveTerminal() {
                                     </div>
                                     {event.details.errors > 0 && (
                                         <p className="text-[10px] text-red-500 font-bold pt-1 border-t border-emerald-500/10">
-                                            ⚠️ {event.details.errors} items failed to process.
+                                            {t('terminal.itemsFailed').replace('{count}', String(event.details.errors))}
                                         </p>
                                     )}
                                 </div>
@@ -320,7 +320,7 @@ export function LiveTerminal() {
                                     {event.details?.system_prompt && (
                                         <div className="space-y-1.5">
                                             <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">
-                                                <Code className="w-3 h-3" /> System Prompt
+                                                <Code className="w-3 h-3" /> {t('terminal.detail.systemPrompt')}
                                             </div>
                                             <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
                                                 <pre className="whitespace-pre-wrap break-words text-[10px] leading-normal text-muted-foreground select-all">
@@ -332,7 +332,7 @@ export function LiveTerminal() {
                                     {event.details?.content_preview && (
                                         <div className="space-y-1.5">
                                             <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">
-                                                <Code className="w-3 h-3" /> Input Content (Cleaned)
+                                                <Code className="w-3 h-3" /> {t('terminal.detail.inputContent')}
                                             </div>
                                             <div className="bg-secondary/50 rounded-md p-3 border border-border">
                                                 <p className="whitespace-pre-wrap break-words text-[10px] text-muted-foreground">
@@ -344,7 +344,7 @@ export function LiveTerminal() {
                                     {event.details?._raw_response && (
                                         <div className="space-y-1.5">
                                             <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">
-                                                <Code className="w-3 h-3" /> Raw LLM JSON Output
+                                                <Code className="w-3 h-3" /> {t('terminal.detail.rawLLMOutput')}
                                             </div>
                                             <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
                                                 <pre className="text-[10px] text-muted-foreground select-all">
@@ -356,7 +356,7 @@ export function LiveTerminal() {
                                     {event.details?.raw_response && (
                                         <div className="space-y-1.5">
                                             <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">
-                                                <Code className="w-3 h-3" /> Raw Response (from Error)
+                                                <Code className="w-3 h-3" /> {t('terminal.detail.rawResponse')}
                                             </div>
                                             <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
                                                 <pre className="text-[10px] text-muted-foreground select-all whitespace-pre-wrap">
