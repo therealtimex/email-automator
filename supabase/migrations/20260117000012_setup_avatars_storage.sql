@@ -1,26 +1,42 @@
--- Setup avatars storage bucket
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('avatars', 'avatars', true)
-ON CONFLICT (id) DO NOTHING;
+DO $$
+BEGIN
+  IF to_regclass('storage.buckets') IS NULL THEN
+    RAISE NOTICE 'storage.buckets missing; skipping avatars bucket setup. Install Supabase Storage to enable avatars.';
+    RETURN;
+  END IF;
 
--- RLS Policies for avatars
-CREATE POLICY "Public profiles are viewable by everyone" ON storage.objects
-    FOR SELECT USING (bucket_id = 'avatars');
+  -- Setup avatars storage bucket
+  INSERT INTO storage.buckets (id, name, public)
+  VALUES ('avatars', 'avatars', true)
+  ON CONFLICT (id) DO NOTHING;
 
-CREATE POLICY "Users can upload their own avatar" ON storage.objects
-    FOR INSERT WITH CHECK (
-        bucket_id = 'avatars' AND 
-        (storage.foldername(name))[1] = auth.uid()::text
+  -- RLS Policies for avatars
+  DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON storage.objects;
+  CREATE POLICY "Public profiles are viewable by everyone"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'avatars');
+
+  DROP POLICY IF EXISTS "Users can upload their own avatar" ON storage.objects;
+  CREATE POLICY "Users can upload their own avatar"
+    ON storage.objects FOR INSERT
+    WITH CHECK (
+      bucket_id = 'avatars' AND
+      (storage.foldername(name))[1] = auth.uid()::text
     );
 
-CREATE POLICY "Users can update their own avatar" ON storage.objects
-    FOR UPDATE USING (
-        bucket_id = 'avatars' AND 
-        (storage.foldername(name))[1] = auth.uid()::text
+  DROP POLICY IF EXISTS "Users can update their own avatar" ON storage.objects;
+  CREATE POLICY "Users can update their own avatar"
+    ON storage.objects FOR UPDATE
+    USING (
+      bucket_id = 'avatars' AND
+      (storage.foldername(name))[1] = auth.uid()::text
     );
 
-CREATE POLICY "Users can delete their own avatar" ON storage.objects
-    FOR DELETE USING (
-        bucket_id = 'avatars' AND 
-        (storage.foldername(name))[1] = auth.uid()::text
+  DROP POLICY IF EXISTS "Users can delete their own avatar" ON storage.objects;
+  CREATE POLICY "Users can delete their own avatar"
+    ON storage.objects FOR DELETE
+    USING (
+      bucket_id = 'avatars' AND
+      (storage.foldername(name))[1] = auth.uid()::text
     );
+END $$;

@@ -57,7 +57,33 @@ echo "🔗 Linking to project: $SUPABASE_PROJECT_ID"
 $SUPABASE_CMD link --project-ref "$SUPABASE_PROJECT_ID" --yes
 
 echo "📂 Pushing Database Schema Changes..."
-$SUPABASE_CMD db push --include-all --yes
+max_retries=3
+attempt=1
+while true; do
+    set +e
+    DB_PUSH_OUTPUT=$($SUPABASE_CMD db push --include-all --yes 2>&1)
+    status=$?
+    set -e
+
+    echo "$DB_PUSH_OUTPUT"
+
+    if [ $status -eq 0 ]; then
+        break
+    fi
+
+    if echo "$DB_PUSH_OUTPUT" | grep -q "57P03\\|shutting down\\|Failed to create login role"; then
+        if [ $attempt -lt $max_retries ]; then
+            wait_seconds=$((attempt * 10))
+            echo "⏳ Database is restarting. Retrying in ${wait_seconds}s... (${attempt}/${max_retries})"
+            sleep $wait_seconds
+            attempt=$((attempt + 1))
+            continue
+        fi
+    fi
+
+    echo "❌ Database push failed"
+    exit $status
+done
 
 echo "⚙️  Pushing Project Configuration..."
 $SUPABASE_CMD config push --yes

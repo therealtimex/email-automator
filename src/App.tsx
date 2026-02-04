@@ -265,21 +265,34 @@ function AppContent() {
     };
 
     if (loading) {
-        return <PageLoader text={t('app.loadingWorkspace')} />;
+        return (
+            <>
+                <PageLoader text={t('app.loadingWorkspace')} />
+                <AgentOverlay className="z-[80]" />
+            </>
+        );
     }
 
     if (needsSetup) {
         return (
-            <SetupWizard onComplete={() => setNeedsSetup(false)} />
+            <>
+                <SetupWizard onComplete={() => setNeedsSetup(false)} />
+                <AgentOverlay className="z-[80]" />
+            </>
         );
     }
 
     if (!user) {
-        return <Login
-            onSuccess={() => actions.fetchProfile()}
-            onConfigure={() => setNeedsSetup(true)}
-            isInitialized={isSystemInitialized}
-        />;
+        return (
+            <>
+                <Login
+                    onSuccess={() => actions.fetchProfile()}
+                    onConfigure={() => setNeedsSetup(true)}
+                    isInitialized={isSystemInitialized}
+                />
+                <AgentOverlay className="z-[80]" />
+            </>
+        );
     }
 
     const handleLogout = async () => {
@@ -883,4 +896,3 @@ function App() {
 }
 
 export default App;
-

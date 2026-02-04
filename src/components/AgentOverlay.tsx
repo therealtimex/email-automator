@@ -46,7 +46,7 @@ const getContextualIntro = (pageId: string, data?: any): string => {
     }
 };
 
-export function AgentOverlay() {
+export function AgentOverlay({ className }: { className?: string }) {
     const { currentConfig, chatHistory, agentState, sendMessage } = useAgentContext();
     const { state } = useApp();
     const { speak } = useTTS();
@@ -228,7 +228,7 @@ export function AgentOverlay() {
     };
 
     return (
-        <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2">
+        <div className={cn("fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2", className)}>
 
 
             {/* Chat Window */}
