@@ -13,17 +13,6 @@ A comprehensive guide to setting up and mastering your AI email agent.
 5.  [**Account & Privacy**](./user-guide/ACCOUNT.md) - Managing your persona, security, and data sovereignty.
 6.  [**Troubleshooting & Support**](./user-guide/TROUBLESHOOTING.md) - Common issues and how to resolve them.
 
-## 💻 Developer Documentation
-
-Technical details for contributing to or extending the project.
-
-*   [**Architecture Overview**](../docs-dev/ARCHITECTURE.md) - Hybrid architecture and component responsibilities.
-*   [**NPX Implementation**](../docs-dev/NPX-IMPLEMENTATION.md) - Deep dive into the `npx` execution model.
-*   [**Local Development**](../docs-dev/SETUP.md) - Setting up the development environment.
-*   [**RealTimeX Integration**](../docs-dev/REALTIMEX-INTEGRATION.md) - Integrating with the RealTimeX ecosystem.
-
----
-
 ## 🚀 Key Features
 
 *   **Privacy First**: Your emails never touch our servers. Processing is local or via your own AI keys.
