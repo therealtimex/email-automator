@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.21.8] - 2026-02-01
+
+### Added
+- **Agent Overlay**: Introduced expand/minimize functionality for the AI Assistant chat window. Users can now toggle between a compact view and a larger, more spacious interface for easier reading and interaction during complex tasks.
+- **UI Improvements**: Refined the Agent Overlay's visual design with updated icons (`Maximize2`, `Minimize2`) and smoother transitions when resizing. Reduced the floating toggle button size for a less intrusive presence.
+
 ## [2.21.7] - 2026-02-01
 
 ### Removed

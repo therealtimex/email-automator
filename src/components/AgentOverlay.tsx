@@ -228,24 +228,25 @@ export function AgentOverlay({ className }: { className?: string }) {
         )
     };
 
+    const rootClass = cn("fixed bottom-6 left-6 z-50", className);
+
     return (
-        <div className={cn("fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2", className)}>
-
-
+        <>
             {/* Chat Window */}
             {isOpen && (
-                <div
-                    className={cn(
-                        isExpanded
-                            ? "w-[calc(100vw-2rem)] sm:w-[33vw] sm:max-w-[560px] h-[90vh] max-h-[calc(100vh-6rem)]"
-                            : "w-[360px] sm:w-[380px] h-[520px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)]",
-                        "bg-background border border-border/60 rounded-2xl shadow-2xl",
-                        "flex flex-col overflow-hidden",
-                        "animate-in slide-in-from-bottom-10 fade-in duration-200",
-                        "transition-[width,height] duration-200 ease-out",
-                        "motion-reduce:transition-none motion-reduce:animate-none"
-                    )}
-                >
+                <div className={rootClass}>
+                    <div
+                        className={cn(
+                            isExpanded
+                                ? "w-[calc(100vw-2rem)] sm:w-[33vw] sm:max-w-[560px] h-[90vh] max-h-[calc(100vh-6rem)]"
+                                : "w-[360px] sm:w-[380px] h-[520px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)]",
+                            "bg-background border border-border/60 rounded-2xl shadow-2xl",
+                            "flex flex-col overflow-hidden",
+                            "animate-in slide-in-from-bottom-10 fade-in duration-200",
+                            "transition-[width,height] duration-200 ease-out",
+                            "motion-reduce:transition-none motion-reduce:animate-none"
+                        )}
+                    >
                     {/* Header */}
                     <div className="p-3 border-b bg-muted/40 flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -409,32 +410,35 @@ export function AgentOverlay({ className }: { className?: string }) {
                             {agentState === 'thinking' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                         </Button>
                     </div>
+                    </div>
                 </div>
             )}
 
             {/* Floating Toggle Button */}
-            <Button
-                size="icon"
-                className={cn(
-                    "rounded-full h-11 w-11 border border-border/60 bg-primary text-primary-foreground shadow-md",
-                    "transition-all duration-200 ease-out",
-                    "hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5",
-                    "active:translate-y-0 active:shadow-md active:scale-95",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    "motion-reduce:transition-none motion-reduce:hover:transform-none",
-                    isOpen ? "rotate-0 scale-0 opacity-0" : "scale-100 opacity-100",
-                    agentState === 'speaking' && "ring-4 ring-emerald-500/30 animate-pulse"
-                )}
-                onClick={() => setIsOpen(true)}
-                aria-label="Open assistant chat"
-                title="Open assistant chat"
-            >
-                {agentState === 'speaking' ? (
-                    <Volume2 className="w-5 h-5 animate-pulse" />
-                ) : (
-                    <MessageSquare className="w-5 h-5" />
-                )}
-            </Button>
-        </div>
+            <div className={rootClass}>
+                <Button
+                    size="icon"
+                    className={cn(
+                        "relative rounded-full h-11 w-11 border border-border/60 bg-primary text-primary-foreground shadow-md",
+                        "transition-all duration-200 ease-out",
+                        "hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5",
+                        "active:translate-y-0 active:shadow-md active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        "motion-reduce:transition-none motion-reduce:hover:transform-none",
+                        isOpen ? "rotate-0 scale-0 opacity-0" : "scale-100 opacity-100",
+                        agentState === 'speaking' && "ring-4 ring-emerald-500/30 animate-pulse"
+                    )}
+                    onClick={() => setIsOpen(true)}
+                    aria-label="Open assistant chat"
+                    title="Open assistant chat"
+                >
+                    {agentState === 'speaking' ? (
+                        <Volume2 className="w-5 h-5 animate-pulse" />
+                    ) : (
+                        <MessageSquare className="w-5 h-5" />
+                    )}
+                </Button>
+            </div>
+        </>
     );
 }
