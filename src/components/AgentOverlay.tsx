@@ -398,9 +398,9 @@ export function AgentOverlay({ className }: { className?: string }) {
 
             {/* Floating Toggle Button */}
             <Button
-                size="lg"
+                size="icon"
                 className={cn(
-                    "rounded-full h-14 w-14 border border-border/60 bg-primary text-primary-foreground shadow-md",
+                    "rounded-full h-11 w-11 border border-border/60 bg-primary text-primary-foreground shadow-md",
                     "transition-all duration-200 ease-out",
                     "hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5",
                     "active:translate-y-0 active:shadow-md active:scale-95",
@@ -414,9 +414,9 @@ export function AgentOverlay({ className }: { className?: string }) {
                 title="Open assistant chat"
             >
                 {agentState === 'speaking' ? (
-                    <Volume2 className="w-6 h-6 animate-pulse" />
+                    <Volume2 className="w-5 h-5 animate-pulse" />
                 ) : (
-                    <MessageSquare className="w-6 h-6" />
+                    <MessageSquare className="w-5 h-5" />
                 )}
             </Button>
         </div>
