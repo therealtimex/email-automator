@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.22.1] - 2026-02-01
+
+### Fixed
+- **Build System**: Resolved a TypeScript type mismatch error in the Agent Service build process. Fixed null/undefined handling for optional parameters in `getSetupWizardShortcut` to ensure strict type compliance.
+
 ## [2.22.0] - 2026-02-01
 
 ### Added

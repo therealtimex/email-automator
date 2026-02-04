@@ -48,7 +48,7 @@ export class AgentService {
 
         const hasRAGContent = ragContext.chunks.length > 0;
         const localGuide = context.page_id === 'setup_wizard' ? await getLocalSetupGuide() : null;
-        const shortcut = getSetupWizardShortcut(message, context.page_id, context.data?.step as string | undefined, localGuide);
+        const shortcut = getSetupWizardShortcut(message, context.page_id, (context.data?.step ?? undefined) as string | undefined, localGuide ?? undefined);
         if (shortcut) {
             return { content: shortcut, action: undefined, usage: undefined };
         }
