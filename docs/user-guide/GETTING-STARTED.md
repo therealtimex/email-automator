@@ -57,4 +57,5 @@ An Access Token allows the Setup Wizard to manage your Supabase projects (creati
 
 ---
 
-**Next Step:** [Configure your Email Accounts](./CONFIGURATION.md)
+**Next Step:** [Configure your Email Accounts](./CONFIGURATION.md)  
+**Glossary:** [Common Terms](./GLOSSARY.md)
