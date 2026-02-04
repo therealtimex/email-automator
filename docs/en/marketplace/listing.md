@@ -31,4 +31,4 @@ Designed to run alongside **RealTimeX Desktop**. It detects your local AI provid
 ---
 
 ## Visual Assets
-- **Landscape Cover**: `docs/images/cover-landscape.webp`
+- **Landscape Cover**: `../../images/cover-landscape.webp`
