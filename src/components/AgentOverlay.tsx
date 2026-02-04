@@ -15,6 +15,7 @@ import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 // Get friendly page title
 const getPageTitle = (pageId: string): string => {
     const titles: Record<string, string> = {
+        'setup_wizard': 'Setup Wizard',
         'configuration_wizard': 'Configuration Helper',
         'draft_review': 'Draft Assistant',
         'explainer': 'Translation Helper',
@@ -26,6 +27,9 @@ const getPageTitle = (pageId: string): string => {
 // Context-aware intro messages based on page_id
 const getContextualIntro = (pageId: string, data?: any): string => {
     switch (pageId) {
+        case 'setup_wizard':
+            return `👋 Welcome to Setup! I can help you:\n• Choose Quick Start or Manual setup\n• Connect your Supabase project\n• Run database migrations\n• Troubleshoot connection issues\n\nTell me what you want to do or say "help me set up".`;
+
         case 'configuration_wizard':
             const accountsCount = data?.accounts_count || 0;
             const rulesCount = data?.rules_count || 0;

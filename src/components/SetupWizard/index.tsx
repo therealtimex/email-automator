@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { usePageAgent } from '../../hooks/usePageAgent';
 
 import { checkMigrationStatus, APP_VERSION } from '../../lib/migration-check';
 import {
@@ -40,6 +41,17 @@ import { Logo } from '../Logo';
 export function SetupWizard({ onComplete, open = true, canClose = false }: SetupWizardProps) {
     const [state, dispatch] = useReducer(wizardReducer, initialState);
     const { t } = useLanguage();
+
+    usePageAgent({
+        page_id: 'setup_wizard',
+        system_instruction: t('setup.agent.systemInstruction'),
+        data: {
+            step: state.step,
+            managedFlow: ['managed-token', 'managed-org', 'provisioning', 'validating'].includes(state.step),
+            projectId: state.projectId || null,
+            hasAccessToken: Boolean(state.managed.accessToken)
+        }
+    });
 
     // Secure refs for sensitive data (not exposed in DevTools)
     const accessTokenRef = useRef<string>('');

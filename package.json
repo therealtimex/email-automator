@@ -1,6 +1,6 @@
 {
   "name": "@realtimex/email-automator",
-  "version": "2.21.8",
+  "version": "2.22.0",
   "type": "module",
   "main": "dist/api/server.js",
   "bin": {
@@ -31,9 +31,11 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "tsx watch api/server.ts",
-    "build": "npm run build:ui && npm run build:api",
+    "build": "npm run build:setup-knowledge && npm run build:ui && npm run build:api",
+    "build:setup-knowledge": "tsx scripts/build-setup-knowledge.ts",
     "build:ui": "vite build",
-    "build:api": "tsc -p tsconfig.api.json",
+    "build:knowledge": "tsx scripts/build-setup-knowledge.ts",
+    "build:api": "npm run build:knowledge && tsc -p tsconfig.api.json",
     "ingest:knowledge": "tsx scripts/ingest-knowledge-rag.ts",
     "preview": "vite preview",
     "serve": "node dist/api/server.js",

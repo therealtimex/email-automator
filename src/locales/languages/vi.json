@@ -115,6 +115,7 @@
   "setup.installSystems": "Cài đặt hệ thống",
   "setup.normalizeSystem": "Chuẩn hóa hệ thống",
   "setup.retryInstallation": "Thử lại cài đặt",
+  "setup.agent.systemInstruction": "Bạn là trợ lý Trình hướng dẫn thiết lập. Hãy hướng dẫn người dùng kết nối Supabase, chọn chế độ thiết lập và hoàn tất di chuyển. Chỉ hỏi thông tin cần thiết tiếp theo và đưa ra các bước rõ ràng. Nếu người dùng nói \"giúp tôi thiết lập\", hãy lập tức liệt kê các bước trong trình hướng dẫn này.",
   "dashboard.recentAnalysis": "Phân tích gần đây",
   "dashboard.emails": "email",
   "dashboard.noEmails": "Không tìm thấy email nào",

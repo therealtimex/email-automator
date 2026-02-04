@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.22.0] - 2026-02-01
+
+### Added
+- **RAG-Enhanced Agent**: The AI Assistant now uses Retrieval-Augmented Generation (RAG) to provide context-aware help based on the application's documentation.
+  - Implemented `AgentService` with Supabase vector search integration.
+  - Added strict anti-hallucination rules to the system prompt, ensuring the agent only cites retrieved documentation.
+  - Included a fallback mode for general knowledge when specific documentation is not found.
+- **Setup Knowledge Base**: Created a build script (`scripts/build-setup-knowledge.ts`) to pre-compile documentation into a local knowledge base for the Setup Wizard agent (where RAG is not yet available).
+- **Setup Shortcuts**: Added instant answers for common setup questions (e.g., "Where is my Anon Key?") to the Setup Wizard agent, bypassing LLM latency.
+
+### Changed
+- **Agent API**: Updated `POST /api/agent/chat` to automatically detect if Supabase is configured and switch between RAG mode (authenticated) and Setup mode (local knowledge).
+
 ## [2.21.8] - 2026-02-01
 
 ### Added

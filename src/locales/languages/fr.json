@@ -115,6 +115,7 @@
     "setup.installSystems": "Installer les systèmes",
     "setup.normalizeSystem": "Normaliser le système",
     "setup.retryInstallation": "Réessayer l'installation",
+    "setup.agent.systemInstruction": "Vous êtes l’assistant du guide de configuration. Aidez l’utilisateur à connecter Supabase, choisir un mode de configuration et terminer les migrations. Ne demandez que l’information suivante nécessaire et fournissez des étapes claires. Si l’utilisateur dit « aide-moi à configurer », listez immédiatement les étapes de ce guide.",
     "dashboard.recentAnalysis": "Analyse récente",
     "dashboard.emails": "e-mails",
     "dashboard.noEmails": "Aucun e-mail trouvé",

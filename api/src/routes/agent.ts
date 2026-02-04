@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { AgentService } from '../services/AgentService.js';
+import { getLocalSetupGuide, getSetupWizardShortcut } from '../lib/setup-knowledge.js';
 
 const router = Router();
 
@@ -79,6 +80,19 @@ router.post('/chat', async (req: Request, res: Response) => {
                     success: false,
                     error: 'AI service unavailable. Please ensure RealTimeX Desktop is running.'
                 });
+            }
+
+            // Setup Wizard shortcut (no RAG)
+            const ctx = context || { page_id: 'global' };
+            if (ctx.page_id === 'setup_wizard') {
+                const localGuide = await getLocalSetupGuide();
+                const shortcut = getSetupWizardShortcut(message, ctx.page_id, ctx.data?.step as string | undefined, localGuide);
+                if (shortcut) {
+                    return res.json({
+                        success: true,
+                        response: { content: shortcut }
+                    });
+                }
             }
 
             // Build system prompt without RAG

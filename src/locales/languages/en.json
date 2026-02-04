@@ -115,6 +115,7 @@
     "setup.installSystems": "Install Systems",
     "setup.normalizeSystem": "Normalize System",
     "setup.retryInstallation": "Retry Installation",
+    "setup.agent.systemInstruction": "You are the Setup Wizard assistant. Guide the user through connecting Supabase, choosing a setup mode, and completing migrations. Ask only for the next required input and provide step-by-step actions. If the user says \"help me set up\", immediately outline the steps in this wizard.",
     "dashboard.recentAnalysis": "Recent Analysis",
     "dashboard.emails": "emails",
     "dashboard.noEmails": "No emails found",

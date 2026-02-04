@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SDKService } from './SDKService.js';
 import { RAGService } from './RAGService.js';
+import { getLocalSetupGuide, getSetupWizardShortcut } from '../lib/setup-knowledge.js';
 
 export interface AgentContextPayload {
     page_id: string;
@@ -46,6 +47,11 @@ export class AgentService {
             "You are a helpful Email Automator Assistant helping users with this page.";
 
         const hasRAGContent = ragContext.chunks.length > 0;
+        const localGuide = context.page_id === 'setup_wizard' ? await getLocalSetupGuide() : null;
+        const shortcut = getSetupWizardShortcut(message, context.page_id, context.data?.step as string | undefined, localGuide);
+        if (shortcut) {
+            return { content: shortcut, action: undefined, usage: undefined };
+        }
 
         let systemPrompt = `${baseInstruction}
 
@@ -92,6 +98,10 @@ The documentation search didn't find relevant content for this query. You can us
 - If discussing specific features, acknowledge you're providing general guidance
 - Suggest they check the app's documentation or settings for specifics
 - Be honest that you don't have the exact documentation available`;
+
+            if (localGuide) {
+                systemPrompt += `\n\n# Local Setup Guide (GETTING-STARTED.md)\n${localGuide}\n\n# Note\nThe user is not connected to Supabase yet, so your knowledge is limited to this local setup guide.`;
+            }
         }
 
         // Add Tool Instructions if tools are available

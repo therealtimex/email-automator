@@ -303,6 +303,30 @@ Tabs:
 - Migration status check
 `,
 
+    setup_wizard: `
+# Setup Wizard
+
+Guides users through connecting a Supabase project and initializing the system.
+
+Typical flow:
+1. **Welcome**: Intro and overview
+2. **Connection Mode**:
+   - **Quick Start** (auto-provision via access token)
+   - **Manual Sync** (enter existing credentials)
+3. **Connection Details**:
+   - Supabase Project URL
+   - Supabase Anon Key
+4. **Database Setup**:
+   - Run migrations
+   - Confirm schema version
+5. **Launch**: Finish setup and enter the app
+
+Troubleshooting:
+- Ensure project URL and anon key are correct
+- Retry migrations if the database is restarting
+- If Storage is not installed, attachments/avatars buckets will be skipped
+`,
+
     explainer: `
 # AI Translation & Explanation Helper
 
@@ -348,7 +372,8 @@ export function detectCrossPageQuery(query: string, currentPageId: string): stri
         inbox: ['inbox', 'email list', 'browse emails', 'filter emails'],
         drafts: ['draft', 'drafts', 'draft response', 'pending drafts'],
         rules: ['rule', 'rules', 'automation', 'automate'],
-        configuration_wizard: ['configuration', 'config', 'setup', 'connect account', 'llm settings', 'tts', 'voice'],
+        configuration_wizard: ['configuration', 'config', 'connect account', 'llm settings', 'tts', 'voice'],
+        setup_wizard: ['setup', 'supabase', 'connect supabase', 'project url', 'anon key', 'migrations', 'quick start', 'manual sync'],
         account_settings: ['account settings', 'profile', 'security', 'password', 'persona']
     };
 

@@ -115,6 +115,7 @@
     "setup.installSystems": "システムをインストール",
     "setup.normalizeSystem": "システムを正規化",
     "setup.retryInstallation": "インストールを再試行",
+    "setup.agent.systemInstruction": "あなたはセットアップウィザードのアシスタントです。Supabase の接続、セットアップ方式の選択、マイグレーション完了まで案内してください。次に必要な入力だけを求め、手順を具体的に示します。ユーザーが「セットアップを手伝って」と言ったら、このウィザードの手順をすぐに提示してください。",
     "dashboard.recentAnalysis": "最近の分析",
     "dashboard.emails": "メール",
     "dashboard.noEmails": "メールが見つかりません",
