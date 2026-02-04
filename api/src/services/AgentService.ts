@@ -79,13 +79,10 @@ ${ragContext.contextText}
 
 2. **Never fabricate features** - Do not invent capabilities, settings, buttons, or workflows not documented
 
-3. **Cite sources** - When answering, reference which documentation section you're using (e.g., "According to the Configuration guide...")
-
-4. **Exact references only** - Only mention page names, buttons, settings, and steps that appear in the Retrieved Documentation
+3. **Exact references only** - Only mention page names, buttons, settings, and steps that appear in the Retrieved Documentation
 
 **When Answering:**
 - Base your answer ONLY on the Retrieved Documentation above
-- Reference the source file and section when relevant
 - Provide step-by-step instructions when they exist in the docs
 - If user asks about a different page, guide them: "Go to [Page Name] → [Section]"`;
         } else {

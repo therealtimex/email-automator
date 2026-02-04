@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
 
+## [2.22.3] - 2026-02-03
+
+### Changed
+- **Agent Prompts**: Refined the RAG system prompt to reduce repetitive "According to the documentation..." citations. The agent now focuses on providing direct, concise answers while still strictly adhering to the retrieved knowledge base.
+
 ## [2.22.2] - 2026-02-03
 
 ### Added
