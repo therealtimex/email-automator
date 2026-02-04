@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, X, MessageSquare, Loader2, Volume2, VolumeX } from 'lucide-react';
+import { Mic, MicOff, Send, X, MessageSquare, Loader2, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -55,6 +55,7 @@ export function AgentOverlay({ className }: { className?: string }) {
     const [isOpen, setIsOpen] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [hasSpokenIntro, setHasSpokenIntro] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const prevPageIdRef = useRef<string>(currentConfig.page_id);
 
@@ -235,11 +236,14 @@ export function AgentOverlay({ className }: { className?: string }) {
             {isOpen && (
                 <div
                     className={cn(
-                        "w-[360px] sm:w-[380px] h-[520px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)]",
+                        isExpanded
+                            ? "w-[calc(100vw-2rem)] sm:w-[33vw] sm:max-w-[560px] h-[90vh] max-h-[calc(100vh-6rem)]"
+                            : "w-[360px] sm:w-[380px] h-[520px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)]",
                         "bg-background border border-border/60 rounded-2xl shadow-2xl",
                         "flex flex-col overflow-hidden",
                         "animate-in slide-in-from-bottom-10 fade-in duration-200",
-                        "motion-reduce:animate-none"
+                        "transition-[width,height] duration-200 ease-out",
+                        "motion-reduce:transition-none motion-reduce:animate-none"
                     )}
                 >
                     {/* Header */}
@@ -261,15 +265,27 @@ export function AgentOverlay({ className }: { className?: string }) {
                                 </span>
                             </div>
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setIsOpen(false)}
-                            aria-label="Close assistant"
-                        >
-                            <X className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setIsExpanded((prev) => !prev)}
+                                aria-label={isExpanded ? "Collapse assistant" : "Expand assistant"}
+                                title={isExpanded ? "Collapse" : "Expand"}
+                            >
+                                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setIsOpen(false)}
+                                aria-label="Close assistant"
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Chat History */}
