@@ -12,6 +12,7 @@ Un guide complet pour configurer et maîtriser votre agent e-mail IA.
 4.  [**Auto-Pilot & Règles**](./user-guide/AUTOMATION.md) - Création de règles IA, ghostwriting et politiques de rétention.
 5.  [**Compte & Confidentialité**](./user-guide/ACCOUNT.md) - Gestion de votre persona, sécurité et souveraineté des données.
 6.  [**Dépannage & Support**](./user-guide/TROUBLESHOOTING.md) - Problèmes courants et solutions.
+7.  [**Glossaire**](./user-guide/GLOSSARY.md) - Termes courants et définitions.
 
 ## 🚀 Fonctionnalités clés
 

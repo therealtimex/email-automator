@@ -12,6 +12,7 @@ Hướng dẫn toàn diện để thiết lập và làm chủ tác nhân email 
 4.  [**Auto-Pilot & Quy tắc**](./user-guide/AUTOMATION.md) - Tạo quy tắc do AI điều khiển, viết nháp hộ và chính sách lưu trữ.
 5.  [**Tài khoản & Quyền riêng tư**](./user-guide/ACCOUNT.md) - Quản lý cá tính (persona), bảo mật và chủ quyền dữ liệu.
 6.  [**Khắc phục sự cố & Hỗ trợ**](./user-guide/TROUBLESHOOTING.md) - Các vấn đề thường gặp và cách giải quyết.
+7.  [**Thuật ngữ**](./user-guide/GLOSSARY.md) - Các thuật ngữ và định nghĩa phổ biến.
 
 ## 🚀 Các tính năng chính
 

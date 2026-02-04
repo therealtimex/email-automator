@@ -12,6 +12,7 @@ Una guía completa para configurar y dominar su agente de correo electrónico co
 4.  [**Auto-Pilot y reglas**](./user-guide/AUTOMATION.md) - Creación de reglas impulsadas por IA, redacción fantasma y políticas de retención.
 5.  [**Cuenta y privacidad**](./user-guide/ACCOUNT.md) - Gestión de su persona, seguridad y soberanía de datos.
 6.  [**Solución de problemas y soporte**](./user-guide/TROUBLESHOOTING.md) - Problemas comunes y cómo resolverlos.
+7.  [**Glosario**](./user-guide/GLOSSARY.md) - Términos comunes y definiciones.
 
 ## 🚀 Características clave
 

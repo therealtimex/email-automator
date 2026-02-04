@@ -12,6 +12,7 @@ AI 이메일 에이전트 설정 및 숙달을 위한 종합 가이드입니다.
 4.  [**오토파일럿 및 규칙**](./user-guide/AUTOMATION.md) - AI 기반 규칙 생성, 고스트라이팅 및 보존 정책.
 5.  [**계정 및 개인정보 보호**](./user-guide/ACCOUNT.md) - 페르소나 관리, 보안 및 데이터 주권.
 6.  [**문제 해결 및 지원**](./user-guide/TROUBLESHOOTING.md) - 일반적인 문제와 해결 방법.
+7.  [**용어 사전**](./user-guide/GLOSSARY.md) - 일반적인 용어 및 정의.
 
 ## 🚀 주요 기능
 

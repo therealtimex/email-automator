@@ -12,6 +12,7 @@ A comprehensive guide to setting up and mastering your AI email agent.
 4.  [**Auto-Pilot & Rules**](./user-guide/AUTOMATION.md) - Building AI-driven rules, ghostwriting, and retention policies.
 5.  [**Account & Privacy**](./user-guide/ACCOUNT.md) - Managing your persona, security, and data sovereignty.
 6.  [**Troubleshooting & Support**](./user-guide/TROUBLESHOOTING.md) - Common issues and how to resolve them.
+7.  [**Glossary**](./user-guide/GLOSSARY.md) - Common terms and definitions.
 
 ## 🚀 Key Features
 
