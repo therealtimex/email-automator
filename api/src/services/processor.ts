@@ -668,8 +668,11 @@ export class EmailProcessorService {
 
         // 1. Extract metadata from raw MIME using mailparser for the DB record
         const parsed = await simpleParser(rawBuffer);
-        const subject = parsed.subject || 'No Subject';
-        const sender = parsed.from?.text || 'Unknown';
+        // For IMAP, fall back to server-authoritative envelope fields if mailparser can't extract them
+        const envelopeSubject = 'envelopeSubject' in message ? (message as ImapMessage).envelopeSubject : undefined;
+        const envelopeSender = 'envelopeSender' in message ? (message as ImapMessage).envelopeSender : undefined;
+        const subject = parsed.subject || envelopeSubject || 'No Subject';
+        const sender = parsed.from?.text || envelopeSender || 'Unknown';
         const recipient = parsed.to ? (Array.isArray(parsed.to) ? parsed.to[0].text : parsed.to.text) : '';
         const date = parsed.date ? parsed.date.toISOString() : new Date().toISOString();
         const bodySnippet = (parsed.text || parsed.textAsHtml || '').substring(0, 500);
@@ -1050,7 +1053,7 @@ export class EmailProcessorService {
                             receivedDate: email.date ? new Date(email.date) : undefined
                         };
 
-                        const draftContent = await intelligenceService.generateDraftReply({
+                        let draftContent = await intelligenceService.generateDraftReply({
                             subject: email.subject || '',
                             sender: email.sender || '',
                             body: email.body_snippet || ''
@@ -1060,7 +1063,30 @@ export class EmailProcessorService {
                         }, richContext);
 
                         if (draftContent) {
-                            await this.executeAction(
+                            // Replace placeholders (e.g. [Sender Name])
+                            try {
+                                draftContent = await processDraftWithNames(
+                                    draftContent,
+                                    email.sender || '',
+                                    account.user_id,
+                                    this.supabase
+                                );
+                            } catch (nameError) {
+                                logger.error('Failed to process draft names', nameError, { emailId: email.id });
+                            }
+
+                            // Persist draft to database
+                            await this.supabase
+                                .from('emails')
+                                .update({
+                                    draft_content: draftContent,
+                                    draft_status: 'pending',
+                                    draft_created_at: new Date().toISOString()
+                                })
+                                .eq('id', email.id);
+
+                            // Execute action on provider (creates draft in Gmail/Outlook)
+                            const draftId = await this.executeAction(
                                 account,
                                 email,
                                 'draft' as any,
@@ -1069,6 +1095,14 @@ export class EmailProcessorService {
                                 `Rules: ${sortedMatches.map(m => m.rule_name).join(', ')}`,
                                 resolved.draft.attachments
                             );
+
+                            // Save provider-assigned draft ID if returned
+                            if (draftId) {
+                                await this.supabase
+                                    .from('emails')
+                                    .update({ draft_id: draftId as string })
+                                    .eq('id', email.id);
+                            }
 
                             if (result) result.drafted++;
                         }

@@ -34,6 +34,8 @@ export interface EmailMessage {
     threadId: string; // Using Message-ID or similar
     internalDate: string; // Date string
     raw: Buffer; // Raw MIME bytes
+    envelopeSubject?: string; // Server-authoritative subject from IMAP ENVELOPE
+    envelopeSender?: string;  // Server-authoritative sender from IMAP ENVELOPE
 }
 
 export class ImapService {
@@ -239,7 +241,9 @@ export class ImapService {
                         id: msg.uid.toString(),
                         threadId: (msg.envelope?.messageId || msg.uid.toString()).replace(/[<>]/g, ''),
                         internalDate: msg.internalDate ? (msg.internalDate instanceof Date ? msg.internalDate.toISOString() : String(msg.internalDate)) : new Date().toISOString(),
-                        raw: msg.source || Buffer.alloc(0)
+                        raw: msg.source || Buffer.alloc(0),
+                        envelopeSubject: msg.envelope?.subject || undefined,
+                        envelopeSender: msg.envelope?.from?.[0]?.address || undefined
                     });
                 }
 
