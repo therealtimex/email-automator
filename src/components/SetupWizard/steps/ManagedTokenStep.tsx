@@ -25,8 +25,19 @@ export function ManagedTokenStep({
     const validation = validateAccessToken(accessToken);
     const isValid = validation.valid;
 
+    // Keyboard shortcuts
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && isValid && !isFetching) {
+            e.preventDefault();
+            onFetchOrgs();
+        } else if (e.key === 'Escape' && !isFetching) {
+            e.preventDefault();
+            onBack();
+        }
+    };
+
     return (
-        <div className="flex-1 flex flex-col justify-center space-y-6">
+        <div className="flex-1 flex flex-col justify-center space-y-6" onKeyDown={handleKeyDown}>
             <div className="space-y-1">
                 <h3 className="text-2xl font-black uppercase italic tracking-tighter">Forge Token</h3>
                 <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">
@@ -67,6 +78,7 @@ export function ManagedTokenStep({
                             className="pl-10 h-12 bg-muted/20 border-border/50 rounded-xl"
                             aria-describedby="token-help"
                             aria-invalid={error ? 'true' : 'false'}
+                            autoFocus
                         />
                     </div>
                     <p id="token-help" className="text-[9px] text-muted-foreground/60 px-1 italic">

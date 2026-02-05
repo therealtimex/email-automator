@@ -5,6 +5,15 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.5] - 2026-02-05
+
+### Added
+- **Setup Wizard Accessibility**: Implemented full keyboard navigation support for the onboarding experience.
+  - **Enter Key Support**: Users can now submit forms and proceed to the next step using the `Enter` key across all setup phases (Welcome, Type Selection, Credentials, Migration).
+  - **Escape Key Support**: Enabled the `Escape` key to navigate back to previous steps in the wizard.
+  - **Smart Auto-Focus**: Integrated automatic focus management that highlights the primary input field upon step transitions, reducing friction for power users.
+- **Documentation**: Added a comprehensive `docs/SETUP_WIZARD_KEYBOARD_SHORTCUTS.md` guide detailing all available shortcuts and navigation patterns.
+
 ## [2.23.4] - 2026-02-05
 
 ### Improved

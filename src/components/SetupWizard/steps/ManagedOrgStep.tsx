@@ -28,8 +28,19 @@ export function ManagedOrgStep({
     onProvision,
     onBack,
 }: ManagedOrgStepProps) {
+    // Keyboard shortcuts
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && selectedOrg) {
+            e.preventDefault();
+            onProvision();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onBack();
+        }
+    };
+
     return (
-        <div className="flex-1 flex flex-col justify-center space-y-6">
+        <div className="flex-1 flex flex-col justify-center space-y-6" onKeyDown={handleKeyDown}>
             <div className="space-y-1">
                 <h3 className="text-2xl font-black uppercase italic tracking-tighter">Project Config</h3>
                 <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">
@@ -51,6 +62,7 @@ export function ManagedOrgStep({
                             value={projectName}
                             onChange={(e) => onProjectNameChange(e.target.value)}
                             className="bg-muted/20 border-border/50 rounded-xl text-[11px]"
+                            autoFocus
                         />
                     </div>
                     <div className="space-y-1.5">

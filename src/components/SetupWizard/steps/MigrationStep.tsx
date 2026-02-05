@@ -33,8 +33,16 @@ export function MigrationStep({
     const canBypass = migrationStatus?.dbVersion !== null && !migrationStatus?.isUnknown;
     const isFreshInstall = migrationStatus?.dbVersion === null || migrationStatus?.isUnknown;
 
+    // Keyboard shortcuts
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !needsToken && !isMigrating) {
+            e.preventDefault();
+            onRunMigration();
+        }
+    };
+
     return (
-        <div className="flex-1 flex flex-col justify-center space-y-6">
+        <div className="flex-1 flex flex-col justify-center space-y-6" onKeyDown={handleKeyDown}>
             <div className="space-y-1">
                 <div className="flex items-center gap-3">
                     {isMigrating ? (
@@ -87,6 +95,7 @@ export function MigrationStep({
                                         onChange={(e) => onTokenChange(e.target.value)}
                                         className="pl-9 h-10 bg-background/50 border-primary/20 rounded-xl text-[11px]"
                                         aria-describedby="migration-token-help"
+                                        autoFocus
                                     />
                                 </div>
                                 <p id="migration-token-help" className="text-[9px] text-muted-foreground/60 italic px-1">

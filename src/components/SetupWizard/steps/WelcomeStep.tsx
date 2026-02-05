@@ -8,8 +8,17 @@ interface WelcomeStepProps {
 
 export function WelcomeStep({ onNext }: WelcomeStepProps) {
     const { t } = useLanguage();
+
+    // Keyboard shortcuts
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            onNext();
+        }
+    };
+
     return (
-        <div className="flex-1 flex flex-col justify-center space-y-8">
+        <div className="flex-1 flex flex-col justify-center space-y-8" onKeyDown={handleKeyDown}>
             <div className="space-y-2">
                 <h2 className="text-4xl font-black italic tracking-tighter uppercase leading-none">
                     {t('setup.welcomeTitle')}
@@ -36,6 +45,7 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
                 onClick={onNext}
                 size="lg"
                 className="h-14 rounded-2xl text-md font-bold uppercase tracking-widest group shadow-xl hover:shadow-primary/20 transition-all active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90"
+                autoFocus
             >
                 {t('setup.getStarted')}
                 <ArrowLeft
