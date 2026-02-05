@@ -24,25 +24,38 @@ router.get('/',
             account_id
         } = req.query;
 
+        // Resolve the user's account IDs first — avoids unreliable joined-table
+        // filters (.eq on embedded resource) that silently return empty when no
+        // direct filter narrows the base table.
+        const { data: userAccounts, error: accError } = await req.supabase!
+            .from('email_accounts')
+            .select('id')
+            .eq('user_id', req.user!.id);
+
+        if (accError) throw accError;
+
+        const accountIds = (userAccounts || []).map((a: any) => a.id as string);
+
+        // If a specific account is requested, narrow further (and verify ownership)
+        const filterIds = account_id
+            ? accountIds.filter((id: string) => id === (account_id as string))
+            : accountIds;
+
         let query = req.supabase!
             .from('emails')
             .select(`
                 id, subject, sender, recipient, date,
                 draft_status, draft_created_at, draft_content, ai_analysis,
                 account_id, external_id, draft_id,
-                email_accounts!inner(id, user_id, email_address, provider)
+                email_accounts(id, email_address, provider)
             `, { count: 'exact' })
-            .eq('email_accounts.user_id', req.user!.id)
+            .in('account_id', filterIds)
             .eq('draft_status', status)
             .order('draft_created_at', { ascending: false })
             .range(
                 parseInt(offset as string, 10),
                 parseInt(offset as string, 10) + parseInt(limit as string, 10) - 1
             );
-
-        if (account_id) {
-            query = query.eq('account_id', account_id);
-        }
 
         const { data, error, count } = await query;
 

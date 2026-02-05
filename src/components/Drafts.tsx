@@ -28,7 +28,7 @@ export function Drafts({ onPreview }: DraftsProps) {
     const { confirm, dialogState } = useConfirm();
 
     // Filters
-    const [filterAccount, setFilterAccount] = useState<string>('all');
+    const [filterAccount, setFilterAccount] = useState<string>('');
     const [filterStatus, setFilterStatus] = useState<'pending' | 'sent' | 'dismissed'>('pending');
 
     // Define Agent Tools
@@ -135,15 +135,19 @@ export function Drafts({ onPreview }: DraftsProps) {
     const fetchAccounts = useCallback(async () => {
         try {
             const response = await api.getAccounts();
-            if (response.data) {
+            if (response.data?.accounts?.length) {
                 setAccounts(response.data.accounts);
+                if (!filterAccount) {
+                    setFilterAccount(response.data.accounts[0].id);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch accounts:', error);
         }
-    }, []);
+    }, [filterAccount]);
 
     const fetchDrafts = useCallback(async () => {
+        if (!filterAccount) return; // wait for account selection
         setLoading(true);
         try {
             const response = await api.getDrafts({
@@ -315,21 +319,22 @@ export function Drafts({ onPreview }: DraftsProps) {
             {/* Filters */}
             <Card className="p-4">
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <Filter className="w-4 h-4 text-muted-foreground" />
-                        <select
-                            value={filterAccount}
-                            onChange={(e) => setFilterAccount(e.target.value)}
-                            className="px-3 py-1.5 rounded-md border bg-background text-sm"
-                        >
-                            <option value="all">{t('drafts.filterByAccount') || 'All Accounts'}</option>
-                            {accounts.map(account => (
-                                <option key={account.id} value={account.id}>
-                                    {account.email_address}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    {accounts.length > 1 && (
+                        <div className="flex items-center gap-2">
+                            <Filter className="w-4 h-4 text-muted-foreground" />
+                            <select
+                                value={filterAccount}
+                                onChange={(e) => setFilterAccount(e.target.value)}
+                                className="px-3 py-1.5 rounded-md border bg-background text-sm"
+                            >
+                                {accounts.map(account => (
+                                    <option key={account.id} value={account.id}>
+                                        {account.email_address}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <select

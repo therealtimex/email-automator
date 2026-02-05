@@ -396,7 +396,7 @@ class HybridApiClient {
         if (params.status) query.set('status', params.status);
         if (params.limit) query.set('limit', params.limit.toString());
         if (params.offset) query.set('offset', params.offset.toString());
-        if (params.account_id && params.account_id !== 'all') query.set('account_id', params.account_id);
+        if (params.account_id) query.set('account_id', params.account_id);
 
         return this.expressRequest<{ drafts: Email[]; total: number }>(`/api/drafts?${query}`);
     }
