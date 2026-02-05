@@ -177,6 +177,52 @@ Deno.serve(async (req) => {
       return createSuccessResponse({ success: true });
     }
 
+    // PATCH /api-v1-emails/:id - Update email
+    if (req.method === 'PATCH' && pathParts.length === 2) {
+      const emailId = pathParts[1];
+      const updates = await req.json();
+
+      // Allowed fields to update
+      const allowedFields = ['category', 'is_useless', 'action_taken'];
+      const filteredUpdates: any = {};
+      
+      for (const field of allowedFields) {
+        if (updates[field] !== undefined) {
+          filteredUpdates[field] = updates[field];
+        }
+      }
+
+      if (Object.keys(filteredUpdates).length === 0) {
+        return createErrorResponse(400, 'No valid fields to update');
+      }
+
+      // Verify ownership
+      const { data: email } = await supabaseAdmin
+        .from('emails')
+        .select('id, email_accounts!inner(user_id)')
+        .eq('id', emailId)
+        .eq('email_accounts.user_id', user.id)
+        .single();
+
+      if (!email) {
+        return createErrorResponse(404, 'Email not found');
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('emails')
+        .update(filteredUpdates)
+        .eq('id', emailId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database error:', error);
+        return createErrorResponse(500, 'Failed to update email');
+      }
+
+      return createSuccessResponse({ email: data });
+    }
+
     return createErrorResponse(405, 'Method not allowed');
   } catch (error) {
     console.error('Request error:', error);

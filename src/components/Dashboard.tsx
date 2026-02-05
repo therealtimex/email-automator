@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, X, MessageSquare } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, X, MessageSquare, Pencil } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -20,6 +20,7 @@ import {
     DialogTitle,
 } from './ui/dialog';
 import { FeedbackModal } from './Feedback/FeedbackModal';
+import { EditCategoryModal } from './EditCategoryModal';
 
 export function AITraceModal({
     email,
@@ -286,6 +287,9 @@ export function Dashboard() {
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [feedbackEmail, setFeedbackEmail] = useState<Email | null>(null);
 
+    const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
+    const [editCategoryEmail, setEditCategoryEmail] = useState<Email | null>(null);
+
     useEffect(() => {
         // Only fetch emails if user is authenticated
         if (state.isAuthenticated) {
@@ -406,6 +410,16 @@ export function Dashboard() {
     const handleFeedback = (email: Email) => {
         setFeedbackEmail(email);
         setIsFeedbackOpen(true);
+    };
+
+    const handleEditCategory = (email: Email) => {
+        setEditCategoryEmail(email);
+        setIsEditCategoryOpen(true);
+    };
+
+    const handleCategoryUpdate = (emailId: string, updates: Partial<Email>) => {
+        // Optimistic update handled by AppContext via api.updateEmail response
+        // which dispatches UPDATE_EMAIL
     };
 
     return (
@@ -553,6 +567,7 @@ export function Dashboard() {
                                 onRetry={handleRetry}
                                 onViewTrace={handleViewTrace}
                                 onFeedback={handleFeedback}
+                                onEditCategory={handleEditCategory}
                                 onSelect={() => setSelectedEmail(email)}
                                 isSelected={selectedEmail?.id === email.id}
                                 loadingAction={actionLoading[email.id]}
@@ -574,6 +589,15 @@ export function Dashboard() {
                                 onClose={() => setIsFeedbackOpen(false)}
                                 email={feedbackEmail}
                                 defaultType="analysis"
+                            />
+                        )}
+
+                        {editCategoryEmail && (
+                            <EditCategoryModal
+                                isOpen={isEditCategoryOpen}
+                                onClose={() => setIsEditCategoryOpen(false)}
+                                email={editCategoryEmail}
+                                onUpdate={handleCategoryUpdate}
                             />
                         )}
 
@@ -938,6 +962,7 @@ interface EmailCardProps {
 
     onViewTrace: (email: Email) => void;
     onFeedback: (email: Email) => void;
+    onEditCategory: (email: Email) => void;
     onSelect: () => void;
     isSelected: boolean;
     loadingAction?: string;
@@ -945,7 +970,7 @@ interface EmailCardProps {
     onCancelDelete?: () => void;
 }
 
-function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
+function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onEditCategory, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
     const { t } = useLanguage();
     if (!email) return null;
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
@@ -994,9 +1019,20 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onSelect
                         </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", categoryClass)}>
-                            {email.category || 'unknown'}
-                        </span>
+                        <div className="flex items-center gap-1 group/badge">
+                            <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", categoryClass)}>
+                                {email.category || 'unknown'}
+                            </span>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 opacity-0 group-hover/badge:opacity-100 transition-opacity text-muted-foreground hover:text-primary p-0"
+                                onClick={(e) => { e.stopPropagation(); onEditCategory(email); }}
+                                title={t('dashboard.editCategory') || "Edit Category"}
+                            >
+                                <Pencil className="w-2.5 h-2.5" />
+                            </Button>
+                        </div>
                         <div className="flex items-center justify-end gap-1">
                             {email.processing_status === 'pending' && (
                                 <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded flex items-center gap-1">

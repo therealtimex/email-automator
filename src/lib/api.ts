@@ -243,6 +243,13 @@ class HybridApiClient {
         return this.edgeRequest<{ email: any }>(`/api-v1-emails/${emailId}`);
     }
 
+    async updateEmail(emailId: string, updates: { category?: string; is_useless?: boolean; action_taken?: string }) {
+        return this.edgeRequest<{ email: any }>(`/api-v1-emails/${emailId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates)
+        });
+    }
+
     async getEmailEvents(emailId: string) {
         return this.edgeRequest<{ events: any[] }>(`/api-v1-emails/${emailId}/events`);
     }

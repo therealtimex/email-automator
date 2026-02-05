@@ -244,6 +244,7 @@ interface AppContextType {
         updateSettings: (settings: Partial<UserSettings>) => Promise<boolean>;
         updateProfile: (updates: { first_name?: string; last_name?: string; avatar_url?: string }) => Promise<boolean>;
         updateAccount: (accountId: string, updates: Partial<EmailAccount>) => Promise<boolean>;
+        updateEmail: (emailId: string, updates: Partial<Email>) => Promise<boolean>;
         retryProcessing: (emailId: string) => Promise<boolean>;
         createRule: (rule: Omit<Rule, 'id' | 'user_id' | 'created_at'>) => Promise<boolean>;
         updateRule: (ruleId: string, updates: Partial<Rule>) => Promise<boolean>;
@@ -534,6 +535,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 return true;
             }
             dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update account') });
+            return false;
+        },
+
+        updateEmail: async (emailId: string, updates: Partial<Email>) => {
+            const response = await api.updateEmail(emailId, updates);
+            if (response.data?.email) {
+                dispatch({
+                    type: 'UPDATE_EMAIL',
+                    payload: response.data.email
+                });
+                return true;
+            }
+            dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to update email') });
             return false;
         },
 
