@@ -5,6 +5,15 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.4] - 2026-02-05
+
+### Improved
+- **RAG Ingestion Performance**: Significant optimization of the documentation ingestion script (`ingest-knowledge-rag.ts`).
+  - **Smart Caching**: Implemented a content-hash based cache that skips unchanged chunks, reducing unnecessary API calls and database writes.
+  - **Parallel Batching**: Added concurrent processing (10 chunks per batch) for embedding generation and database upserts, dramatically increasing ingestion speed.
+  - **Auto-Cleanup**: Script now automatically identifies and removes outdated chunks from the database that are no longer present in source documentation.
+  - **Better Progress Visibility**: Enhanced terminal output with batch status, success/error counters, and cache hit metrics.
+
 ## [2.23.3] - 2026-02-05
 
 ### Added

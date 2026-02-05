@@ -186,68 +186,128 @@ async function ingestKnowledge() {
 
     console.log(`\n📦 Total chunks: ${allChunks.length}`);
 
-    // Clear only current version chunks before re-ingesting
-    console.log('\n🧹 Clearing old chunks for this version...');
-    const { error: deleteError } = await supabase
+    // Smart caching: Check which chunks already exist with same content_hash
+    console.log('\n🔍 Checking for unchanged chunks (smart caching)...');
+    const existingHashes = new Set<string>();
+
+    const { data: existingChunks, error: fetchError } = await supabase
         .from('knowledge_chunks')
-        .delete()
+        .select('content_hash')
         .eq('version', packageJson.version);
 
-    if (deleteError) {
-        console.error('❌ Failed to clear old chunks:', deleteError);
-    } else {
-        console.log('✓ Old chunks cleared');
+    if (!fetchError && existingChunks) {
+        existingChunks.forEach(chunk => existingHashes.add(chunk.content_hash));
+        console.log(`✓ Found ${existingHashes.size} existing chunks in database`);
     }
 
-    // Generate embeddings and insert
+    // Filter out unchanged chunks
+    const chunksToProcess = allChunks.filter(chunk => !existingHashes.has(chunk.content_hash));
+    const skippedCount = allChunks.length - chunksToProcess.length;
+
+    if (skippedCount > 0) {
+        console.log(`⚡ Skipping ${skippedCount} unchanged chunks (smart cache hit)`);
+    }
+
+    if (chunksToProcess.length === 0) {
+        console.log('\n✨ All chunks are up to date! No processing needed.');
+        return;
+    }
+
+    console.log(`📝 Will process ${chunksToProcess.length} new/changed chunks`);
+
+    // Delete chunks that are no longer in the source files
+    const currentHashes = new Set(allChunks.map(c => c.content_hash));
+    const hashesToDelete = Array.from(existingHashes).filter(h => !currentHashes.has(h));
+
+    if (hashesToDelete.length > 0) {
+        console.log(`\n🧹 Removing ${hashesToDelete.length} outdated chunks...`);
+        const { error: deleteError } = await supabase
+            .from('knowledge_chunks')
+            .delete()
+            .in('content_hash', hashesToDelete);
+
+        if (!deleteError) {
+            console.log('✓ Outdated chunks removed');
+        }
+    }
+
+    // Generate embeddings and insert (parallel batches for speed)
     console.log('\n🔮 Generating embeddings and inserting...');
+    const BATCH_SIZE = 10; // Process 10 chunks concurrently
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < allChunks.length; i++) {
-        const chunk = allChunks[i];
-        const progress = `[${i + 1}/${allChunks.length}]`;
+    // Process chunks in parallel batches
+    for (let batchStart = 0; batchStart < chunksToProcess.length; batchStart += BATCH_SIZE) {
+        const batch = chunksToProcess.slice(batchStart, batchStart + BATCH_SIZE);
+        const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(chunksToProcess.length / BATCH_SIZE);
 
-        try {
-            // Generate embedding
-            const embedding = await generateEmbedding(chunk.content);
+        console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} chunks)...`);
 
-            // Upsert into database (idempotent on content_hash)
-            const { error: insertError } = await supabase
-                .from('knowledge_chunks')
-                .upsert({
-                    content: chunk.content,
-                    content_hash: chunk.content_hash,
-                    source_file: chunk.source_file,
-                    section_title: chunk.section_title,
-                    doc_type: chunk.doc_type,
-                    lang: chunk.lang,
-                    embedding: embedding,
-                    version: chunk.version
-                }, { onConflict: 'content_hash' });
+        // Process all chunks in this batch concurrently
+        const results = await Promise.allSettled(
+            batch.map(async (chunk, idx) => {
+                const globalIdx = batchStart + idx;
+                const progress = `[${globalIdx + 1}/${chunksToProcess.length}]`;
 
-            if (insertError) {
-                console.error(`${progress} ❌ [${chunk.lang}] ${chunk.source_file}:`, insertError.message);
-                errorCount++;
+                try {
+                    // Generate embedding
+                    const embedding = await generateEmbedding(chunk.content);
+
+                    // Upsert into database
+                    const { error: insertError } = await supabase
+                        .from('knowledge_chunks')
+                        .upsert({
+                            content: chunk.content,
+                            content_hash: chunk.content_hash,
+                            source_file: chunk.source_file,
+                            section_title: chunk.section_title,
+                            doc_type: chunk.doc_type,
+                            lang: chunk.lang,
+                            embedding: embedding,
+                            version: chunk.version
+                        }, { onConflict: 'content_hash' });
+
+                    if (insertError) {
+                        throw new Error(insertError.message);
+                    }
+
+                    return { success: true, progress, chunk };
+                } catch (error: any) {
+                    return { success: false, progress, chunk, error: error.message };
+                }
+            })
+        );
+
+        // Log results for this batch
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                const { success, progress, chunk, error } = result.value;
+                if (success) {
+                    console.log(`${progress} ✓ [${chunk.lang}] ${chunk.source_file} - ${chunk.section_title || 'Untitled'}`);
+                    successCount++;
+                } else {
+                    console.error(`${progress} ❌ [${chunk.lang}] ${chunk.source_file}: ${error}`);
+                    errorCount++;
+                }
             } else {
-                console.log(`${progress} ✓ [${chunk.lang}] ${chunk.source_file} - ${chunk.section_title || 'Untitled'}`);
-                successCount++;
+                console.error(`Batch task rejected: ${result.reason}`);
+                errorCount++;
             }
-        } catch (error: any) {
-            console.error(`${progress} ❌ [${chunk.lang}] ${chunk.source_file}:`, error.message);
-            errorCount++;
         }
 
-        // Rate limiting - wait between requests to avoid overwhelming the API
-        if (i < allChunks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100));
+        // Small delay between batches to avoid rate limits
+        if (batchStart + BATCH_SIZE < chunksToProcess.length) {
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
     }
 
     console.log('\n📊 Ingestion Summary:');
     console.log(`   ✓ Success: ${successCount}`);
     console.log(`   ❌ Errors: ${errorCount}`);
-    console.log(`   📦 Total: ${allChunks.length}`);
+    console.log(`   ⚡ Skipped (cached): ${skippedCount}`);
+    console.log(`   📦 Total chunks: ${allChunks.length}`);
 
     // Verify ingestion
     const { count, error: countError } = await supabase
