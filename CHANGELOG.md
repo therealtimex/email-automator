@@ -5,6 +5,22 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.3] - 2026-02-05
+
+### Added
+- **Sandbox-Aware Encryption**: Removed `.env` file dependencies for encryption key management. All configuration is now database-only, optimized for RealTimeX Desktop sandbox environment.
+- **Auto-Key Generation**: Server automatically generates and persists encryption key on first run if none exists in database.
+- **Key Propagation**: Database trigger automatically copies encryption key to new users, ensuring all users share the same key in sandbox mode.
+
+### Fixed
+- **Account Loading**: Fixed race condition where accounts wouldn't appear after login until user navigated to Configuration page. Added 1-second retry logic to ensure Supabase client is fully initialized.
+- **Silent Failures**: Added error logging to `fetchAccounts()`, `fetchRules()`, and `fetchSettings()` to diagnose initialization issues.
+- **Migration Conflict**: Fixed timestamp collision in migration `20260205040000` by renaming encryption key propagation migration to `20260205060000`.
+
+### Changed
+- **Error Messages**: Improved encryption error messages to mention Setup Wizard instead of `.env` files, better reflecting sandbox environment.
+- **Initialization Logging**: Enhanced server startup logs with sandbox-aware messages and clearer status indicators.
+
 ## [2.23.2] - 2026-02-05
 
 ### Added
