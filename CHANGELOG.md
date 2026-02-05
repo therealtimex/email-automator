@@ -5,6 +5,21 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.1] - 2026-02-05
+
+### Added
+- **UI/UX Enhancements**:
+  - Enhanced the Configuration page with a collapsible BYOK section (collapsed by default) to save space since IMAP is more practical for most users.
+  - Unified System Configuration card combining Storage Path, Intelligent Rename, and Sync Interval settings with a single save button for better information density.
+  - Improved navigation and layout consistency across the settings interface.
+
+### Fixed
+- **BYOK Label Clarity**: Corrected OAuth credentials section labels across all 6 languages to accurately reflect its purpose for Gmail/Outlook access rather than AI providers. IMAP is recommended for most users.
+- **Duplicate Email Send**: Fixed bug where emails were being sent twice due to redundant API calls in the draft preview modal's onSend callback.
+
+### Changed
+- **Configuration Organization**: Reorganized settings into logical groups with visual separators and contextual icons for better user experience.
+
 ## [2.23.0] - 2026-02-05
 
 ### Added
@@ -18,12 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Draft Editing**: Enhanced the `DraftPreviewModal` with powerful editing capabilities.
   - Added a Markdown editor for draft content with auto-save functionality.
   - Users can now edit recipients (To, Cc, Bcc) and the Subject line directly before sending.
-- **Category Label Editing**:
-  - Introduced the ability to manually edit and refine email category labels (e.g., from 'Newsletter' to 'Support') directly from the Dashboard.
-  - This manual feedback loop helps improve future AI categorization through user-corrected signals.
-- **UI/UX Enhancements**:
-  - Enhanced the Configuration page with a collapsible BYOK section and a unified System Configuration card for better information density.
-  - Improved navigation and layout consistency across the settings interface.
 
 ### Fixed
 - **Draft Security**: Improved security by strictly filtering drafts by user-owned account IDs, preventing cross-user data leakage.
