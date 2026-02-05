@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { X, Send, RefreshCw, Mail, User, Calendar, Loader2, MessageSquare } from 'lucide-react';
 import { Button } from './ui/button';
@@ -8,6 +8,7 @@ import { toast } from './Toast';
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { FeedbackModal } from './Feedback/FeedbackModal';
+import MarkdownEditor from './ui/markdown-editor';
 
 interface DraftPreviewModalProps {
     email: Email;
@@ -32,8 +33,27 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
     const [editedContent, setEditedContent] = useState(resolvedContent);
     const [isDirty, setIsDirty] = useState(false);
     const [saving, setSaving] = useState(false);
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const originalBody = email.body_snippet || '';
+
+    // Auto-save after 2 seconds of no typing
+    useEffect(() => {
+        if (isDirty) {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+            saveTimeoutRef.current = setTimeout(() => {
+                handleSaveDraft();
+            }, 2000);
+        }
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, [isDirty, editedContent]);
+
 
     const handleSend = async () => {
         setLoading(true);
@@ -154,7 +174,7 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                         </Card>
                     </div>
 
-                    {/* AI-Generated Reply — inline editable */}
+                    {/* AI-Generated Reply — inline editable with markdown */}
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -169,18 +189,16 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                                 </span>
                             )}
                         </div>
-                        <Card className="p-4 bg-primary/5 border-primary/20">
-                            <textarea
-                                value={editedContent}
-                                onChange={(e) => {
-                                    setEditedContent(e.target.value);
-                                    setIsDirty(true);
-                                }}
-                                onBlur={handleSaveDraft}
-                                className="w-full bg-transparent resize-none text-sm leading-relaxed outline-none min-h-[80px]"
-                                spellCheck={false}
-                            />
-                        </Card>
+                        <MarkdownEditor
+                            value={editedContent}
+                            onChange={(value) => {
+                                setEditedContent(value);
+                                setIsDirty(true);
+                            }}
+                            placeholder={t('drafts.editPlaceholder') || 'Write your reply in Markdown...'}
+                            minHeight="300px"
+                            disabled={loading || saving}
+                        />
                     </div>
 
                     {/* Metadata */}
