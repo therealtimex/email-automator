@@ -413,6 +413,20 @@ class HybridApiClient {
         });
     }
 
+    async updateDraft(emailId: string, draft_content: string) {
+        return this.expressRequest<{ success: boolean }>(`/api/drafts/${emailId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ draft_content })
+        });
+    }
+
+    async regenerateDraft(emailId: string, instructions: string) {
+        return this.expressRequest<{ success: boolean; draft_content: string }>(`/api/drafts/${emailId}/regenerate`, {
+            method: 'POST',
+            body: JSON.stringify({ instructions })
+        });
+    }
+
     // ============================================================================
     // HEALTH CHECK (Express API)
     // ============================================================================

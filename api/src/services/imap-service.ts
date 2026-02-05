@@ -304,58 +304,25 @@ export class ImapService {
         });
     }
 
-    async sendReply(account: any, originalMessageId: string, replyContent: string, subject: string) {
-        // Fetch original message details for threading
-        return this.runImapOp(account, async (client) => {
-            const lock = await client.getMailboxLock('INBOX');
-            try {
-                // Fetch envelope for threading info
-                // originalMessageId is assumed to be the IMAP UID here
-                const message = await client.fetchOne(originalMessageId, { envelope: true });
+    async sendReply(account: any, toAddress: string, replyContent: string, subject: string, inReplyTo?: string) {
+        const { smtp } = this.getConfigs(account);
+        const transporter = nodemailer.createTransport(smtp);
 
-                if (!message || !message.envelope) {
-                    throw new Error(`Original message ${originalMessageId} not found`);
-                }
+        const headers: Record<string, string> = {};
+        if (inReplyTo) {
+            headers['In-Reply-To'] = inReplyTo;
+            headers['References'] = inReplyTo;
+        }
 
-                const originalEnvelope = message.envelope;
-                const originalMsgId = originalEnvelope.messageId;
-
-                // Construct recipient (Reply-To > From)
-                // envelope.replyTo is array of {name, address}
-                const replyToAddresses = originalEnvelope.replyTo && originalEnvelope.replyTo.length > 0
-                    ? originalEnvelope.replyTo
-                    : originalEnvelope.from;
-
-                if (!replyToAddresses || replyToAddresses.length === 0) {
-                    throw new Error('No valid recipient found in original message');
-                }
-
-                const toAddress = replyToAddresses[0].address;
-
-                // Send reply via SMTP
-                const { smtp } = this.getConfigs(account);
-                const transporter = nodemailer.createTransport(smtp);
-
-                const info = await transporter.sendMail({
-                    from: smtp.auth.user,
-                    to: toAddress,
-                    subject: subject.startsWith('Re:') ? subject : `Re: ${subject}`,
-                    text: replyContent,
-                    headers: {
-                        'In-Reply-To': originalMsgId,
-                        'References': originalMsgId // Ideally we append to existing references, but this minimal valid threading
-                    } as any
-                });
-
-                // Ideally append the sent message to Sent folder, but nodemailer won't do that automatically for IMAP.
-                // We'd need to append manually. Skipping for V1.
-
-                return (info as any).messageId;
-
-            } finally {
-                lock.release();
-            }
+        const info = await transporter.sendMail({
+            from: smtp.auth.user,
+            to: toAddress,
+            subject: subject.startsWith('Re:') ? subject : `Re: ${subject}`,
+            text: replyContent,
+            headers
         });
+
+        return (info as any).messageId;
     }
 
     // Helper to send mail generally

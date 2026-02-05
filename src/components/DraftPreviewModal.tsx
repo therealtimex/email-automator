@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { X, Send, Edit, RefreshCw, Mail, User, Calendar, Loader2, MessageSquare } from 'lucide-react';
+import { X, Send, RefreshCw, Mail, User, Calendar, Loader2, MessageSquare } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Email } from '../lib/types';
 import { toast } from './Toast';
 import { cn } from '../lib/utils';
+import { api } from '../lib/api';
 import { FeedbackModal } from './Feedback/FeedbackModal';
 
 interface DraftPreviewModalProps {
@@ -22,14 +23,26 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
     const [showRegenerateForm, setShowRegenerateForm] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
 
-    const draftContent = email.draft_content || email.ai_analysis?.draft_response || '';
+    // Resolve content from all three sources (same priority as route + card)
+    const resolvedContent = email.draft_content
+        || (email.ai_analysis as any)?.draft_response
+        || (email.ai_analysis as any)?.draft_content
+        || '';
+
+    const [editedContent, setEditedContent] = useState(resolvedContent);
+    const [isDirty, setIsDirty] = useState(false);
+    const [saving, setSaving] = useState(false);
+
     const originalBody = email.body_snippet || '';
 
     const handleSend = async () => {
         setLoading(true);
         try {
+            // Flush any unsaved edits before sending
+            if (isDirty) {
+                await handleSaveDraft();
+            }
             await onSend(email.id);
-            onClose();
         } catch (error) {
             console.error('Failed to send:', error);
         } finally {
@@ -49,6 +62,24 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
         }
     };
 
+    const handleSaveDraft = async () => {
+        if (!isDirty) return;
+        setSaving(true);
+        try {
+            const res = await api.updateDraft(email.id, editedContent);
+            if (res.data?.success) {
+                setIsDirty(false);
+                toast.success('Draft saved');
+            } else {
+                toast.error('Failed to save draft');
+            }
+        } catch {
+            toast.error('Failed to save draft');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleRegenerate = async () => {
         if (!regenerateInstructions.trim()) {
             toast.error('Please provide instructions for regeneration');
@@ -57,41 +88,20 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
 
         setLoading(true);
         try {
-            const response = await fetch(`/api/v1/drafts/${email.id}/regenerate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
-                },
-                body: JSON.stringify({ instructions: regenerateInstructions }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to regenerate draft');
+            const res = await api.regenerateDraft(email.id, regenerateInstructions);
+            if (res.data?.draft_content) {
+                setEditedContent(res.data.draft_content);
+                setIsDirty(false);
+                toast.success('Draft regenerated');
+            } else {
+                toast.error('Failed to regenerate draft');
             }
-
-            toast.success('Draft regeneration queued');
             setShowRegenerateForm(false);
             setRegenerateInstructions('');
-        } catch (error) {
-            console.error('Failed to regenerate:', error);
+        } catch {
             toast.error('Failed to regenerate draft');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleEditInProvider = () => {
-        if (!email.email_accounts) return;
-
-        const { provider, email_address } = email.email_accounts;
-
-        if (provider === 'gmail') {
-            // Open Gmail drafts
-            window.open(`https://mail.google.com/mail/u/${email_address}/#drafts`, '_blank');
-        } else {
-            // Open Outlook drafts
-            window.open('https://outlook.office.com/mail/drafts', '_blank');
         }
     };
 
@@ -144,15 +154,32 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                         </Card>
                     </div>
 
-                    {/* AI-Generated Reply */}
+                    {/* AI-Generated Reply — inline editable */}
                     <div>
-                        <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
-                            {t('drafts.aiReply') || 'AI-Generated Reply'}
-                        </h3>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                                {t('drafts.aiReply') || 'AI-Generated Reply'}
+                            </h3>
+                            {isDirty && (
+                                <span className={cn(
+                                    'text-xs',
+                                    saving ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400'
+                                )}>
+                                    {saving ? 'Saving…' : 'Unsaved changes'}
+                                </span>
+                            )}
+                        </div>
                         <Card className="p-4 bg-primary/5 border-primary/20">
-                            <div className="prose prose-sm max-w-none">
-                                <p className="text-sm whitespace-pre-wrap">{draftContent}</p>
-                            </div>
+                            <textarea
+                                value={editedContent}
+                                onChange={(e) => {
+                                    setEditedContent(e.target.value);
+                                    setIsDirty(true);
+                                }}
+                                onBlur={handleSaveDraft}
+                                className="w-full bg-transparent resize-none text-sm leading-relaxed outline-none min-h-[80px]"
+                                spellCheck={false}
+                            />
                         </Card>
                     </div>
 
@@ -216,14 +243,6 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                                 <Send className="w-4 h-4" />
                             )}
                             {t('drafts.send') || 'Send Now'}
-                        </Button>
-                        <Button
-                            onClick={handleEditInProvider}
-                            variant="outline"
-                            className="gap-2"
-                        >
-                            <Edit className="w-4 h-4" />
-                            Edit in {email.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook'}
                         </Button>
                         {!showRegenerateForm && (
                             <Button

@@ -460,27 +460,21 @@ function AppContent() {
                         email={previewEmail}
                         onClose={() => setPreviewEmail(null)}
                         onSend={async (emailId) => {
-                            const response = await fetch(`/api/v1/drafts/${emailId}/send`, {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
-                                },
-                            });
-                            if (response.ok) {
+                            const res = await api.sendDraft(emailId);
+                            if (res.data?.success) {
                                 toast.success(t('drafts.sendSuccess') || 'Draft sent successfully!');
+                                setPreviewEmail(null);
                             } else {
                                 toast.error(t('drafts.sendError') || 'Failed to send draft');
                             }
                         }}
                         onDismiss={async (emailId) => {
-                            const response = await fetch(`/api/v1/drafts/${emailId}/dismiss`, {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
-                                },
-                            });
-                            if (response.ok) {
+                            const res = await api.dismissDraft(emailId);
+                            if (res.data?.success) {
                                 toast.success(t('drafts.dismissSuccess') || 'Draft dismissed');
+                                setPreviewEmail(null);
+                            } else {
+                                toast.error(t('drafts.dismissError') || 'Failed to dismiss draft');
                             }
                         }}
                     />

@@ -5,6 +5,7 @@ import { apiRateLimit } from '../middleware/rateLimit.js';
 import { validateBody, schemas } from '../middleware/validation.js';
 import { getGmailService } from '../services/gmail.js';
 import { getMicrosoftService } from '../services/microsoft.js';
+import { getImapService } from '../services/imap-service.js';
 import { getIntelligenceService } from '../services/intelligence.js';
 import { createLogger } from '../utils/logger.js';
 
@@ -87,6 +88,19 @@ router.post('/execute',
                         }
                     } else if (currentAction === 'star' || currentAction === 'flag') {
                         await microsoftService.flagMessage(account, email.external_id);
+                    }
+                } else if (account.provider === 'imap') {
+                    const imapService = getImapService();
+
+                    if (currentAction === 'delete') {
+                        await imapService.trashMessage(account, email.external_id);
+                    } else if (currentAction === 'archive') {
+                        await imapService.archiveMessage(account, email.external_id);
+                    } else if (currentAction === 'draft') {
+                        // IMAP draft is persisted to DB; no provider-side draft object to create
+                        details = 'Draft saved (IMAP)';
+                    } else if (currentAction === 'star' || currentAction === 'flag') {
+                        logger.warn('Star/flag not supported for IMAP', { emailId });
                     }
                 }
 
@@ -214,6 +228,13 @@ router.post('/bulk',
                         await microsoftService.trashMessage(account, email.external_id);
                     } else if (action === 'archive') {
                         await microsoftService.archiveMessage(account, email.external_id);
+                    }
+                } else if (account.provider === 'imap') {
+                    const imapService = getImapService();
+                    if (action === 'delete') {
+                        await imapService.trashMessage(account, email.external_id);
+                    } else if (action === 'archive') {
+                        await imapService.archiveMessage(account, email.external_id);
                     }
                 }
 

@@ -4,6 +4,9 @@ import { authMiddleware } from '../middleware/auth.js';
 import { apiRateLimit } from '../middleware/rateLimit.js';
 import { getGmailService } from '../services/gmail.js';
 import { getMicrosoftService } from '../services/microsoft.js';
+import { getImapService } from '../services/imap-service.js';
+import { getIntelligenceService } from '../services/intelligence.js';
+import { getStorageService } from '../services/storage.js';
 import { createLogger } from '../utils/logger.js';
 
 const router = Router();
@@ -132,7 +135,6 @@ router.post('/:emailId/send',
             else {
                 if (account.provider === 'gmail') {
                     const gmailService = getGmailService();
-                    // Send reply
                     sentMessageId = await gmailService.sendReply(
                         account,
                         replyToId,
@@ -145,6 +147,35 @@ router.post('/:emailId/send',
                         account,
                         replyToId,
                         draftContent
+                    );
+                } else if (account.provider === 'imap') {
+                    const imapService = getImapService();
+
+                    // Extract recipient address from stored sender field ("Name <addr>" or plain addr)
+                    const addrMatch = email.sender?.match(/<([^>]+)>/) || email.sender?.match(/([^\s,<>]+@[^\s,<>]+)/);
+                    const toAddress = addrMatch?.[1] || '';
+                    if (!toAddress) {
+                        throw new Error('Could not extract recipient address from sender field');
+                    }
+
+                    // Best-effort: read Message-ID from stored .eml for proper threading
+                    let inReplyTo: string | undefined;
+                    if (email.file_path) {
+                        try {
+                            const raw = await getStorageService().readEmail(email.file_path);
+                            const msgIdMatch = raw.match(/^Message-ID:\s*(<[^>]+>)/im);
+                            if (msgIdMatch) inReplyTo = msgIdMatch[1];
+                        } catch {
+                            logger.warn('Could not read .eml for Message-ID threading', { file_path: email.file_path });
+                        }
+                    }
+
+                    sentMessageId = await imapService.sendReply(
+                        account,
+                        toAddress,
+                        draftContent,
+                        email.subject || '',
+                        inReplyTo
                     );
                 }
                 logger.info('Sent draft via reply', { sentMessageId });
@@ -170,6 +201,100 @@ router.post('/:emailId/send',
                 details: error.message
             });
         }
+    })
+);
+
+// Update draft content (inline edit)
+router.patch('/:emailId',
+    apiRateLimit,
+    authMiddleware,
+    asyncHandler(async (req, res) => {
+        const { emailId } = req.params;
+        const { draft_content } = req.body;
+
+        if (!draft_content || typeof draft_content !== 'string') {
+            return res.status(400).json({ error: 'draft_content is required' });
+        }
+
+        // Verify ownership
+        const { data: email, error } = await req.supabase!
+            .from('emails')
+            .select('id, email_accounts!inner(user_id)')
+            .eq('id', emailId)
+            .eq('email_accounts.user_id', req.user!.id)
+            .single();
+
+        if (error || !email) {
+            throw new NotFoundError('Email');
+        }
+
+        const { error: updateError } = await req.supabase!
+            .from('emails')
+            .update({ draft_content })
+            .eq('id', emailId);
+
+        if (updateError) throw updateError;
+
+        res.json({ success: true });
+    })
+);
+
+// Regenerate draft with new instructions
+router.post('/:emailId/regenerate',
+    apiRateLimit,
+    authMiddleware,
+    asyncHandler(async (req, res) => {
+        const { emailId } = req.params;
+        const { instructions } = req.body;
+
+        if (!instructions?.trim()) {
+            return res.status(400).json({ error: 'Instructions are required' });
+        }
+
+        // Fetch email with ownership check
+        const { data: email, error } = await req.supabase!
+            .from('emails')
+            .select('*, email_accounts!inner(id, user_id)')
+            .eq('id', emailId)
+            .eq('email_accounts.user_id', req.user!.id)
+            .single();
+
+        if (error || !email) {
+            throw new NotFoundError('Email');
+        }
+
+        // Fetch user settings for LLM config
+        const { data: settings } = await req.supabase!
+            .from('user_settings')
+            .select('*')
+            .eq('user_id', req.user!.id)
+            .single();
+
+        const intelligenceService = getIntelligenceService();
+        const newDraft = await intelligenceService.generateDraftReply(
+            {
+                subject: email.subject || '',
+                sender: email.sender || '',
+                body: email.body_snippet || ''
+            },
+            instructions,
+            {
+                llm_provider: settings?.llm_provider,
+                llm_model: settings?.llm_model
+            }
+        );
+
+        if (!newDraft) {
+            return res.status(500).json({ error: 'Failed to regenerate draft' });
+        }
+
+        // Persist regenerated content
+        await req.supabase!
+            .from('emails')
+            .update({ draft_content: newDraft })
+            .eq('id', emailId);
+
+        res.json({ success: true, draft_content: newDraft });
     })
 );
 

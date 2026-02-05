@@ -194,7 +194,7 @@ export class EmailProcessorService {
                 refreshedAccount = await this.gmailService.refreshTokenIfNeeded(this.supabase, account);
             } else if (account.provider === 'outlook') {
                 refreshedAccount = await this.microsoftService.refreshTokenIfNeeded(this.supabase, account);
-            } else if (account.connection_type === 'imap') {
+            } else if (account.provider === 'imap') {
                 // IMAP doesn't need token refresh, but we could verify connection here if we wanted
                 refreshedAccount = account;
             }
@@ -234,7 +234,7 @@ export class EmailProcessorService {
                     await this.processGmailAccount(refreshedAccount, rules || [], settings, result, eventLogger);
                 } else if (refreshedAccount.provider === 'outlook') {
                     await this.processOutlookAccount(refreshedAccount, rules || [], settings, result, eventLogger);
-                } else if (refreshedAccount.connection_type === 'imap') {
+                } else if (refreshedAccount.provider === 'imap') {
                     await this.processImapAccount(refreshedAccount, rules || [], settings, result, eventLogger);
                 }
             } catch (providerError) {
@@ -1584,7 +1584,7 @@ export class EmailProcessorService {
                     await this.gmailService.applyLabelByName(account, email.external_id, labelName);
                 } else if (account.provider === 'outlook') {
                     await this.microsoftService.moveToFolderByPath(account, email.external_id, labelName);
-                } else if (account.connection_type === 'imap') {
+                } else if (account.provider === 'imap') {
                     // IMAP folder support requires more complex logic (checking existence, creating)
                     logger.warn('Label actions not yet supported for IMAP accounts', { emailId: email.id, labelName });
                     if (eventLogger) await eventLogger.info('Skipped', `Label action skipped for IMAP: ${labelName}`);
@@ -1629,7 +1629,7 @@ export class EmailProcessorService {
                 } else if (action === 'star' || action === 'important') {
                     await this.microsoftService.flagMessage(account, email.external_id);
                 }
-            } else if (account.connection_type === 'imap') {
+            } else if (account.provider === 'imap') {
                 if (action === 'delete') {
                     await this.imapService.trashMessage(account, email.external_id);
                     if (email.file_path) {
