@@ -401,9 +401,13 @@ class HybridApiClient {
         return this.expressRequest<{ drafts: Email[]; total: number }>(`/api/drafts?${query}`);
     }
 
-    async sendDraft(emailId: string) {
+    async sendDraft(emailId: string, composeFields?: { to?: string; cc?: string; bcc?: string; subject?: string }) {
         return this.expressRequest<{ success: boolean; messageId: string }>(`/api/drafts/${emailId}/send`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(composeFields || {})
         });
     }
 

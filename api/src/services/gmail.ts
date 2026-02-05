@@ -440,7 +440,10 @@ export class GmailService {
         account: EmailAccount,
         originalMessageId: string,
         replyContent: string,
-        subject: string
+        subject: string,
+        customTo?: string,
+        customCc?: string,
+        customBcc?: string
     ): Promise<string> {
         const gmail = await this.getAuthenticatedClient(account);
 
@@ -449,7 +452,8 @@ export class GmailService {
         const headers = original.data.payload?.headers || [];
         const getHeader = (name: string) => headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
 
-        const toAddress = getHeader('From');
+        // Use custom recipient or fallback to original sender
+        const toAddress = customTo || getHeader('From');
         const originalMsgId = getHeader('Message-ID');
         const threadId = original.data.threadId;
 
@@ -460,9 +464,21 @@ export class GmailService {
             replyHeaders.push(`References: ${originalMsgId}`);
         }
 
-        const rawMessage = [
+        // Build email headers
+        const emailHeaders = [
             `To: ${toAddress}`,
             `Subject: ${subject}`,
+        ];
+
+        if (customCc) {
+            emailHeaders.push(`Cc: ${customCc}`);
+        }
+        if (customBcc) {
+            emailHeaders.push(`Bcc: ${customBcc}`);
+        }
+
+        const rawMessage = [
+            ...emailHeaders,
             ...replyHeaders,
             'MIME-Version: 1.0',
             'Content-Type: text/plain; charset="UTF-8"',
@@ -486,7 +502,7 @@ export class GmailService {
             });
 
             const messageId = result.data.id || 'unknown';
-            logger.info('Reply sent successfully', { messageId, threadId });
+            logger.info('Reply sent successfully', { messageId, threadId, to: toAddress, cc: customCc, bcc: customBcc });
             return messageId;
         } catch (error) {
             logger.error('Gmail API Error sending reply', error);

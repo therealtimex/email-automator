@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { X, Send, RefreshCw, Mail, User, Calendar, Loader2, MessageSquare } from 'lucide-react';
+import { X, Send, RefreshCw, Mail, User, Calendar, Loader2, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Email } from '../lib/types';
@@ -16,6 +16,12 @@ interface DraftPreviewModalProps {
     onSend: (emailId: string) => Promise<void>;
     onDismiss: (emailId: string) => Promise<void>;
 }
+
+// Helper to extract email address from "Name <email>" format
+const extractEmail = (sender: string): string => {
+    const match = sender?.match(/<([^>]+)>/) || sender?.match(/([^\s,<>]+@[^\s,<>]+)/);
+    return match?.[1] || sender || '';
+};
 
 export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPreviewModalProps) {
     const { t } = useLanguage();
@@ -34,6 +40,17 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
     const [isDirty, setIsDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Email compose fields
+    const defaultSubject = email.subject?.toLowerCase().startsWith('re:')
+        ? email.subject
+        : `Re: ${email.subject || ''}`;
+
+    const [to, setTo] = useState(extractEmail(email.sender || ''));
+    const [cc, setCc] = useState('');
+    const [bcc, setBcc] = useState('');
+    const [subject, setSubject] = useState(defaultSubject);
+    const [showOriginal, setShowOriginal] = useState(false);
 
     const originalBody = email.body_snippet || '';
 
@@ -56,15 +73,38 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
 
 
     const handleSend = async () => {
+        // Validate recipient
+        if (!to.trim()) {
+            toast.error('Please enter a recipient email address');
+            return;
+        }
+
         setLoading(true);
         try {
             // Flush any unsaved edits before sending
             if (isDirty) {
                 await handleSaveDraft();
             }
-            await onSend(email.id);
+
+            // Send draft with custom compose fields
+            const res = await api.sendDraft(email.id, {
+                to: to.trim(),
+                cc: cc.trim() || undefined,
+                bcc: bcc.trim() || undefined,
+                subject: subject.trim()
+            });
+
+            if (res.data?.success) {
+                toast.success('Email sent successfully');
+                onClose();
+                // Trigger parent refresh
+                await onSend(email.id);
+            } else {
+                toast.error('Failed to send email');
+            }
         } catch (error) {
             console.error('Failed to send:', error);
+            toast.error('Failed to send email');
         } finally {
             setLoading(false);
         }
@@ -132,7 +172,7 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                 <div className="flex items-center justify-between p-6 border-b">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <Mail className="w-5 h-5 text-primary" />
-                        {t('drafts.preview') || 'Draft Preview'}
+                        {t('drafts.compose') || 'Compose Draft'}
                     </h2>
                     <Button onClick={onClose} variant="ghost" size="sm">
                         <X className="w-4 h-4" />
@@ -141,36 +181,103 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {/* Original Email */}
+                    {/* Compose Email Fields */}
                     <div>
                         <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
-                            {t('drafts.originalEmail') || 'Original Email'}
+                            {t('drafts.compose') || 'Compose Email'}
                         </h3>
-                        <Card className="p-4 bg-muted/30">
-                            <div className="space-y-2 text-sm">
-                                <div className="flex items-start gap-2">
-                                    <User className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                                    <div>
-                                        <span className="font-medium">From:</span> {email.sender}
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-2">
-                                    <Mail className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                                    <div>
-                                        <span className="font-medium">Subject:</span> {email.subject || t('dashboard.noSubject')}
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-2">
-                                    <Calendar className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                                    <div>
-                                        <span className="font-medium">Date:</span>{' '}
-                                        {email.date ? new Date(email.date).toLocaleString() : '-'}
-                                    </div>
-                                </div>
+                        <Card className="p-4 space-y-3">
+                            {/* To */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
+                                    To:
+                                </label>
+                                <input
+                                    type="email"
+                                    value={to}
+                                    onChange={(e) => setTo(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                    placeholder="recipient@example.com"
+                                />
                             </div>
-                            <div className="mt-4 pt-4 border-t">
-                                <p className="text-sm whitespace-pre-wrap">{originalBody}</p>
+
+                            {/* CC */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
+                                    CC:
+                                </label>
+                                <input
+                                    type="email"
+                                    value={cc}
+                                    onChange={(e) => setCc(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                    placeholder="Optional"
+                                />
                             </div>
+
+                            {/* BCC */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
+                                    BCC:
+                                </label>
+                                <input
+                                    type="email"
+                                    value={bcc}
+                                    onChange={(e) => setBcc(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                    placeholder="Optional"
+                                />
+                            </div>
+
+                            {/* Subject */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
+                                    Subject:
+                                </label>
+                                <input
+                                    type="text"
+                                    value={subject}
+                                    onChange={(e) => setSubject(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                    placeholder="Email subject"
+                                />
+                            </div>
+
+                            {/* Show Original Message Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setShowOriginal(!showOriginal)}
+                                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+                            >
+                                {showOriginal ? (
+                                    <ChevronDown className="w-3 h-3" />
+                                ) : (
+                                    <ChevronRight className="w-3 h-3" />
+                                )}
+                                Show original message
+                            </button>
+
+                            {/* Original Message (Collapsible) */}
+                            {showOriginal && (
+                                <div className="mt-3 pt-3 border-t space-y-2">
+                                    <div className="flex items-start gap-2 text-xs">
+                                        <User className="w-3 h-3 mt-0.5 text-muted-foreground flex-shrink-0" />
+                                        <div className="text-muted-foreground">
+                                            <span className="font-medium">From:</span> {email.sender}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-2 text-xs">
+                                        <Calendar className="w-3 h-3 mt-0.5 text-muted-foreground flex-shrink-0" />
+                                        <div className="text-muted-foreground">
+                                            <span className="font-medium">Date:</span>{' '}
+                                            {email.date ? new Date(email.date).toLocaleString() : '-'}
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 pt-2 border-t">
+                                        <p className="text-xs text-muted-foreground whitespace-pre-wrap">{originalBody}</p>
+                                    </div>
+                                </div>
+                            )}
                         </Card>
                     </div>
 

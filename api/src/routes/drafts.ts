@@ -82,6 +82,9 @@ router.post('/:emailId/send',
         const { emailId } = req.params;
         const userId = req.user!.id;
 
+        // Optional compose fields from request body (UI customization)
+        const { to: customTo, cc: customCc, bcc: customBcc, subject: customSubject } = req.body;
+
         // Fetch email with account info and SECURITY CHECK in query
         const { data: email, error } = await req.supabase!
             .from('emails')
@@ -93,10 +96,6 @@ router.post('/:emailId/send',
         if (error || !email) {
             throw new NotFoundError('Email');
         }
-
-        // if (email.email_accounts.user_id !== userId) {
-        //     throw new NotFoundError('Email');
-        // }
 
         const account = email.email_accounts;
         // CRITICAL: Priority Definition
@@ -132,9 +131,23 @@ router.post('/:emailId/send',
         let sentMessageId: string | null = null;
         const replyToId = email.external_id;
 
+        // Prepare compose fields with fallbacks to original email values
+        const extractEmail = (sender: string): string => {
+            const match = sender?.match(/<([^>]+)>/) || sender?.match(/([^\s,<>]+@[^\s,<>]+)/);
+            return match?.[1] || sender || '';
+        };
+
+        const toAddress = customTo || extractEmail(email.sender || '');
+        const subject = customSubject || email.subject || '';
+        const cc = customCc || '';
+        const bcc = customBcc || '';
+
+        logger.debug('Sending with compose fields', { to: toAddress, cc, bcc, subject });
+
         try {
             // Priority: Send existing draft if ID exists (cleaner, preserves original draft object)
-            if (email.draft_id) {
+            // Note: Existing draft objects (Gmail/Outlook) cannot be customized for to/cc/bcc/subject
+            if (email.draft_id && !customTo && !customCc && !customBcc && !customSubject) {
                 if (account.provider === 'gmail') {
                     const gmailService = getGmailService();
                     sentMessageId = await gmailService.sendDraft(account, email.draft_id);
@@ -144,7 +157,7 @@ router.post('/:emailId/send',
                 }
                 logger.info('Sent existing draft', { draftId: email.draft_id, sentMessageId });
             }
-            // Fallback: Create new reply using content (if draft object was deleted externally or not saved)
+            // Fallback: Create new reply using content (if draft object was deleted, not saved, or custom compose fields provided)
             else {
                 if (account.provider === 'gmail') {
                     const gmailService = getGmailService();
@@ -152,24 +165,24 @@ router.post('/:emailId/send',
                         account,
                         replyToId,
                         draftContent,
-                        email.subject || ''
+                        subject,
+                        toAddress,
+                        cc,
+                        bcc
                     );
                 } else if (account.provider === 'outlook') {
                     const microsoftService = getMicrosoftService();
                     sentMessageId = await microsoftService.sendReply(
                         account,
                         replyToId,
-                        draftContent
+                        draftContent,
+                        subject,
+                        toAddress,
+                        cc,
+                        bcc
                     );
                 } else if (account.provider === 'imap') {
                     const imapService = getImapService();
-
-                    // Extract recipient address from stored sender field ("Name <addr>" or plain addr)
-                    const addrMatch = email.sender?.match(/<([^>]+)>/) || email.sender?.match(/([^\s,<>]+@[^\s,<>]+)/);
-                    const toAddress = addrMatch?.[1] || '';
-                    if (!toAddress) {
-                        throw new Error('Could not extract recipient address from sender field');
-                    }
 
                     // Best-effort: read Message-ID from stored .eml for proper threading
                     let inReplyTo: string | undefined;
@@ -187,11 +200,13 @@ router.post('/:emailId/send',
                         account,
                         toAddress,
                         draftContent,
-                        email.subject || '',
-                        inReplyTo
+                        subject,
+                        inReplyTo,
+                        cc,
+                        bcc
                     );
                 }
-                logger.info('Sent draft via reply', { sentMessageId });
+                logger.info('Sent draft via reply', { sentMessageId, to: toAddress, cc, bcc, subject });
             }
 
             // Update email status

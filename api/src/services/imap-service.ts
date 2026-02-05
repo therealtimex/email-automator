@@ -304,7 +304,15 @@ export class ImapService {
         });
     }
 
-    async sendReply(account: any, toAddress: string, replyContent: string, subject: string, inReplyTo?: string) {
+    async sendReply(
+        account: any,
+        toAddress: string,
+        replyContent: string,
+        subject: string,
+        inReplyTo?: string,
+        cc?: string,
+        bcc?: string
+    ) {
         const { smtp } = this.getConfigs(account);
         const transporter = nodemailer.createTransport(smtp);
 
@@ -314,13 +322,23 @@ export class ImapService {
             headers['References'] = inReplyTo;
         }
 
-        const info = await transporter.sendMail({
+        const mailOptions: any = {
             from: smtp.auth.user,
             to: toAddress,
             subject: subject.startsWith('Re:') ? subject : `Re: ${subject}`,
             text: replyContent,
             headers
-        });
+        };
+
+        if (cc) {
+            mailOptions.cc = cc;
+        }
+
+        if (bcc) {
+            mailOptions.bcc = bcc;
+        }
+
+        const info = await transporter.sendMail(mailOptions);
 
         return (info as any).messageId;
     }

@@ -429,7 +429,11 @@ export class MicrosoftService {
     async sendReply(
         account: EmailAccount,
         originalMessageId: string,
-        replyContent: string
+        replyContent: string,
+        customSubject?: string,
+        customTo?: string,
+        customCc?: string,
+        customBcc?: string
     ): Promise<string> {
         const accessToken = account.access_token || '';
 
@@ -451,7 +455,38 @@ export class MicrosoftService {
 
         const draft = await createResponse.json();
 
-        // Update content
+        // Build update payload
+        const updatePayload: any = {
+            body: {
+                contentType: 'text',
+                content: replyContent,
+            },
+        };
+
+        // Add custom recipients if provided
+        if (customTo) {
+            updatePayload.toRecipients = customTo.split(',').map(email => ({
+                emailAddress: { address: email.trim() }
+            }));
+        }
+
+        if (customCc) {
+            updatePayload.ccRecipients = customCc.split(',').map(email => ({
+                emailAddress: { address: email.trim() }
+            }));
+        }
+
+        if (customBcc) {
+            updatePayload.bccRecipients = customBcc.split(',').map(email => ({
+                emailAddress: { address: email.trim() }
+            }));
+        }
+
+        if (customSubject) {
+            updatePayload.subject = customSubject;
+        }
+
+        // Update draft with content and custom recipients/subject
         await fetch(
             `https://graph.microsoft.com/v1.0/me/messages/${draft.id}`,
             {
@@ -460,12 +495,7 @@ export class MicrosoftService {
                     Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    body: {
-                        contentType: 'text',
-                        content: replyContent,
-                    },
-                }),
+                body: JSON.stringify(updatePayload),
             }
         );
 
@@ -484,7 +514,13 @@ export class MicrosoftService {
             throw new Error('Failed to send reply');
         }
 
-        logger.info('Reply sent successfully', { messageId: draft.id });
+        logger.info('Reply sent successfully', {
+            messageId: draft.id,
+            to: customTo,
+            cc: customCc,
+            bcc: customBcc,
+            subject: customSubject
+        });
         return draft.id;
     }
 
