@@ -431,6 +431,23 @@ class HybridApiClient {
         });
     }
 
+    async uploadAttachment(emailId: string, file: File) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        return this.expressRequest<{ success: boolean; attachment: any }>(`/api/drafts/${emailId}/attachments`, {
+            method: 'POST',
+            body: formData
+            // Note: Don't set Content-Type header - browser will set it with boundary for multipart/form-data
+        });
+    }
+
+    async deleteAttachment(emailId: string, attachmentId: string) {
+        return this.expressRequest<{ success: boolean }>(`/api/drafts/${emailId}/attachments/${attachmentId}`, {
+            method: 'DELETE'
+        });
+    }
+
     // ============================================================================
     // HEALTH CHECK (Express API)
     // ============================================================================

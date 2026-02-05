@@ -11,6 +11,7 @@ import sdkRoutes from './sdk.js';
 import ttsRoutes from './tts.js';
 import agentRoutes from './agent.js';
 import draftsRoutes from './drafts.js';
+import attachmentsRoutes from './attachments.js';
 
 
 const router = Router();
@@ -28,6 +29,7 @@ router.use('/sdk', sdkRoutes);
 router.use('/tts', ttsRoutes);
 router.use('/agent', agentRoutes);
 router.use('/drafts', draftsRoutes);
+router.use('/drafts', attachmentsRoutes);
 
 
 export default router;

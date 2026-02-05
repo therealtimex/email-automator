@@ -57,6 +57,15 @@ export interface Email {
     draft_created_at?: string | null;
     draft_sent_at?: string | null;
     draft_dismissed_at?: string | null;
+    // Attachments
+    attachments?: Array<{
+        id: string;
+        name: string;
+        path: string;
+        size: number;
+        type: string;
+        uploaded_at: string;
+    }> | null;
 }
 
 export interface Rule {

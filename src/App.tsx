@@ -460,13 +460,9 @@ function AppContent() {
                         email={previewEmail}
                         onClose={() => setPreviewEmail(null)}
                         onSend={async (emailId) => {
-                            const res = await api.sendDraft(emailId);
-                            if (res.data?.success) {
-                                toast.success(t('drafts.sendSuccess') || 'Draft sent successfully!');
-                                setPreviewEmail(null);
-                            } else {
-                                toast.error(t('drafts.sendError') || 'Failed to send draft');
-                            }
+                            // Email already sent by DraftPreviewModal with compose fields
+                            // Just close the modal
+                            setPreviewEmail(null);
                         }}
                         onDismiss={async (emailId) => {
                             const res = await api.dismissDraft(emailId);

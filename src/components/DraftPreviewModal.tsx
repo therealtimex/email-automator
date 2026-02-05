@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { X, Send, RefreshCw, Mail, User, Calendar, Loader2, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Send, RefreshCw, Mail, User, Calendar, Loader2, MessageSquare, ChevronDown, ChevronRight, Paperclip, Upload } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Email } from '../lib/types';
@@ -9,6 +9,15 @@ import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { FeedbackModal } from './Feedback/FeedbackModal';
 import MarkdownEditor from './ui/markdown-editor';
+
+interface AttachmentMetadata {
+    id: string;
+    name: string;
+    path: string;
+    size: number;
+    type: string;
+    uploaded_at: string;
+}
 
 interface DraftPreviewModalProps {
     email: Email;
@@ -51,8 +60,21 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
     const [bcc, setBcc] = useState('');
     const [subject, setSubject] = useState(defaultSubject);
     const [showOriginal, setShowOriginal] = useState(false);
+    const [showCc, setShowCc] = useState(false);
+    const [showBcc, setShowBcc] = useState(false);
+
+    // Attachments
+    const [attachments, setAttachments] = useState<AttachmentMetadata[]>([]);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const originalBody = email.body_snippet || '';
+
+    // Load attachments on mount
+    useEffect(() => {
+        const emailAttachments = (Array.isArray(email.attachments) ? email.attachments : []) as AttachmentMetadata[];
+        setAttachments(emailAttachments);
+    }, [email.attachments]);
 
     // Auto-save after 2 seconds of no typing
     useEffect(() => {
@@ -165,6 +187,61 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
         }
     };
 
+    const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        const file = files[0];
+        const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+
+        // Validate file size
+        if (file.size > MAX_SIZE) {
+            toast.error('File size exceeds 10MB limit');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const res = await api.uploadAttachment(email.id, file);
+            if (res.data?.success && res.data.attachment) {
+                setAttachments(prev => [...prev, res.data!.attachment]);
+                toast.success(`Attached ${file.name}`);
+            } else {
+                toast.error('Failed to upload attachment');
+            }
+        } catch (error) {
+            console.error('Upload failed:', error);
+            toast.error('Failed to upload attachment');
+        } finally {
+            setUploading(false);
+            // Reset input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleDeleteAttachment = async (attachmentId: string) => {
+        try {
+            const res = await api.deleteAttachment(email.id, attachmentId);
+            if (res.data?.success) {
+                setAttachments(prev => prev.filter(a => a.id !== attachmentId));
+                toast.success('Attachment removed');
+            } else {
+                toast.error('Failed to remove attachment');
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+            toast.error('Failed to remove attachment');
+        }
+    };
+
+    const formatFileSize = (bytes: number): string => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -187,7 +264,7 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                             {t('drafts.compose') || 'Compose Email'}
                         </h3>
                         <Card className="p-4 space-y-3">
-                            {/* To */}
+                            {/* To with Cc/Bcc toggles */}
                             <div className="flex items-center gap-3">
                                 <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
                                     To:
@@ -199,35 +276,62 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                                     className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                     placeholder="recipient@example.com"
                                 />
+                                {/* Cc/Bcc toggle buttons */}
+                                <div className="flex items-center gap-2">
+                                    {!showCc && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCc(true)}
+                                            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                                        >
+                                            Cc
+                                        </button>
+                                    )}
+                                    {!showBcc && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowBcc(true)}
+                                            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                                        >
+                                            Bcc
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* CC */}
-                            <div className="flex items-center gap-3">
-                                <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
-                                    CC:
-                                </label>
-                                <input
-                                    type="email"
-                                    value={cc}
-                                    onChange={(e) => setCc(e.target.value)}
-                                    className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                    placeholder="Optional"
-                                />
-                            </div>
+                            {/* CC (collapsible) */}
+                            {showCc && (
+                                <div className="flex items-center gap-3">
+                                    <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
+                                        CC:
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={cc}
+                                        onChange={(e) => setCc(e.target.value)}
+                                        className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                        placeholder="email1@example.com, email2@example.com"
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
 
-                            {/* BCC */}
-                            <div className="flex items-center gap-3">
-                                <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
-                                    BCC:
-                                </label>
-                                <input
-                                    type="email"
-                                    value={bcc}
-                                    onChange={(e) => setBcc(e.target.value)}
-                                    className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                    placeholder="Optional"
-                                />
-                            </div>
+                            {/* BCC (collapsible) */}
+                            {showBcc && (
+                                <div className="flex items-center gap-3">
+                                    <label className="text-sm font-medium text-muted-foreground w-12 flex-shrink-0">
+                                        BCC:
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={bcc}
+                                        onChange={(e) => setBcc(e.target.value)}
+                                        className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                        placeholder="email1@example.com, email2@example.com"
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
 
                             {/* Subject */}
                             <div className="flex items-center gap-3">
@@ -241,6 +345,74 @@ export function DraftPreviewModal({ email, onClose, onSend, onDismiss }: DraftPr
                                     className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                     placeholder="Email subject"
                                 />
+                            </div>
+
+                            {/* Attachments */}
+                            <div className="pt-3 border-t">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                        Attachments
+                                    </label>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs gap-1.5"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={uploading}
+                                    >
+                                        {uploading ? (
+                                            <>
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                                Uploading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Paperclip className="w-3 h-3" />
+                                                Attach File
+                                            </>
+                                        )}
+                                    </Button>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        className="hidden"
+                                        onChange={handleFileSelect}
+                                        accept="*/*"
+                                    />
+                                </div>
+
+                                {/* Attachment List */}
+                                {attachments.length > 0 ? (
+                                    <div className="space-y-1.5">
+                                        {attachments.map((attachment) => (
+                                            <div
+                                                key={attachment.id}
+                                                className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-md text-xs group"
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    <Paperclip className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                                    <span className="font-medium truncate">{attachment.name}</span>
+                                                    <span className="text-muted-foreground flex-shrink-0">
+                                                        ({formatFileSize(attachment.size)})
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteAttachment(attachment.id)}
+                                                    className="ml-2 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                                                    title="Remove attachment"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground italic">
+                                        No attachments. Files up to 10MB supported.
+                                    </p>
+                                )}
                             </div>
 
                             {/* Show Original Message Toggle */}

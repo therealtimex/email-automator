@@ -443,7 +443,8 @@ export class GmailService {
         subject: string,
         customTo?: string,
         customCc?: string,
-        customBcc?: string
+        customBcc?: string,
+        attachments?: Array<{ filename: string; content: Buffer; contentType: string }>
     ): Promise<string> {
         const gmail = await this.getAuthenticatedClient(account);
 
@@ -477,14 +478,53 @@ export class GmailService {
             emailHeaders.push(`Bcc: ${customBcc}`);
         }
 
-        const rawMessage = [
-            ...emailHeaders,
-            ...replyHeaders,
-            'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset="UTF-8"',
-            '',
-            replyContent,
-        ].join('\r\n');
+        let rawMessage: string;
+
+        // If attachments present, construct multipart/mixed message
+        if (attachments && attachments.length > 0) {
+            const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+            const messageParts = [
+                ...emailHeaders,
+                ...replyHeaders,
+                'MIME-Version: 1.0',
+                `Content-Type: multipart/mixed; boundary="${boundary}"`,
+                '',
+                `--${boundary}`,
+                'Content-Type: text/plain; charset="UTF-8"',
+                'Content-Transfer-Encoding: 7bit',
+                '',
+                replyContent,
+                ''
+            ];
+
+            // Add each attachment
+            for (const attachment of attachments) {
+                const base64Content = attachment.content.toString('base64');
+                messageParts.push(
+                    `--${boundary}`,
+                    `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
+                    `Content-Disposition: attachment; filename="${attachment.filename}"`,
+                    'Content-Transfer-Encoding: base64',
+                    '',
+                    base64Content,
+                    ''
+                );
+            }
+
+            messageParts.push(`--${boundary}--`);
+            rawMessage = messageParts.join('\r\n');
+        } else {
+            // Plain text message without attachments
+            rawMessage = [
+                ...emailHeaders,
+                ...replyHeaders,
+                'MIME-Version: 1.0',
+                'Content-Type: text/plain; charset="UTF-8"',
+                '',
+                replyContent,
+            ].join('\r\n');
+        }
 
         const encodedMessage = Buffer.from(rawMessage)
             .toString('base64')
@@ -502,7 +542,14 @@ export class GmailService {
             });
 
             const messageId = result.data.id || 'unknown';
-            logger.info('Reply sent successfully', { messageId, threadId, to: toAddress, cc: customCc, bcc: customBcc });
+            logger.info('Reply sent successfully', {
+                messageId,
+                threadId,
+                to: toAddress,
+                cc: customCc,
+                bcc: customBcc,
+                attachments: attachments?.length || 0
+            });
             return messageId;
         } catch (error) {
             logger.error('Gmail API Error sending reply', error);

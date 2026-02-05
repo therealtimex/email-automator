@@ -311,7 +311,8 @@ export class ImapService {
         subject: string,
         inReplyTo?: string,
         cc?: string,
-        bcc?: string
+        bcc?: string,
+        attachments?: Array<{ filename: string; content: Buffer; contentType: string }>
     ) {
         const { smtp } = this.getConfigs(account);
         const transporter = nodemailer.createTransport(smtp);
@@ -336,6 +337,15 @@ export class ImapService {
 
         if (bcc) {
             mailOptions.bcc = bcc;
+        }
+
+        // Add attachments if present
+        if (attachments && attachments.length > 0) {
+            mailOptions.attachments = attachments.map(att => ({
+                filename: att.filename,
+                content: att.content,
+                contentType: att.contentType
+            }));
         }
 
         const info = await transporter.sendMail(mailOptions);

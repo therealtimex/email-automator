@@ -7,6 +7,7 @@ import { getMicrosoftService } from '../services/microsoft.js';
 import { getImapService } from '../services/imap-service.js';
 import { getIntelligenceService } from '../services/intelligence.js';
 import { getStorageService } from '../services/storage.js';
+import { getAttachmentStorageService, AttachmentMetadata } from '../services/attachment-storage.js';
 import { createLogger } from '../utils/logger.js';
 
 const router = Router();
@@ -144,10 +145,31 @@ router.post('/:emailId/send',
 
         logger.debug('Sending with compose fields', { to: toAddress, cc, bcc, subject });
 
+        // Fetch attachments from storage if present
+        const emailAttachments = (Array.isArray(email.attachments) ? email.attachments : []) as AttachmentMetadata[];
+        const attachmentFiles: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+
+        if (emailAttachments.length > 0) {
+            const attachmentStorage = getAttachmentStorageService();
+            for (const attachment of emailAttachments) {
+                try {
+                    const fileBuffer = await attachmentStorage.downloadAttachment(req.supabase!, attachment.path);
+                    attachmentFiles.push({
+                        filename: attachment.name,
+                        content: fileBuffer,
+                        contentType: attachment.type
+                    });
+                } catch (error) {
+                    logger.warn('Failed to download attachment, skipping', { attachmentId: attachment.id, error });
+                }
+            }
+            logger.info('Loaded attachments for sending', { count: attachmentFiles.length });
+        }
+
         try {
             // Priority: Send existing draft if ID exists (cleaner, preserves original draft object)
-            // Note: Existing draft objects (Gmail/Outlook) cannot be customized for to/cc/bcc/subject
-            if (email.draft_id && !customTo && !customCc && !customBcc && !customSubject) {
+            // Note: Existing draft objects (Gmail/Outlook) cannot be customized for to/cc/bcc/subject or attachments
+            if (email.draft_id && !customTo && !customCc && !customBcc && !customSubject && attachmentFiles.length === 0) {
                 if (account.provider === 'gmail') {
                     const gmailService = getGmailService();
                     sentMessageId = await gmailService.sendDraft(account, email.draft_id);
@@ -157,7 +179,7 @@ router.post('/:emailId/send',
                 }
                 logger.info('Sent existing draft', { draftId: email.draft_id, sentMessageId });
             }
-            // Fallback: Create new reply using content (if draft object was deleted, not saved, or custom compose fields provided)
+            // Fallback: Create new reply using content (if draft object was deleted, not saved, custom compose fields, or attachments provided)
             else {
                 if (account.provider === 'gmail') {
                     const gmailService = getGmailService();
@@ -168,7 +190,8 @@ router.post('/:emailId/send',
                         subject,
                         toAddress,
                         cc,
-                        bcc
+                        bcc,
+                        attachmentFiles
                     );
                 } else if (account.provider === 'outlook') {
                     const microsoftService = getMicrosoftService();
@@ -179,7 +202,8 @@ router.post('/:emailId/send',
                         subject,
                         toAddress,
                         cc,
-                        bcc
+                        bcc,
+                        attachmentFiles
                     );
                 } else if (account.provider === 'imap') {
                     const imapService = getImapService();
@@ -203,7 +227,8 @@ router.post('/:emailId/send',
                         subject,
                         inReplyTo,
                         cc,
-                        bcc
+                        bcc,
+                        attachmentFiles
                     );
                 }
                 logger.info('Sent draft via reply', { sentMessageId, to: toAddress, cc, bcc, subject });

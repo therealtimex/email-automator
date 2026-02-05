@@ -958,9 +958,12 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onSelect
         if (provider === 'gmail') {
             // Gmail deep link using the message ID
             return `https://mail.google.com/mail/u/${email_address}/#all/${email.external_id}`;
-        } else {
+        } else if (provider === 'outlook') {
             // Outlook/M365 deep link
             return `https://outlook.office.com/mail/deeplink/read/${encodeURIComponent(email.external_id)}`;
+        } else {
+            // IMAP: No web interface available
+            return '#';
         }
     };
 
@@ -1110,15 +1113,17 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onSelect
                         ) : (
                             // Normal action buttons
                             <>
-                                <a
-                                    href={getExternalMailUrl()}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                                    title={t('dashboard.openIn').replace('{provider}', email.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook')}
-                                >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
+                                {email.email_accounts?.provider !== 'imap' && (
+                                    <a
+                                        href={getExternalMailUrl()}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
+                                        title={t('dashboard.openIn').replace('{provider}', email.email_accounts?.provider === 'gmail' ? 'Gmail' : 'Outlook')}
+                                    >
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                    </a>
+                                )}
                                 <Button
                                     variant="ghost"
                                     size="icon"

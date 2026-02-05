@@ -433,7 +433,8 @@ export class MicrosoftService {
         customSubject?: string,
         customTo?: string,
         customCc?: string,
-        customBcc?: string
+        customBcc?: string,
+        attachments?: Array<{ filename: string; content: Buffer; contentType: string }>
     ): Promise<string> {
         const accessToken = account.access_token || '';
 
@@ -499,6 +500,38 @@ export class MicrosoftService {
             }
         );
 
+        // Upload attachments if present
+        if (attachments && attachments.length > 0) {
+            for (const attachment of attachments) {
+                const attachmentPayload = {
+                    '@odata.type': '#microsoft.graph.fileAttachment',
+                    name: attachment.filename,
+                    contentType: attachment.contentType,
+                    contentBytes: attachment.content.toString('base64')
+                };
+
+                const attachResponse = await fetch(
+                    `https://graph.microsoft.com/v1.0/me/messages/${draft.id}/attachments`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(attachmentPayload)
+                    }
+                );
+
+                if (!attachResponse.ok) {
+                    logger.warn('Failed to attach file, continuing with send', {
+                        filename: attachment.filename,
+                        status: attachResponse.status
+                    });
+                }
+            }
+            logger.info('Attachments uploaded to draft', { draftId: draft.id, count: attachments.length });
+        }
+
         // Send
         const sendResponse = await fetch(
             `https://graph.microsoft.com/v1.0/me/messages/${draft.id}/send`,
@@ -519,7 +552,8 @@ export class MicrosoftService {
             to: customTo,
             cc: customCc,
             bcc: customBcc,
-            subject: customSubject
+            subject: customSubject,
+            attachments: attachments?.length || 0
         });
         return draft.id;
     }
