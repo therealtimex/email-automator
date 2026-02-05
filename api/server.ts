@@ -17,56 +17,69 @@ import { startScheduler, stopScheduler } from './src/services/scheduler.js';
 import { setEncryptionKey } from './src/utils/encryption.js';
 
 // Initialize Persistence Encryption
+// NOTE: In RealTimeX Desktop sandbox, all config is stored in Supabase (no .env files)
 async function initializePersistenceEncryption() {
     try {
         const supabase = getServiceRoleSupabase();
         if (!supabase) {
-            logger.info('Supabase not configured yet, skipping encryption persistence init');
+            logger.info('Supabase not configured yet, skipping encryption initialization');
+            logger.info('IMAP features will be available after completing Setup Wizard');
             return;
         }
 
         // 1. Check if ANY user has an encryption key stored
-        // We use limit(1) because in a single-tenant BYOK app, all users (or the main one) share the instance state
+        // In sandbox mode, encryption key is always in database
         const { data: users, error } = await supabase
             .from('user_settings')
             .select('user_id, encryption_key')
-            .not('encryption_key', 'is', null) // filter where key is NOT null
+            .not('encryption_key', 'is', null)
             .limit(1);
 
         if (error) {
             logger.warn('Failed to query user_settings for encryption key', { error });
-            // Non-fatal, fallback to env key
             return;
         }
 
         if (users && users.length > 0 && users[0].encryption_key) {
-            // Found a persisted key!
-            logger.info('Loaded encryption key from database persistence');
+            // Found a persisted key in database
+            logger.info('✓ Loaded encryption key from database');
             setEncryptionKey(users[0].encryption_key);
             return;
         }
 
-        // 2. If NO key in DB, but we have one in Env (volatile or .env), persist it to the DB for the first user
-        // This handles the "Migration" phase (moving from Env -> DB)
-        const envKey = process.env.ENCRYPTION_KEY;
-        if (envKey) {
-            const { data: firstUser } = await supabase
-                .from('user_settings')
-                .select('user_id')
-                .limit(1)
-                .maybeSingle();
+        // 2. No key in database - auto-generate and persist
+        // This happens on first run or after fresh database setup
+        logger.info('No encryption key found in database, generating new key...');
+        const newKey = crypto.randomBytes(32).toString('hex');
+        setEncryptionKey(newKey);
 
-            if (firstUser) {
-                logger.info('Persisting environment encryption key to database for future portability');
-                await supabase
+        // 3. Persist to all existing users in database
+        const { data: allUsers } = await supabase
+            .from('user_settings')
+            .select('user_id')
+            .limit(100);
+
+        if (allUsers && allUsers.length > 0) {
+            logger.info(`Saving encryption key to database for ${allUsers.length} user(s)...`);
+
+            // Update all users with the new key
+            const updates = allUsers.map(user =>
+                supabase
                     .from('user_settings')
-                    .update({ encryption_key: envKey })
-                    .eq('user_id', firstUser.user_id);
-            }
+                    .update({ encryption_key: newKey })
+                    .eq('user_id', user.user_id)
+            );
+
+            await Promise.all(updates);
+            logger.info('✓ Encryption key saved to database');
+        } else {
+            logger.info('No users found yet, encryption key loaded in memory');
+            logger.info('Key will be persisted when first user is created');
         }
 
     } catch (err) {
-        logger.error('Error initializing encryption persistence', err);
+        logger.error('Error initializing encryption:', err);
+        logger.warn('⚠ IMAP features may not work properly');
     }
 }
 

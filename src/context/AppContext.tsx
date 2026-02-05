@@ -416,6 +416,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const response = await api.getAccounts();
             if (response.data) {
                 dispatch({ type: 'SET_ACCOUNTS', payload: response.data.accounts });
+            } else if (response.error) {
+                console.error('[AppContext] Failed to fetch accounts:', response.error);
+                // Don't show error toast on silent background fetches, just log it
             }
         },
 
@@ -423,6 +426,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const response = await api.getRules();
             if (response.data) {
                 dispatch({ type: 'SET_RULES', payload: response.data.rules });
+            } else if (response.error) {
+                console.error('[AppContext] Failed to fetch rules:', response.error);
             }
         },
 
@@ -430,6 +435,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const response = await api.getSettings();
             if (response.data) {
                 dispatch({ type: 'SET_SETTINGS', payload: response.data.settings });
+            } else if (response.error) {
+                console.error('[AppContext] Failed to fetch settings:', response.error);
             }
         },
 

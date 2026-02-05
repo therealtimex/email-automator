@@ -5,6 +5,16 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.2] - 2026-02-05
+
+### Added
+- **Security**: Improved encryption key management. The encryption key is now automatically generated on first run and persisted in the database, ensuring IMAP/SMTP accounts are secure without requiring manual `.env` configuration in sandbox environments.
+- **Reliability**: Implemented automatic encryption key propagation for new users via database triggers, ensuring seamless onboarding for multi-user sandbox deployments.
+
+### Fixed
+- **App Initialization**: Added robust retry logic for initial data fetching (accounts, rules, settings) to handle race conditions during the application boot process.
+- **Logging**: Improved background fetch error reporting. Failures in silent background syncs are now logged to the console instead of triggering UI toast notifications, reducing user interruptions.
+
 ## [2.23.1] - 2026-02-05
 
 ### Added

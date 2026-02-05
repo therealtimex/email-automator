@@ -229,10 +229,20 @@ function AppContent() {
     // Data loading when authenticated
     useEffect(() => {
         if (user) {
+            // Immediate fetch
             actions.fetchAccounts();
             actions.fetchRules();
             actions.fetchSettings();
             actions.fetchProfile();
+
+            // Retry accounts fetch after a delay to handle race conditions
+            // where Supabase client or API might not be fully ready
+            const retryTimer = setTimeout(() => {
+                console.debug('[App] Retrying fetchAccounts after initialization');
+                actions.fetchAccounts();
+            }, 1000);
+
+            return () => clearTimeout(retryTimer);
         }
     }, [user]);
 
