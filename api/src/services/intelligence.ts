@@ -9,7 +9,7 @@ const logger = createLogger('Intelligence');
 // Define the schema for email analysis
 export const EmailAnalysisSchema = z.object({
     summary: z.string().describe('A brief summary of the email content'),
-    category: z.enum(['spam', 'newsletter', 'news', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'other'])
+    category: z.enum(['spam', 'newsletter', 'news', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'notification', 'other'])
         .describe('The category of the email'),
     sentiment: z.enum(['Positive', 'Neutral', 'Negative'])
         .describe('The emotional tone of the email'),
@@ -34,7 +34,7 @@ export type EmailAnalysis = z.infer<typeof EmailAnalysisSchema>;
 // Context-Aware Analysis Schema - AI evaluates email against user's rules
 export const ContextAwareAnalysisSchema = z.object({
     summary: z.string().describe('A brief summary of the email content'),
-    category: z.enum(['spam', 'newsletter', 'news', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'other'])
+    category: z.enum(['spam', 'newsletter', 'news', 'promotional', 'transactional', 'social', 'support', 'client', 'internal', 'personal', 'notification', 'other'])
         .describe('The category of the email'),
     sentiment: z.enum(['Positive', 'Neutral', 'Negative']).optional()
         .describe('The emotional tone of the email'),
@@ -640,7 +640,22 @@ CRITICAL INSTRUCTIONS:
             }
 
             // 5. Validate with Zod
-            return schema.parse(parsed);
+            const firstAttempt = schema.safeParse(parsed);
+            if (firstAttempt.success) return firstAttempt.data;
+
+            // 6. Coerce invalid enum values and retry before giving up
+            const coerced = this.coerceEnumErrors(parsed, firstAttempt.error);
+            if (coerced) {
+                logger.debug('Coerced enum values in LLM response', { coercions: coerced.log });
+                if (eventLogger && emailId) {
+                    eventLogger.info('Coerced', `Auto-corrected: ${coerced.log.join(', ')}`, {}, emailId).catch(() => {});
+                }
+                const retry = schema.safeParse(coerced.data);
+                if (retry.success) return retry.data;
+            }
+
+            // Still failing after coercion — throw original error for the catch block
+            throw firstAttempt.error;
         } catch (e: any) {
             logger.error('JSON Robust Parsing failed', { error: e.message, input: input.substring(0, 200) });
             if (eventLogger && emailId) {
@@ -651,6 +666,103 @@ CRITICAL INSTRUCTIONS:
             }
             return null;
         }
+    }
+
+    /**
+     * Extracts invalid_enum_value issues from a ZodError, coerces each to the
+     * closest valid option, and returns the patched object + a log of what changed.
+     * Returns null if there were no enum issues to fix.
+     */
+    private coerceEnumErrors(parsed: any, error: z.ZodError): { data: any; log: string[] } | null {
+        const enumIssues = error.issues.filter(
+            (i): i is z.ZodIssue & { code: 'invalid_enum_value'; options: string[]; received: string } => i.code === 'invalid_enum_value'
+        );
+        if (enumIssues.length === 0) return null;
+
+        const coerced = JSON.parse(JSON.stringify(parsed)); // deep clone
+        const log: string[] = [];
+
+        for (const issue of enumIssues) {
+            const options = issue.options as string[];
+            const received = String(issue.received);
+            const mapped = this.mapToClosestEnum(received, options);
+
+            // Walk the path to set the coerced value (handles nested e.g. actions_to_execute[0])
+            let target = coerced;
+            for (let i = 0; i < issue.path.length - 1; i++) {
+                target = target[issue.path[i]];
+                if (target == null) break;
+            }
+            if (target != null && issue.path.length > 0) {
+                target[issue.path[issue.path.length - 1]] = mapped;
+                log.push(`${issue.path.join('.')}: "${received}" → "${mapped}"`);
+            }
+        }
+
+        return log.length > 0 ? { data: coerced, log } : null;
+    }
+
+    /**
+     * Maps an unexpected enum value to the closest valid option using:
+     * 1. Case-insensitive exact match (e.g. "positive" → "Positive")
+     * 2. Known synonym table (e.g. "marketing" → "promotional")
+     * 3. Substring containment (e.g. "newsletter_digest" → "newsletter")
+     * 4. Sensible field-agnostic defaults ("other", "Neutral", "Medium", "none")
+     */
+    private mapToClosestEnum(received: string, options: string[]): string {
+        const lower = received.toLowerCase().trim();
+
+        // 1. Case-insensitive exact match
+        const exact = options.find(o => o.toLowerCase() === lower);
+        if (exact) return exact;
+
+        // 2. Known synonyms (covers common LLM drift across category + action enums)
+        const synonyms: Record<string, string> = {
+            // Category
+            'marketing': 'promotional',
+            'advertisement': 'promotional',
+            'ads': 'promotional',
+            'alert': 'notification',
+            'alerts': 'notification',
+            'automated': 'transactional',
+            'receipt': 'transactional',
+            'confirmation': 'transactional',
+            'update': 'transactional',
+            'updates': 'transactional',
+            'digest': 'newsletter',
+            'subscription': 'newsletter',
+            'work': 'client',
+            'business': 'client',
+            'colleague': 'internal',
+            'team': 'internal',
+            'family': 'personal',
+            'friends': 'personal',
+            'security': 'transactional',
+            'bug': 'support',
+            'ticket': 'support',
+            // Actions
+            'trash': 'delete',
+            'remove': 'delete',
+            'reply': 'draft',
+            'respond': 'draft',
+            'mark': 'star',
+            'flag': 'star',
+        };
+        if (synonyms[lower] && options.includes(synonyms[lower])) {
+            return synonyms[lower];
+        }
+
+        // 3. Substring containment (e.g. "newsletter_digest" contains "newsletter")
+        const partial = options.find(o => lower.includes(o.toLowerCase()) || o.toLowerCase().includes(lower));
+        if (partial) return partial;
+
+        // 4. Sensible defaults — pick the most neutral option available
+        if (options.includes('other')) return 'other';
+        if (options.includes('Neutral')) return 'Neutral';
+        if (options.includes('Medium')) return 'Medium';
+        if (options.includes('none')) return 'none';
+
+        return options[options.length - 1];
     }
 }
 

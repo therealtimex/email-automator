@@ -5,10 +5,67 @@ import { authRateLimit } from '../middleware/rateLimit.js';
 import { validateBody, schemas } from '../middleware/validation.js';
 import { getGmailService } from '../services/gmail.js';
 import { getMicrosoftService } from '../services/microsoft.js';
+import { getImapService } from '../services/imap-service.js';
 import { createLogger } from '../utils/logger.js';
 
 const router = Router();
 const logger = createLogger('AuthRoutes');
+
+// IMAP/SMTP Connection
+router.post('/imap/connect',
+    authRateLimit,
+    authMiddleware,
+    validateBody(schemas.imapConnect),
+    asyncHandler(async (req, res) => {
+        const {
+            email, password,
+            imapHost, imapPort, imapSecure,
+            smtpHost, smtpPort, smtpSecure
+        } = req.body;
+
+        const imapService = getImapService();
+        const imapConfig = {
+            host: imapHost,
+            port: imapPort,
+            secure: imapSecure,
+            user: email,
+            auth: { user: email, pass: password }
+        };
+        const smtpConfig = {
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpSecure,
+            auth: { user: email, pass: password }
+        };
+
+        // 1. Verify Connection
+        await imapService.verifyConnection(imapConfig, smtpConfig);
+
+        // 2. Save Account
+        const account = await imapService.saveAccount(
+            req.supabase!,
+            req.user!.id,
+            email,
+            imapConfig,
+            smtpConfig
+        );
+
+        logger.info('IMAP account connected', {
+            userId: req.user!.id,
+            email: email
+        });
+
+        res.json({
+            success: true,
+            account: {
+                id: account.id,
+                email_address: account.email_address,
+                provider: 'imap',
+                connection_type: 'imap'
+            }
+        });
+    })
+);
 
 // Gmail OAuth
 router.get('/gmail/url', authRateLimit, asyncHandler(async (req, res) => {
@@ -18,17 +75,17 @@ router.get('/gmail/url', authRateLimit, asyncHandler(async (req, res) => {
     res.json({ url });
 }));
 
-router.post('/gmail/callback', 
+router.post('/gmail/callback',
     authRateLimit,
     authMiddleware,
     validateBody(schemas.gmailCallback),
     asyncHandler(async (req, res) => {
         const { code } = req.body;
         const gmailService = getGmailService();
-        
+
         // Exchange code for tokens
         const tokens = await gmailService.exchangeCode(code);
-        
+
         if (!tokens.access_token) {
             throw new ValidationError('Failed to obtain access token');
         }
@@ -47,9 +104,9 @@ router.post('/gmail/callback',
             created_at: '',
             updated_at: '',
         };
-        
+
         const profile = await gmailService.getProfile(tempAccount);
-        
+
         // Save account
         const account = await gmailService.saveAccount(
             req.supabase!,
@@ -58,13 +115,13 @@ router.post('/gmail/callback',
             tokens
         );
 
-        logger.info('Gmail account connected', { 
-            userId: req.user!.id, 
-            email: profile.emailAddress 
+        logger.info('Gmail account connected', {
+            userId: req.user!.id,
+            email: profile.emailAddress
         });
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             account: {
                 id: account.id,
                 email_address: account.email_address,
@@ -80,7 +137,7 @@ router.post('/microsoft/device-flow',
     authMiddleware,
     asyncHandler(async (req, res) => {
         const microsoftService = getMicrosoftService();
-        
+
         // Start device code flow
         const result = await microsoftService.acquireTokenByDeviceCode((response) => {
             // This callback is called when the device code is ready
@@ -124,7 +181,7 @@ router.delete('/accounts/:accountId',
     authMiddleware,
     asyncHandler(async (req, res) => {
         const { accountId } = req.params;
-        
+
         const { error } = await req.supabase!
             .from('email_accounts')
             .delete()

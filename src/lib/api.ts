@@ -188,6 +188,13 @@ class HybridApiClient {
         });
     }
 
+    async connectImap(data: any) {
+        return this.expressRequest<{ success: boolean; account: any }>('/api/auth/imap/connect', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
     // ============================================================================
     // ACCOUNTS ENDPOINTS (Edge Functions)
     // ============================================================================

@@ -81,7 +81,7 @@ export type EmailAction = 'reply' | 'draft' | 'archive' | 'trash' | 'mark_read' 
 export interface EmailAccount {
     id: string;
     user_id: string;
-    provider: 'gmail' | 'outlook';
+    provider: 'gmail' | 'outlook' | 'imap';
     email_address: string;
     access_token: string | null;
     refresh_token: string | null;
@@ -96,6 +96,8 @@ export interface EmailAccount {
     last_sync_error?: string | null;
     created_at: string;
     updated_at: string;
+    connection_type?: string | null; // 'oauth' (default) or 'imap'
+    imap_config?: any | null; // JSONB with IMAP/SMTP details
 }
 
 export interface Email {

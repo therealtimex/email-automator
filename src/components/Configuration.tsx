@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { ShieldCheck, Database, RefreshCw, Check, Trash2, Power, ExternalLink, Upload, X, Plus, Clock } from 'lucide-react';
+import { ShieldCheck, Database, RefreshCw, Check, Trash2, Power, ExternalLink, Upload, X, Plus, Clock, Mail } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,6 +11,7 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { EmailAccount, UserSettings } from '../lib/types';
 import { usePageAgent } from '../hooks/usePageAgent';
 import { TTSSettings } from './TTSSettings';
+import { ImapConnectModal } from './ImapConnectModal';
 import {
     Dialog,
     DialogContent,
@@ -87,6 +88,9 @@ export function Configuration() {
     const [outlookClientId, setOutlookClientId] = useState('');
     const [outlookTenantId, setOutlookTenantId] = useState('');
     const [savingOutlookCredentials, setSavingOutlookCredentials] = useState(false);
+
+    // IMAP modal state
+    const [showImapModal, setShowImapModal] = useState(false);
 
     const [chatProviders, setChatProviders] = useState<LLMProvider[]>([]);
     const [isLoadingProviders, setIsLoadingProviders] = useState(false);
@@ -471,6 +475,13 @@ export function Configuration() {
                 </div>
             );
         }
+        if (provider === 'imap') {
+            return (
+                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400">
+                    <Mail className="w-5 h-5" />
+                </div>
+            );
+        }
         return (
             <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
                 O
@@ -529,21 +540,21 @@ export function Configuration() {
                                 {/* Manual entry */}
                                 <div className="space-y-3">
                                     <div className="space-y-2">
-                                    <label className="text-sm font-medium">{t('config.byok.clientId')}</label>
-                                    <Input
-                                        placeholder={t('config.gmail.clientIdPlaceholder')}
-                                        value={gmailClientId}
-                                        onChange={(e) => setGmailClientId(e.target.value)}
-                                    />
+                                        <label className="text-sm font-medium">{t('config.byok.clientId')}</label>
+                                        <Input
+                                            placeholder={t('config.gmail.clientIdPlaceholder')}
+                                            value={gmailClientId}
+                                            onChange={(e) => setGmailClientId(e.target.value)}
+                                        />
                                     </div>
                                     <div className="space-y-2">
-                                    <label className="text-sm font-medium">{t('config.byok.clientSecret')}</label>
-                                    <Input
-                                        type="password"
-                                        placeholder={t('config.gmail.clientSecretPlaceholder')}
-                                        value={gmailClientSecret}
-                                        onChange={(e) => setGmailClientSecret(e.target.value)}
-                                    />
+                                        <label className="text-sm font-medium">{t('config.byok.clientSecret')}</label>
+                                        <Input
+                                            type="password"
+                                            placeholder={t('config.gmail.clientSecretPlaceholder')}
+                                            value={gmailClientSecret}
+                                            onChange={(e) => setGmailClientSecret(e.target.value)}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -570,9 +581,9 @@ export function Configuration() {
                             {/* Step 2: Paste Authorization Code */}
                             <div className="space-y-4 py-4">
                                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                        <p className="text-sm text-blue-800 dark:text-blue-200">
-                                            {t('config.gmail.authSteps')}
-                                        </p>
+                                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                                        {t('config.gmail.authSteps')}
+                                    </p>
                                 </div>
 
                                 <div className="space-y-2">
@@ -718,6 +729,9 @@ export function Configuration() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* IMAP Connect Modal */}
+            <ImapConnectModal open={showImapModal} onOpenChange={setShowImapModal} />
 
             {/* Bring Your Own Key (BYOK) */}
             <div ref={credentialsRef}>
@@ -865,6 +879,24 @@ export function Configuration() {
                                             )}
                                         </div>
                                     </Button>
+
+                                    <Button
+                                        className="w-full border-dashed justify-start h-auto py-4"
+                                        variant="outline"
+                                        onClick={() => setShowImapModal(true)}
+                                        disabled={isConnecting || isOutlookConnecting}
+                                    >
+                                        <div className="flex items-center gap-3 w-full">
+                                            <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 font-bold shrink-0">
+                                                <Mail className="w-5 h-5" />
+                                            </div>
+                                            <div className="flex-1 text-left">
+                                                <div className="font-medium">{t('config.providers.imap') || 'IMAP / SMTP'}</div>
+                                                <div className="text-xs text-muted-foreground">{t('config.imap.connectDesc') || 'Connect any provider via App Password'}</div>
+                                            </div>
+                                            <Plus className="w-5 h-5 shrink-0" />
+                                        </div>
+                                    </Button>
                                 </div>
                             </div>
 
@@ -921,7 +953,7 @@ export function Configuration() {
                                             <div className="flex items-center gap-3">
                                                 {getProviderIcon(account.provider)}
                                                 <div>
-                                                    <h4 className="font-medium capitalize">{account.provider}</h4>
+                                                    <h4 className="font-medium capitalize">{account.provider === 'imap' ? 'IMAP' : account.provider}</h4>
                                                     <p className="text-xs text-muted-foreground">
                                                         {account.email_address}
                                                     </p>
@@ -1088,7 +1120,7 @@ export function Configuration() {
                                         ))}
                                     </select>
                                 ) : (
-                                <Input
+                                    <Input
                                         placeholder={t('config.model.modelPlaceholder')}
                                         value={localSettings.llm_model || ''}
                                         onChange={(e) => setLocalSettings(s => ({ ...s, llm_model: e.target.value }))}
@@ -1147,7 +1179,7 @@ export function Configuration() {
                                         ))}
                                     </select>
                                 ) : (
-                                <Input
+                                    <Input
                                         placeholder={t('config.embed.modelPlaceholder')}
                                         value={localSettings.embedding_model || ''}
                                         onChange={(e) => setLocalSettings(s => ({ ...s, embedding_model: e.target.value }))}

@@ -12,8 +12,63 @@ import { errorHandler } from './src/middleware/errorHandler.js';
 import { apiRateLimit } from './src/middleware/rateLimit.js';
 import routes from './src/routes/index.js';
 import { logger } from './src/utils/logger.js';
-import { getServerSupabase } from './src/services/supabase.js';
+import { getServerSupabase, getServiceRoleSupabase } from './src/services/supabase.js';
 import { startScheduler, stopScheduler } from './src/services/scheduler.js';
+import { setEncryptionKey } from './src/utils/encryption.js';
+
+// Initialize Persistence Encryption
+async function initializePersistenceEncryption() {
+    try {
+        const supabase = getServiceRoleSupabase();
+        if (!supabase) {
+            logger.info('Supabase not configured yet, skipping encryption persistence init');
+            return;
+        }
+
+        // 1. Check if ANY user has an encryption key stored
+        // We use limit(1) because in a single-tenant BYOK app, all users (or the main one) share the instance state
+        const { data: users, error } = await supabase
+            .from('user_settings')
+            .select('user_id, encryption_key')
+            .not('encryption_key', 'is', null) // filter where key is NOT null
+            .limit(1);
+
+        if (error) {
+            logger.warn('Failed to query user_settings for encryption key', { error });
+            // Non-fatal, fallback to env key
+            return;
+        }
+
+        if (users && users.length > 0 && users[0].encryption_key) {
+            // Found a persisted key!
+            logger.info('Loaded encryption key from database persistence');
+            setEncryptionKey(users[0].encryption_key);
+            return;
+        }
+
+        // 2. If NO key in DB, but we have one in Env (volatile or .env), persist it to the DB for the first user
+        // This handles the "Migration" phase (moving from Env -> DB)
+        const envKey = process.env.ENCRYPTION_KEY;
+        if (envKey) {
+            const { data: firstUser } = await supabase
+                .from('user_settings')
+                .select('user_id')
+                .limit(1)
+                .maybeSingle();
+
+            if (firstUser) {
+                logger.info('Persisting environment encryption key to database for future portability');
+                await supabase
+                    .from('user_settings')
+                    .update({ encryption_key: envKey })
+                    .eq('user_id', firstUser.user_id);
+            }
+        }
+
+    } catch (err) {
+        logger.error('Error initializing encryption persistence', err);
+    }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -314,27 +369,34 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
 // Start server
-const server = app.listen(config.port, () => {
-    const url = `http://localhost:${config.port}`;
-    logger.info(`Server running at ${url}`, {
-        environment: config.nodeEnv,
-        supabase: getServerSupabase() ? 'connected' : 'not configured',
+const startServer = async () => {
+    // Try to load encryption key before accepting requests
+    await initializePersistenceEncryption();
+
+    const server = app.listen(config.port, () => {
+        const url = `http://localhost:${config.port}`;
+        logger.info(`Server running at ${url}`, {
+            environment: config.nodeEnv,
+            supabase: getServerSupabase() ? 'connected' : 'not configured',
+        });
+
+        // Start background scheduler
+        if (getServerSupabase()) {
+            startScheduler();
+        }
     });
 
-    // Start background scheduler
-    if (getServerSupabase()) {
-        startScheduler();
-    }
-});
+    // Handle server errors
+    server.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'EADDRINUSE') {
+            logger.error(`Port ${config.port} is already in use`);
+        } else {
+            logger.error('Server error', error);
+        }
+        process.exit(1);
+    });
+};
 
-// Handle server errors
-server.on('error', (error: NodeJS.ErrnoException) => {
-    if (error.code === 'EADDRINUSE') {
-        logger.error(`Port ${config.port} is already in use`);
-    } else {
-        logger.error('Server error', error);
-    }
-    process.exit(1);
-});
+startServer();
 
 export default app;

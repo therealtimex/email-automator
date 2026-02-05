@@ -13,9 +13,10 @@ export interface Profile {
 export interface EmailAccount {
     id: string;
     user_id: string;
-    provider: 'gmail' | 'outlook';
+    provider: 'gmail' | 'outlook' | 'imap';
     email_address: string;
     is_active: boolean;
+    connection_type?: 'oauth' | 'imap' | null;
     last_sync_checkpoint?: string | null;
     sync_start_date?: string | null;
     sync_max_emails_per_run?: number;
@@ -245,7 +246,7 @@ export interface UserFeedback {
 }
 
 // Enums
-export type EmailCategory = 'spam' | 'newsletter' | 'news' | 'promotional' | 'transactional' | 'social' | 'support' | 'client' | 'internal' | 'personal' | 'other';
+export type EmailCategory = 'spam' | 'newsletter' | 'news' | 'promotional' | 'transactional' | 'social' | 'support' | 'client' | 'internal' | 'personal' | 'notification' | 'other';
 export type EmailAction = 'none' | 'delete' | 'archive' | 'reply' | 'flag' | 'draft';
 export type Sentiment = 'Positive' | 'Neutral' | 'Negative';
 export type Priority = 'High' | 'Medium' | 'Low';

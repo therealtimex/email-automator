@@ -17,8 +17,8 @@ const ROOT_DIR = path.join(__dirname, '..');
 const DOCS_ROOT = path.join(ROOT_DIR, 'docs');
 const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf-8'));
 
-// Supported languages for RAG
-const SUPPORTED_LANGUAGES = ['en', 'fr', 'es', 'ja', 'ko', 'vi'];
+// Language to ingest for RAG (English only)
+const SUPPORTED_LANGUAGES = ['en'];
 
 // Initialize Supabase client
 // Prefer SERVICE_ROLE_KEY for admin operations (bypasses RLS)
@@ -135,9 +135,9 @@ async function generateEmbedding(text: string): Promise<number[]> {
  * Main ingestion function
  */
 async function ingestKnowledge() {
-    console.log('📚 Starting multilingual knowledge base ingestion...');
+    console.log('📚 Starting knowledge base ingestion...');
     console.log(`   Version: ${packageJson.version}`);
-    console.log(`   Languages: ${SUPPORTED_LANGUAGES.join(', ')}`);
+    console.log(`   Language: ${SUPPORTED_LANGUAGES[0]}`);
 
     // Initialize SDK
     try {
@@ -157,7 +157,7 @@ async function ingestKnowledge() {
     // Process each language
     for (const lang of SUPPORTED_LANGUAGES) {
         const langDir = path.join(DOCS_ROOT, lang, 'user-guide');
-        
+
         if (!fs.existsSync(langDir)) {
             console.warn(`⚠️ Warning: Documentation directory not found for language: ${lang} (${langDir})`);
             continue;
@@ -184,10 +184,10 @@ async function ingestKnowledge() {
         }
     }
 
-    console.log(`\n📦 Total chunks across all languages: ${allChunks.length}`);
+    console.log(`\n📦 Total chunks: ${allChunks.length}`);
 
-    // Clear existing chunks for this version
-    console.log('\n🧹 Clearing old chunks...');
+    // Clear only current version chunks before re-ingesting
+    console.log('\n🧹 Clearing old chunks for this version...');
     const { error: deleteError } = await supabase
         .from('knowledge_chunks')
         .delete()
@@ -212,10 +212,10 @@ async function ingestKnowledge() {
             // Generate embedding
             const embedding = await generateEmbedding(chunk.content);
 
-            // Insert into database
+            // Upsert into database (idempotent on content_hash)
             const { error: insertError } = await supabase
                 .from('knowledge_chunks')
-                .insert({
+                .upsert({
                     content: chunk.content,
                     content_hash: chunk.content_hash,
                     source_file: chunk.source_file,
@@ -224,7 +224,7 @@ async function ingestKnowledge() {
                     lang: chunk.lang,
                     embedding: embedding,
                     version: chunk.version
-                });
+                }, { onConflict: 'content_hash' });
 
             if (insertError) {
                 console.error(`${progress} ❌ [${chunk.lang}] ${chunk.source_file}:`, insertError.message);

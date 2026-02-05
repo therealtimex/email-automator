@@ -128,4 +128,16 @@ export const schemas = {
         microsoft_client_secret: z.string().optional(),
         microsoft_tenant_id: z.string().optional(),
     }),
+
+    // IMAP/SMTP Schema
+    imapConnect: z.object({
+        email: z.string().email(),
+        password: z.string().min(1, 'Password is required'),
+        imapHost: z.string().min(1),
+        imapPort: z.number().int().positive(),
+        imapSecure: z.boolean().default(true),
+        smtpHost: z.string().min(1),
+        smtpPort: z.number().int().positive(),
+        smtpSecure: z.boolean().default(true),
+    }),
 };

@@ -4,6 +4,7 @@ import { createLogger } from '../utils/logger.js';
 import { config } from '../config/index.js';
 import { getGmailService, GmailMessage } from './gmail.js';
 import { getMicrosoftService, OutlookMessage } from './microsoft.js';
+import { getImapService, EmailMessage as ImapMessage } from './imap-service.js';
 import { getIntelligenceService, EmailAnalysis, ContextAwareAnalysis, RuleContext } from './intelligence.js';
 import { getStorageService } from './storage.js';
 import { generateEmailFilename } from '../utils/filename.js';
@@ -131,6 +132,7 @@ export class EmailProcessorService {
     private supabase: SupabaseClient;
     private gmailService = getGmailService();
     private microsoftService = getMicrosoftService();
+    private imapService = getImapService();
     private storageService = getStorageService();
     private lastStopCheck: number = 0;
 
@@ -192,6 +194,9 @@ export class EmailProcessorService {
                 refreshedAccount = await this.gmailService.refreshTokenIfNeeded(this.supabase, account);
             } else if (account.provider === 'outlook') {
                 refreshedAccount = await this.microsoftService.refreshTokenIfNeeded(this.supabase, account);
+            } else if (account.connection_type === 'imap') {
+                // IMAP doesn't need token refresh, but we could verify connection here if we wanted
+                refreshedAccount = account;
             }
 
             // Update status to syncing
@@ -229,9 +234,13 @@ export class EmailProcessorService {
                     await this.processGmailAccount(refreshedAccount, rules || [], settings, result, eventLogger);
                 } else if (refreshedAccount.provider === 'outlook') {
                     await this.processOutlookAccount(refreshedAccount, rules || [], settings, result, eventLogger);
+                } else if (refreshedAccount.connection_type === 'imap') {
+                    await this.processImapAccount(refreshedAccount, rules || [], settings, result, eventLogger);
                 }
             } catch (providerError) {
-                const providerName = refreshedAccount.provider === 'gmail' ? 'Gmail' : 'Outlook';
+                const providerName = refreshedAccount.provider === 'gmail' ? 'Gmail' :
+                    refreshedAccount.provider === 'outlook' ? 'Outlook' :
+                        'IMAP';
                 throw new Error(`${providerName} Sync Error: ${providerError instanceof Error ? providerError.message : String(providerError)}`);
             }
 
@@ -519,9 +528,103 @@ export class EmailProcessorService {
         }
     }
 
+    private async processImapAccount(
+        account: EmailAccount,
+        rules: Rule[],
+        settings: any,
+        result: ProcessingResult,
+        eventLogger: EventLogger | null
+    ): Promise<void> {
+        const batchSize = account.sync_max_emails_per_run || config.processing.batchSize;
+
+        logger.info('IMAP sync settings', {
+            accountId: account.id,
+            sync_start_date: account.sync_start_date,
+            batchSize
+        });
+
+        // IMAP fetching is simpler - usually just fetches N oldest messages or messages since UID
+        // For simplicity in this v1, we use the same "Oldest First" strategy via sequence numbers
+        // We rely on the ImapService to handle the fetch logic.
+        // Note: IMAP doesn't inherently support 'query' like Gmail API, so we fetch standard batch.
+
+        // However, to support sync_start_date, native IMAP SEARCH is needed. 
+        // Our simple ImapService currently just fetches 1:limit.
+        // We will stick to that for V1 (fetching oldest first), filtering in memory if needed.
+        // Ideally we improve ImapService later to support SEARCH SINCE <DATE>.
+
+        // Determine effective start timestamp for IMAP SEARCH + Filter
+        let minTimestamp: number | undefined;
+        if (account.sync_start_date) {
+            minTimestamp = new Date(account.sync_start_date).getTime();
+            logger.info('Using sync_start_date for IMAP SEARCH', { minTimestamp, date: account.sync_start_date });
+        } else if (account.last_sync_checkpoint) {
+            // Checkpoint is milliseconds timestamp string
+            const ms = parseInt(account.last_sync_checkpoint);
+            if (!isNaN(ms)) {
+                minTimestamp = ms;
+                logger.info('Using last_sync_checkpoint for IMAP SEARCH', { minTimestamp });
+            }
+        }
+
+        const { messages, hasMore } = await this.imapService.fetchMessagesOldestFirst(account, {
+            limit: batchSize,
+            minTimestamp: minTimestamp
+        });
+
+        if (eventLogger && messages.length > 0) {
+            await eventLogger.info('Fetching', `Fetched ${messages.length} emails via IMAP${hasMore ? ', more available' : ''}`);
+        }
+
+        // Initialize max tracking
+        let maxInternalDate = 0;
+        if (account.last_sync_checkpoint) {
+            maxInternalDate = parseInt(account.last_sync_checkpoint);
+        }
+
+        for (const message of messages) {
+            // --- STOP CHECK ---
+            if (await this.checkStopRequested(account.user_id, eventLogger)) break;
+
+            // Note: SEARCH SINCE is date-only (ignores time), so we still need fine-grained filtering
+            // for exact checkpoints or time-based start dates.
+            // Check effective start date (skip if too old and we have a manual start date)
+            const msgDate = new Date(message.internalDate).getTime();
+            if (account.sync_start_date && msgDate < new Date(account.sync_start_date).getTime()) {
+                continue; // Skip emails older than manual start date
+            }
+
+            try {
+                await this.processMessage(account, message, rules, settings, result, eventLogger);
+
+                // Track highest internalDate
+                if (msgDate > maxInternalDate) {
+                    maxInternalDate = msgDate;
+                }
+            } catch (error) {
+                logger.error('Failed to process IMAP message', error, { messageId: message.id });
+                if (eventLogger) await eventLogger.error('Error', error);
+                result.errors++;
+            }
+        }
+
+        // Update checkpoint
+        if (maxInternalDate > 0 && (!account.last_sync_checkpoint || maxInternalDate > parseInt(account.last_sync_checkpoint))) {
+            logger.info('Updating IMAP checkpoint', {
+                accountId: account.id,
+                newCheckpoint: maxInternalDate.toString()
+            });
+
+            await this.supabase
+                .from('email_accounts')
+                .update({ last_sync_checkpoint: maxInternalDate.toString() })
+                .eq('id', account.id);
+        }
+    }
+
     private async processMessage(
         account: EmailAccount,
-        message: GmailMessage | OutlookMessage,
+        message: GmailMessage | OutlookMessage | ImapMessage,
         rules: Rule[],
         settings: any,
         result: ProcessingResult,
@@ -540,31 +643,31 @@ export class EmailProcessorService {
             if (eventLogger) await eventLogger.info('Skipped', `Already processed ID: ${message.id}`);
 
             // Still need to return the date for checkpointing even if skipped
-            const rawMime = 'raw' in message
-                ? (account.provider === 'gmail'
-                    ? Buffer.from(message.raw, 'base64').toString('utf-8')
-                    : message.raw)
-                : '';
-            if (rawMime) {
-                const parsed = await simpleParser(rawMime);
+            const rawBuffer: Buffer = Buffer.isBuffer(message.raw)
+                ? message.raw
+                : account.provider === 'gmail'
+                    ? Buffer.from(message.raw, 'base64')
+                    : Buffer.from(message.raw, 'utf-8');
+            if (rawBuffer.length > 0) {
+                const parsed = await simpleParser(rawBuffer);
                 return { date: parsed.date ? parsed.date.toISOString() : new Date().toISOString() };
             }
             return;
         }
 
-        // Extract raw content string (Gmail is base64url, Outlook is raw text from $value)
-        const rawMime = 'raw' in message
-            ? (account.provider === 'gmail'
-                ? Buffer.from(message.raw, 'base64').toString('utf-8')
-                : message.raw)
-            : '';
+        // Extract raw bytes (Gmail is base64 string, IMAP is Buffer, Outlook is plain text string)
+        const rawBuffer: Buffer = Buffer.isBuffer(message.raw)
+            ? message.raw
+            : account.provider === 'gmail'
+                ? Buffer.from(message.raw, 'base64')
+                : Buffer.from(message.raw, 'utf-8');
 
-        if (!rawMime) {
+        if (rawBuffer.length === 0) {
             throw new Error(`No raw MIME content found for message ${message.id}`);
         }
 
         // 1. Extract metadata from raw MIME using mailparser for the DB record
-        const parsed = await simpleParser(rawMime);
+        const parsed = await simpleParser(rawBuffer);
         const subject = parsed.subject || 'No Subject';
         const sender = parsed.from?.text || 'Unknown';
         const recipient = parsed.to ? (Array.isArray(parsed.to) ? parsed.to[0].text : parsed.to.text) : '';
@@ -582,7 +685,7 @@ export class EmailProcessorService {
                 externalId: message.id,
                 intelligentRename: settings?.intelligent_rename || config.intelligentRename
             });
-            filePath = await this.storageService.saveEmail(rawMime, filename, settings?.storage_path);
+            filePath = await this.storageService.saveEmail(rawBuffer, filename, settings?.storage_path);
         } catch (storageError) {
             logger.error('Failed to save raw email content', storageError);
             if (eventLogger) await eventLogger.error('Storage Error', storageError);
@@ -1447,6 +1550,10 @@ export class EmailProcessorService {
                     await this.gmailService.applyLabelByName(account, email.external_id, labelName);
                 } else if (account.provider === 'outlook') {
                     await this.microsoftService.moveToFolderByPath(account, email.external_id, labelName);
+                } else if (account.connection_type === 'imap') {
+                    // IMAP folder support requires more complex logic (checking existence, creating)
+                    logger.warn('Label actions not yet supported for IMAP accounts', { emailId: email.id, labelName });
+                    if (eventLogger) await eventLogger.info('Skipped', `Label action skipped for IMAP: ${labelName}`);
                 }
                 logger.debug('Label/folder action executed', { emailId: email.id, labelName });
                 return;
@@ -1487,6 +1594,18 @@ export class EmailProcessorService {
                     return draftId;
                 } else if (action === 'star' || action === 'important') {
                     await this.microsoftService.flagMessage(account, email.external_id);
+                }
+            } else if (account.connection_type === 'imap') {
+                if (action === 'delete') {
+                    await this.imapService.trashMessage(account, email.external_id);
+                    if (email.file_path) {
+                        await this.storageService.deleteEmail(email.file_path);
+                    }
+                } else if (action === 'archive') {
+                    await this.imapService.archiveMessage(account, email.external_id);
+                } else if (action === 'draft') {
+                    // TODO: Implement IMAP draft creation via APPEND
+                    logger.warn('Draft action not yet fully supported for IMAP', { emailId: email.id });
                 }
             }
 

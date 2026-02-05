@@ -53,12 +53,12 @@ export class StorageService {
      * Saves raw email content to disk.
      * Returns the absolute path to the saved file.
      */
-    async saveEmail(content: string, filename: string, customPath?: string | null): Promise<string> {
+    async saveEmail(content: Buffer, filename: string, customPath?: string | null): Promise<string> {
         const baseDir = await this.ensureDirectory(customPath);
         const filePath = path.join(baseDir, filename);
-        
+
         try {
-            await fs.writeFile(filePath, content, 'utf8');
+            await fs.writeFile(filePath, content);
             logger.debug('Email saved to disk', { filePath });
             return filePath;
         } catch (error) {
