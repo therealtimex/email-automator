@@ -29,31 +29,36 @@ export function ImapConnectModal({ open, onOpenChange }: ImapConnectModalProps) 
     const [imapPort, setImapPort] = useState(993);
     const [smtpHost, setSmtpHost] = useState('');
     const [smtpPort, setSmtpPort] = useState(465);
+    const [imapSecure, setImapSecure] = useState(true);  // 993 = implicit TLS
+    const [smtpSecure, setSmtpSecure] = useState(true);  // 465 = implicit TLS
 
     const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setEmail(val);
 
-        // Simple auto-fill for common providers
-        if (val.includes('@') && !imapHost) {
+        // Auto-fill for common providers (re-fires on every domain change)
+        if (val.includes('@')) {
             const domain = val.split('@')[1].toLowerCase();
             if (domain.includes('gmail.com')) {
-                setImapHost('imap.gmail.com');
-                setSmtpHost('smtp.gmail.com');
+                setImapHost('imap.gmail.com');   setSmtpHost('smtp.gmail.com');
+                setImapPort(993); setImapSecure(true);
+                setSmtpPort(465); setSmtpSecure(true);
             } else if (domain.includes('outlook.com') || domain.includes('hotmail.com')) {
-                setImapHost('outlook.office365.com');
-                setSmtpHost('smtp.office365.com');
-                setSmtpPort(587); // Outlook often uses 587
+                setImapHost('outlook.office365.com'); setSmtpHost('smtp.office365.com');
+                setImapPort(993); setImapSecure(true);
+                setSmtpPort(587); setSmtpSecure(false); // 587 = STARTTLS
             } else if (domain.includes('yahoo.com')) {
-                setImapHost('imap.mail.yahoo.com');
-                setSmtpHost('smtp.mail.yahoo.com');
+                setImapHost('imap.mail.yahoo.com'); setSmtpHost('smtp.mail.yahoo.com');
+                setImapPort(993); setImapSecure(true);
+                setSmtpPort(465); setSmtpSecure(true);
             } else if (domain.includes('icloud.com')) {
-                setImapHost('imap.mail.me.com');
-                setSmtpHost('smtp.mail.me.com');
-                setSmtpPort(587);
+                setImapHost('imap.mail.me.com');  setSmtpHost('smtp.mail.me.com');
+                setImapPort(993); setImapSecure(true);
+                setSmtpPort(587); setSmtpSecure(false); // 587 = STARTTLS
             } else if (domain.includes('fastmail.com')) {
-                setImapHost('imap.fastmail.com');
-                setSmtpHost('smtp.fastmail.com');
+                setImapHost('imap.fastmail.com'); setSmtpHost('smtp.fastmail.com');
+                setImapPort(993); setImapSecure(true);
+                setSmtpPort(465); setSmtpSecure(true);
             }
         }
     };
@@ -73,8 +78,8 @@ export function ImapConnectModal({ open, onOpenChange }: ImapConnectModalProps) 
                 imapPort: Number(imapPort),
                 smtpHost: smtpHost,
                 smtpPort: Number(smtpPort),
-                imapSecure: true,
-                smtpSecure: true
+                imapSecure,
+                smtpSecure
             });
 
             if (response.data?.success) {
@@ -84,8 +89,9 @@ export function ImapConnectModal({ open, onOpenChange }: ImapConnectModalProps) 
                 // Reset form
                 setEmail('');
                 setPassword('');
-                setImapHost('');
-                setSmtpHost('');
+                setImapHost('');   setSmtpHost('');
+                setImapPort(993);  setSmtpPort(465);
+                setImapSecure(true); setSmtpSecure(true);
             } else {
                 const errMsg = typeof response.error === 'string' ? response.error : response.error?.message;
                 toast.error(errMsg || t('config.imap.connectFailed') || 'Failed to connect');
@@ -167,8 +173,12 @@ export function ImapConnectModal({ open, onOpenChange }: ImapConnectModalProps) 
                                         placeholder="993"
                                         type="number"
                                         value={imapPort}
-                                        onChange={(e) => setImapPort(parseInt(e.target.value) || 993)}
+                                        onChange={(e) => { const p = parseInt(e.target.value) || 993; setImapPort(p); setImapSecure(p === 993); }}
                                     />
+                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                        <input type="checkbox" checked={imapSecure} onChange={e => setImapSecure(e.target.checked)} className="accent-primary" />
+                                        <span className="text-xs text-muted-foreground">Implicit TLS</span>
+                                    </label>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-medium text-muted-foreground">SMTP Host</label>
@@ -186,8 +196,12 @@ export function ImapConnectModal({ open, onOpenChange }: ImapConnectModalProps) 
                                         placeholder="465"
                                         type="number"
                                         value={smtpPort}
-                                        onChange={(e) => setSmtpPort(parseInt(e.target.value) || 465)}
+                                        onChange={(e) => { const p = parseInt(e.target.value) || 465; setSmtpPort(p); setSmtpSecure(p === 465); }}
                                     />
+                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                        <input type="checkbox" checked={smtpSecure} onChange={e => setSmtpSecure(e.target.checked)} className="accent-primary" />
+                                        <span className="text-xs text-muted-foreground">Implicit TLS</span>
+                                    </label>
                                 </div>
                             </div>
                         </div>
