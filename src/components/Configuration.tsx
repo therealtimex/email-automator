@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { ShieldCheck, Database, RefreshCw, Check, Trash2, Power, ExternalLink, Upload, X, Plus, Clock, Mail } from 'lucide-react';
+import { ShieldCheck, Database, RefreshCw, Check, Trash2, Power, ExternalLink, Upload, X, Plus, Clock, Mail, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -98,6 +98,9 @@ export function Configuration() {
     const [embedProviders, setEmbedProviders] = useState<LLMProvider[]>([]);
     const [isLoadingEmbedProviders, setIsLoadingEmbedProviders] = useState(false);
     const [embedProviderError, setEmbedProviderError] = useState<string | null>(null);
+
+    // BYOK collapsible state
+    const [byokExpanded, setByokExpanded] = useState(false);
 
     useEffect(() => {
         const fetchProviders = async () => {
@@ -733,19 +736,30 @@ export function Configuration() {
             {/* IMAP Connect Modal */}
             <ImapConnectModal open={showImapModal} onOpenChange={setShowImapModal} />
 
-            {/* Bring Your Own Key (BYOK) */}
+            {/* Bring Your Own Key (BYOK) - Collapsible */}
             <div ref={credentialsRef}>
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <ShieldCheck className="w-5 h-5 text-orange-500" />
-                            {t('config.byok.title')}
+                    <CardHeader
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => setByokExpanded(!byokExpanded)}
+                    >
+                        <CardTitle className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="w-5 h-5 text-orange-500" />
+                                {t('config.byok.title')}
+                            </div>
+                            {byokExpanded ? (
+                                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                            ) : (
+                                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                            )}
                         </CardTitle>
                         <CardDescription>
-                            {t('config.byok.desc')} {t('config.byok.systemDefault')}
+                            {t('config.byok.desc')}
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
+                    {byokExpanded && (
+                        <CardContent className="space-y-6">
                         {/* Google */}
                         <div className="space-y-4 border-b pb-4">
                             <h4 className="font-medium flex items-center gap-2">
@@ -817,6 +831,7 @@ export function Configuration() {
                             </Button>
                         </div>
                     </CardContent>
+                    )}
                 </Card>
             </div>
 
@@ -988,74 +1003,89 @@ export function Configuration() {
                 </CardContent>
             </Card>
 
-            {/* Storage Path */}
+            {/* System Configuration - Unified Card */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Database className="w-5 h-5 text-primary" />
-                        {t('config.storage.title')}
+                        System Configuration
                     </CardTitle>
-                    <CardDescription>{t('config.storage.desc')}</CardDescription>
+                    <CardDescription>Configure storage, file naming, and synchronization settings</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                    <label className="text-sm font-medium">{t('config.storage.label')}</label>
-                    <Input
-                        placeholder={t('config.storage.placeholder')}
-                        value={localSettings.storage_path || ''}
-                        onChange={(e) => setLocalSettings(s => ({ ...s, storage_path: e.target.value }))}
-                    />
-                    <p className="text-[10px] text-muted-foreground italic">
-                        {t('config.storage.help')}
-                    </p>
-                </CardContent>
-            </Card>
-
-            {/* Intelligent Rename */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Power className="w-5 h-5 text-indigo-500" />
-                        {t('config.rename.title')}
-                    </CardTitle>
-                    <CardDescription>{t('config.rename.desc')}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between">
-                    <div className="space-y-1">
-                        <p className="text-sm font-medium">{t('config.rename.label')}</p>
-                        <p className="text-xs text-muted-foreground">{t('config.rename.help')}</p>
+                <CardContent className="space-y-6">
+                    {/* Storage Path Section */}
+                    <div className="space-y-3 pb-6 border-b">
+                        <div className="flex items-center gap-2">
+                            <Database className="w-4 h-4 text-primary" />
+                            <h4 className="font-medium">{t('config.storage.title')}</h4>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">{t('config.storage.label')}</label>
+                            <Input
+                                placeholder={t('config.storage.placeholder')}
+                                value={localSettings.storage_path || ''}
+                                onChange={(e) => setLocalSettings(s => ({ ...s, storage_path: e.target.value }))}
+                            />
+                            <p className="text-[10px] text-muted-foreground italic">
+                                {t('config.storage.help')}
+                            </p>
+                        </div>
                     </div>
-                    <Button
-                        variant={localSettings.intelligent_rename ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setLocalSettings(s => ({ ...s, intelligent_rename: !s.intelligent_rename }))}
-                    >
-                        <Power className="w-4 h-4 mr-1" />
-                        {localSettings.intelligent_rename ? t('common.enabled') : t('common.disabled')}
-                    </Button>
-                </CardContent>
-            </Card>
 
-            {/* Sync Interval */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-primary" />
-                        {t('config.sync.title')}
-                    </CardTitle>
-                    <CardDescription>{t('config.sync.desc')}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                    <label className="text-sm font-medium">{t('config.sync.label')}</label>
-                    <Input
-                        type="number"
-                        min={1}
-                        max={1440}
-                        value={localSettings.sync_interval_minutes || 5}
-                        onChange={(e) => setLocalSettings(s => ({ ...s, sync_interval_minutes: parseInt(e.target.value, 10) || 5 }))}
-                    />
-                    <p className="text-[10px] text-muted-foreground italic">
-                        {t('config.sync.help')}
-                    </p>
+                    {/* Intelligent Rename Section */}
+                    <div className="space-y-3 pb-6 border-b">
+                        <div className="flex items-center gap-2">
+                            <Power className="w-4 h-4 text-indigo-500" />
+                            <h4 className="font-medium">{t('config.rename.title')}</h4>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium">{t('config.rename.label')}</p>
+                                <p className="text-xs text-muted-foreground">{t('config.rename.help')}</p>
+                            </div>
+                            <Button
+                                variant={localSettings.intelligent_rename ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setLocalSettings(s => ({ ...s, intelligent_rename: !s.intelligent_rename }))}
+                            >
+                                <Power className="w-4 h-4 mr-1" />
+                                {localSettings.intelligent_rename ? t('common.enabled') : t('common.disabled')}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Sync Interval Section */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-primary" />
+                            <h4 className="font-medium">{t('config.sync.title')}</h4>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">{t('config.sync.label')}</label>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={1440}
+                                value={localSettings.sync_interval_minutes || 5}
+                                onChange={(e) => setLocalSettings(s => ({ ...s, sync_interval_minutes: parseInt(e.target.value, 10) || 5 }))}
+                            />
+                            <p className="text-[10px] text-muted-foreground italic">
+                                {t('config.sync.help')}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Save Configuration Button */}
+                    <div className="flex justify-end pt-4">
+                        <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                            {savingSettings ? (
+                                <LoadingSpinner size="sm" className="mr-2" />
+                            ) : (
+                                <Check className="w-4 h-4 mr-2" />
+                            )}
+                            Save Configuration
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 

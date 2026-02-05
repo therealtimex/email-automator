@@ -5,6 +5,35 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - 2026-02-05
+
+### Added
+- **Full IMAP/SMTP Support**: Users can now connect any standard IMAP/SMTP email account, in addition to Gmail and Outlook.
+  - New `ImapConnectModal` for secure connection setup.
+  - Enhanced auto-fill logic for common providers (iCloud, Yahoo, etc.) including security parameters and ports.
+  - Support for syncing and sending emails via standard protocols.
+- **Email Attachment Support**: Added the ability to process and view email attachments.
+  - New database schema for tracking attachment metadata.
+  - API endpoints for retrieving attachment information.
+- **Draft Editing**: Enhanced the `DraftPreviewModal` with powerful editing capabilities.
+  - Added a Markdown editor for draft content with auto-save functionality.
+  - Users can now edit recipients (To, Cc, Bcc) and the Subject line directly before sending.
+- **Category Label Editing**:
+  - Introduced the ability to manually edit and refine email category labels (e.g., from 'Newsletter' to 'Support') directly from the Dashboard.
+  - This manual feedback loop helps improve future AI categorization through user-corrected signals.
+- **UI/UX Enhancements**:
+  - Enhanced the Configuration page with a collapsible BYOK section and a unified System Configuration card for better information density.
+  - Improved navigation and layout consistency across the settings interface.
+
+### Fixed
+- **Draft Security**: Improved security by strictly filtering drafts by user-owned account IDs, preventing cross-user data leakage.
+- **Metadata Extraction**: Improved reliability of email metadata extraction by falling back to IMAP envelope fields when standard parsing fails.
+
+## [2.22.6] - 2026-02-03
+
+### Fixed
+- **Localization**: Added translation support for dynamic content in the Live Terminal. System messages like "Background processing: [Subject]" and "Analyzing email: [Subject]" are now correctly localized by extracting variable content and using parameterized translation keys.
+
 ## [2.5.0] - 2026-01-18
 
 ### Added
@@ -17,11 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Architecture**: Split `EmailProcessorService` into fast Ingestion and smart background Processing.
 - **Storage**: Automatically cleans up disk files when emails are deleted from the UI.
-
-## [2.22.6] - 2026-02-03
-
-### Fixed
-- **Localization**: Added translation support for dynamic content in the Live Terminal. System messages like "Background processing: [Subject]" and "Analyzing email: [Subject]" are now correctly localized by extracting variable content and using parameterized translation keys.
 
 ## [2.22.5] - 2026-02-03
 
