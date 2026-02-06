@@ -5,6 +5,16 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.7] - 2026-02-06
+
+### Added
+- **Enhanced Rule Editing**: The Rule Editor (`RuleEditDialog`) now supports selecting multiple categories for a single rule, allowing for more flexible and powerful automation logic.
+- **Advanced Condition Parsing**: Improved the rule editor to correctly parse and display complex nested conditions (AND/OR logic) for existing rules.
+
+### Improved
+- **Localization**: Updated translation files for English, Spanish, French, Japanese, Korean, and Vietnamese to support new rule editing features, including multi-category selection labels.
+- **Cleanup**: Removed unused test and debug scripts (`test-manual-init.sql`, `test-rag.js`, `test_msal.js`, `debug-trigger.sql`) to keep the repository clean.
+
 ## [2.23.6] - 2026-02-06
 
 ### Fixed

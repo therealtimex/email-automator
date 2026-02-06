@@ -46,6 +46,7 @@ export function RuleEditDialog({
   const [intent, setIntent] = useState('');
   const [conditionKey, setConditionKey] = useState('category');
   const [conditionValue, setConditionValue] = useState('newsletter');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['newsletter']);
   const [olderThan, setOlderThan] = useState('');
   const [actions, setActions] = useState<string[]>(['archive']);
   const [instructions, setInstructions] = useState('');
@@ -61,15 +62,108 @@ export function RuleEditDialog({
       setInstructions(rule.instructions || '');
       setAttachments(rule.attachments || []);
 
-      // Parse condition
+      // Parse condition - handle both simple and complex nested conditions
       const condition = rule.condition || {};
-      const keys = Object.keys(condition).filter(k => k !== 'older_than_days');
-      if (keys.length > 0) {
-        setConditionKey(keys[0]);
-        setConditionValue(condition[keys[0]]);
+
+      // Helper to recursively find a specific condition type in nested structure
+      const findCondition = (cond: any, targetKey: string): any => {
+        if (cond[targetKey]) return cond[targetKey];
+
+        // Check inside 'and' array
+        if (cond.and && Array.isArray(cond.and)) {
+          for (const subCond of cond.and) {
+            const found = findCondition(subCond, targetKey);
+            if (found !== undefined) return found;
+          }
+        }
+
+        // Check inside 'or' array
+        if (cond.or && Array.isArray(cond.or)) {
+          for (const subCond of cond.or) {
+            const found = findCondition(subCond, targetKey);
+            if (found !== undefined) return found;
+          }
+        }
+
+        return undefined;
+      };
+
+      // Helper to extract all categories from OR condition
+      const extractCategories = (cond: any): string[] => {
+        const categories: string[] = [];
+
+        // Direct category
+        if (cond.category) {
+          categories.push(cond.category);
+          return categories;
+        }
+
+        // Check inside 'or' array for multiple categories
+        if (cond.or && Array.isArray(cond.or)) {
+          for (const subCond of cond.or) {
+            if (subCond.category) {
+              categories.push(subCond.category);
+            }
+          }
+          if (categories.length > 0) return categories;
+        }
+
+        // Check inside 'and' array
+        if (cond.and && Array.isArray(cond.and)) {
+          for (const subCond of cond.and) {
+            const found = extractCategories(subCond);
+            if (found.length > 0) return found;
+          }
+        }
+
+        return categories;
+      };
+
+      // Try to find categories first (special handling for multi-select)
+      const categories = extractCategories(condition);
+      if (categories.length > 0) {
+        setConditionKey('category');
+        setSelectedCategories(categories);
+        setConditionValue(categories[0]); // Keep for backward compatibility
+      } else {
+        // Try to find other simple condition fields
+        const simpleKeys = ['sentiment', 'priority', 'sender_email', 'sender_domain',
+                            'sender_contains', 'subject_contains', 'body_contains'];
+        let foundKey = null;
+        let foundValue = null;
+
+        for (const key of simpleKeys) {
+          const value = findCondition(condition, key);
+          if (value !== undefined) {
+            foundKey = key;
+            foundValue = value;
+            break;
+          }
+        }
+
+        if (foundKey && foundValue !== null) {
+          setConditionKey(foundKey);
+          setConditionValue(foundValue);
+          setSelectedCategories(['newsletter']); // Reset categories
+        } else {
+          // Fallback to simple parsing if no nested structure
+          const keys = Object.keys(condition).filter(k =>
+            k !== 'older_than_days' && k !== 'and' && k !== 'or' && k !== 'not' && k !== 'confidence_gt'
+          );
+          if (keys.length > 0) {
+            setConditionKey(keys[0]);
+            setConditionValue(condition[keys[0]]);
+          }
+          setSelectedCategories(['newsletter']); // Reset categories
+        }
       }
-      if (condition.older_than_days) {
-        setOlderThan(String(condition.older_than_days));
+
+      // Find older_than_days anywhere in the nested structure
+      const olderThanValue = findCondition(condition, 'older_than_days');
+      if (olderThanValue !== undefined) {
+        setOlderThan(String(olderThanValue));
+      } else {
+        setOlderThan('');
       }
     } else {
       // Reset for new rule
@@ -78,6 +172,7 @@ export function RuleEditDialog({
       setIntent('');
       setConditionKey('category');
       setConditionValue('newsletter');
+      setSelectedCategories(['newsletter']);
       setOlderThan('');
       setActions(['archive']);
       setInstructions('');
@@ -96,9 +191,44 @@ export function RuleEditDialog({
 
     setSaving(true);
     try {
-      const condition: Record<string, any> = { [conditionKey]: conditionValue };
-      if (olderThan) {
-        condition.older_than_days = parseInt(olderThan, 10);
+      // Build condition based on field type
+      let condition: Record<string, any>;
+
+      if (conditionKey === 'category') {
+        // Multi-category support
+        if (selectedCategories.length === 1) {
+          // Single category: simple condition
+          condition = { category: selectedCategories[0] };
+        } else if (selectedCategories.length > 1) {
+          // Multiple categories: OR condition
+          condition = {
+            or: selectedCategories.map(cat => ({ category: cat }))
+          };
+        } else {
+          // No categories selected, use default
+          condition = { category: 'newsletter' };
+        }
+
+        // Wrap with AND if we have older_than_days
+        if (olderThan) {
+          const olderThanDays = parseInt(olderThan, 10);
+          if (selectedCategories.length === 1) {
+            condition.older_than_days = olderThanDays;
+          } else {
+            condition = {
+              and: [
+                condition,
+                { older_than_days: olderThanDays }
+              ]
+            };
+          }
+        }
+      } else {
+        // Other condition types (sentiment, priority, etc.)
+        condition = { [conditionKey]: conditionValue };
+        if (olderThan) {
+          condition.older_than_days = parseInt(olderThan, 10);
+        }
       }
 
       const hasDraftAction = actions.includes('draft');
@@ -150,7 +280,7 @@ export function RuleEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-6 border-b">
           <DialogTitle>{rule ? t('autopilot.editDialog.editTitle') : t('autopilot.editDialog.createTitle')}</DialogTitle>
           <DialogDescription>
@@ -201,10 +331,16 @@ export function RuleEditDialog({
                 value={conditionKey}
                 onChange={(e) => {
                   setConditionKey(e.target.value);
-                  if (e.target.value === 'category') setConditionValue('newsletter');
-                  else if (e.target.value === 'sentiment') setConditionValue('Positive');
-                  else if (e.target.value === 'priority') setConditionValue('High');
-                  else setConditionValue('');
+                  if (e.target.value === 'category') {
+                    setSelectedCategories(['newsletter']);
+                    setConditionValue('newsletter');
+                  } else if (e.target.value === 'sentiment') {
+                    setConditionValue('Positive');
+                  } else if (e.target.value === 'priority') {
+                    setConditionValue('High');
+                  } else {
+                    setConditionValue('');
+                  }
                 }}
               >
                 <optgroup label={t('autopilot.editDialog.aiAnalysisGroup')}>
@@ -222,25 +358,49 @@ export function RuleEditDialog({
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">{t('autopilot.editDialog.equalsValue')}</label>
+              <label className="text-sm font-medium">
+                {conditionKey === 'category' ? t('autopilot.editDialog.selectCategories') : t('autopilot.editDialog.equalsValue')}
+              </label>
               {conditionKey === 'category' ? (
-                <select
-                  className="w-full p-2 border rounded-md bg-background text-sm"
-                  value={conditionValue}
-                  onChange={(e) => setConditionValue(e.target.value)}
-                >
-                  <option value="newsletter">{t('autopilot.editDialog.cat.newsletter')}</option>
-                  <option value="news">{t('autopilot.editDialog.cat.news')}</option>
-                  <option value="spam">{t('autopilot.editDialog.cat.spam')}</option>
-                  <option value="promotional">{t('autopilot.editDialog.cat.promotional')}</option>
-                  <option value="transactional">{t('autopilot.editDialog.cat.transactional')}</option>
-                  <option value="social">{t('autopilot.editDialog.cat.social')}</option>
-                  <option value="support">{t('autopilot.editDialog.cat.support')}</option>
-                  <option value="client">{t('autopilot.editDialog.cat.client')}</option>
-                  <option value="internal">{t('autopilot.editDialog.cat.internal')}</option>
-                  <option value="personal">{t('autopilot.editDialog.cat.personal')}</option>
-                  <option value="other">{t('autopilot.editDialog.cat.other')}</option>
-                </select>
+                <div className="grid grid-cols-2 gap-2 p-3 border rounded-md bg-background">
+                  {[
+                    { value: 'newsletter', label: t('autopilot.editDialog.cat.newsletter') },
+                    { value: 'news', label: t('autopilot.editDialog.cat.news') },
+                    { value: 'spam', label: t('autopilot.editDialog.cat.spam') },
+                    { value: 'promotional', label: t('autopilot.editDialog.cat.promotional') },
+                    { value: 'transactional', label: t('autopilot.editDialog.cat.transactional') },
+                    { value: 'social', label: t('autopilot.editDialog.cat.social') },
+                    { value: 'support', label: t('autopilot.editDialog.cat.support') },
+                    { value: 'client', label: t('autopilot.editDialog.cat.client') },
+                    { value: 'internal', label: t('autopilot.editDialog.cat.internal') },
+                    { value: 'personal', label: t('autopilot.editDialog.cat.personal') },
+                    { value: 'notification', label: t('autopilot.editDialog.cat.notification') || 'Notification' },
+                    { value: 'other', label: t('autopilot.editDialog.cat.other') },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex items-center gap-2 p-2 border rounded-md cursor-pointer transition-colors text-sm ${
+                        selectedCategories.includes(option.value)
+                          ? 'bg-primary/10 border-primary'
+                          : 'bg-background hover:bg-secondary/50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCategories.includes(option.value)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCategories([...selectedCategories, option.value]);
+                          } else {
+                            setSelectedCategories(selectedCategories.filter(c => c !== option.value));
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm">{option.label}</span>
+                    </label>
+                  ))}
+                </div>
               ) : conditionKey === 'sentiment' ? (
                 <select
                   className="w-full p-2 border rounded-md bg-background text-sm"
