@@ -5,6 +5,16 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.9] - 2026-02-06
+
+### Added
+- **Resilience & Reliability**: Significant improvements to ensure the system remains functional even during AI outages or configuration issues.
+  - **Heuristic Fallback Analysis**: Implemented a rule-based fallback analyzer that uses keywords and sender metadata to categorize emails (Newsletter, Transactional, Social, etc.) when the LLM is unavailable or fails.
+  - **Fail-Safe Processing**: The ingestion and background processing pipelines now automatically switch to heuristic mode if the AI provider returns an error, ensuring newsletters are still archived and receipts are still labeled.
+- **Improved Observability**:
+  - **JSON Sanitization**: The `EventLogger` now includes a robust `sanitizeForJSON` utility to prevent circular references, deep nesting, and excessively large payloads from breaking processing logs or UI rendering.
+  - **Fallback Event Tracking**: New "Fallback" event type in the Live Terminal and AI Trace to clearly indicate when heuristic analysis was used instead of an LLM.
+
 ## [2.23.8] - 2026-02-06
 
 ### Added

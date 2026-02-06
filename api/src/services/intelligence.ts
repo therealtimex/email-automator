@@ -102,14 +102,52 @@ export class IntelligenceService {
         return this.isConfigured && !!SDKService.getSDK();
     }
 
+    /**
+     * Fallback analysis using simple heuristics when LLM fails
+     */
+    private createFallbackAnalysis(context: EmailContext, content: string): EmailAnalysis {
+        const sender = context.sender.toLowerCase();
+        const subject = context.subject?.toLowerCase() || '';
+        const body = content.toLowerCase();
+
+        // Simple heuristic categorization
+        let category: any = 'other';
+        let is_useless = false;
+
+        if (sender.includes('noreply') || sender.includes('no-reply')) {
+            if (body.includes('unsubscribe')) category = 'newsletter';
+            else category = 'notification';
+            is_useless = true;
+        } else if (body.includes('receipt') || body.includes('order') || body.includes('invoice')) {
+            category = 'transactional';
+        } else if (body.includes('unsubscribe') || subject.includes('newsletter')) {
+            category = 'newsletter';
+            is_useless = true;
+        } else if (sender.includes('linkedin') || sender.includes('twitter') || sender.includes('facebook')) {
+            category = 'social';
+            is_useless = true;
+        }
+
+        return {
+            summary: subject || 'Email received',
+            category,
+            sentiment: 'Neutral',
+            is_useless,
+            suggested_actions: is_useless ? ['archive'] : [],
+            priority: 'Medium',
+            key_points: [],
+            action_items: []
+        };
+    }
+
     async analyzeEmail(content: string, context: EmailContext, eventLogger?: EventLogger, emailId?: string, llmSettings?: { llm_provider?: string; llm_model?: string }): Promise<(EmailAnalysis & { _metadata?: any }) | null> {
         const sdk = SDKService.getSDK();
         if (!sdk) {
-            logger.warn('Intelligence service not ready, skipping analysis');
+            logger.warn('Intelligence service not ready, using fallback analysis');
             if (eventLogger) {
-                await eventLogger.info('Skipped', 'AI Analysis skipped: SDK not configured.', undefined, emailId);
+                await eventLogger.info('Fallback', 'AI Analysis skipped: SDK not configured. Using heuristic analysis.', undefined, emailId);
             }
-            return null;
+            return this.createFallbackAnalysis(context, content);
         }
 
         const { provider, model, isDefaultFallback } = await SDKService.resolveChatProvider({
@@ -269,9 +307,12 @@ REQUIRED JSON STRUCTURE:
 
             return result;
         } catch (error: any) {
-            logger.error('Analysis failed', error);
-            if (eventLogger) await eventLogger.error('Error', error.message, emailId);
-            return null;
+            logger.error('Analysis failed, using fallback', error);
+            if (eventLogger) {
+                await eventLogger.error('Error', error.message, emailId);
+                await eventLogger.info('Fallback', 'Using heuristic analysis due to LLM error', undefined, emailId);
+            }
+            return this.createFallbackAnalysis(context, cleanedContent || content);
         }
     }
 
@@ -603,15 +644,33 @@ CRITICAL INSTRUCTIONS:
 
             return result;
         } catch (error: any) {
-            logger.error('Rule analysis failed', {
+            logger.error('Rule analysis failed, using fallback', {
                 error: error.message,
                 stack: error.stack,
                 provider,
                 model,
                 errorType: error.constructor.name
             });
-            if (eventLogger) await eventLogger.error('Error', `${error.message} (${provider}/${model})`, emailId);
-            return null;
+            if (eventLogger) {
+                await eventLogger.error('Error', `${error.message} (${provider}/${model})`, emailId);
+                await eventLogger.info('Fallback', 'Using heuristic analysis due to LLM error', undefined, emailId);
+            }
+
+            // Create fallback analysis with no rule matches
+            const basicAnalysis = this.createFallbackAnalysis(context, cleanedContent || '');
+            // Convert actions to ContextAwareAnalysis format
+            const actions = basicAnalysis.suggested_actions?.includes('archive') ? ['archive' as const] : [];
+            return {
+                ...basicAnalysis,
+                matched_rules: [],
+                actions_to_execute: actions,
+                _metadata: {
+                    provider: 'fallback',
+                    model: 'heuristic',
+                    is_fallback: true,
+                    timestamp: new Date().toISOString()
+                }
+            };
         }
     }
 
