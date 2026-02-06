@@ -155,6 +155,7 @@ export interface Rule {
     priority?: number;     // Higher = evaluated first by AI
     condition: Record<string, unknown>; // Positive condition - email must match this
     negative_condition?: Record<string, unknown>; // Negative condition - email matching this will be excluded
+    min_confidence?: number; // Minimum confidence threshold (0.0-1.0) for LLM matching (default: 0.7)
     action?: 'delete' | 'archive' | 'draft' | 'star' | 'read'; // Legacy single action
     actions?: ('delete' | 'archive' | 'draft' | 'star' | 'read')[]; // New multi-action array
     instructions?: string; // Draft generation instructions

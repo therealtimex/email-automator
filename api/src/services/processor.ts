@@ -923,7 +923,7 @@ export class EmailProcessorService {
                     const conditionText = parseCondition(r.condition as any);
                     const negativeConditionText = r.negative_condition ? parseCondition(r.negative_condition as any) : null;
 
-                    // Format: "- Rule Name [ID: xxx]: Intent [WHEN: conditions] [EXCLUDE: negative conditions] → actions"
+                    // Format: "- Rule Name [ID: xxx]: Intent [WHEN: conditions] [EXCLUDE: negative conditions] [CONFIDENCE: threshold] → actions"
                     let ruleText = `- ${r.name} [ID: ${r.id}]: ${r.intent || r.description || 'No description'}`;
                     if (conditionText) {
                         ruleText += `\n  WHEN: ${conditionText}`;
@@ -931,6 +931,8 @@ export class EmailProcessorService {
                     if (negativeConditionText) {
                         ruleText += `\n  EXCLUDE WHEN: ${negativeConditionText}`;
                     }
+                    const minConfidence = r.min_confidence ?? 0.7;
+                    ruleText += `\n  CONFIDENCE: ${(minConfidence * 100).toFixed(0)}% minimum required`;
                     ruleText += `\n  THEN: ${r.actions?.join(', ') || r.action || 'none'}`;
                     if (r.instructions) {
                         ruleText += `\n  DRAFT: ${r.instructions}`;
@@ -997,6 +999,32 @@ export class EmailProcessorService {
                             vipSenders: settings?.vip_senders
                         }
                     });
+
+                    // Check confidence threshold (per-rule tuning)
+                    const minConfidence = rule.min_confidence ?? 0.7;
+                    const meetsConfidence = match.confidence >= minConfidence;
+
+                    if (!meetsConfidence) {
+                        logger.info('Rule match below confidence threshold', {
+                            rule_name: rule.name,
+                            rule_id: rule.id,
+                            confidence: match.confidence,
+                            min_confidence: minConfidence,
+                            email_id: email.id
+                        });
+                        if (eventLogger) {
+                            await eventLogger.info('Validation',
+                                `Rule "${rule.name}" below confidence threshold (${(match.confidence * 100).toFixed(0)}% < ${(minConfidence * 100).toFixed(0)}%)`,
+                                {
+                                    rule_id: rule.id,
+                                    confidence: match.confidence,
+                                    min_confidence: minConfidence
+                                },
+                                email.id
+                            );
+                        }
+                        continue; // Skip this rule
+                    }
 
                     // Check negative condition (exclusion logic)
                     let isExcluded = false;

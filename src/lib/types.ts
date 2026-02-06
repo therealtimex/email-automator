@@ -77,6 +77,7 @@ export interface Rule {
     priority?: number;     // Higher = evaluated first by AI
     condition: RuleCondition; // Legacy - kept for backwards compatibility
     negative_condition?: RuleCondition; // Exclude emails matching these conditions
+    min_confidence?: number; // Minimum confidence threshold (0.0-1.0) for LLM matching (default: 0.7)
     action?: 'delete' | 'archive' | 'draft' | 'star'; // Legacy single action
     actions?: ('delete' | 'archive' | 'draft' | 'star')[]; // New multi-action array
     instructions?: string; // Draft generation instructions

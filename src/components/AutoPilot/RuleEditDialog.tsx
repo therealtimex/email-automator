@@ -122,6 +122,7 @@ export function RuleEditDialog({
   const [instructions, setInstructions] = useState('');
   const [attachments, setAttachments] = useState<RuleAttachment[]>([]);
   const [negativeCondition, setNegativeCondition] = useState('');
+  const [minConfidence, setMinConfidence] = useState(0.7);
 
   // Initialize form when rule changes
   useEffect(() => {
@@ -243,6 +244,9 @@ export function RuleEditDialog({
       } else {
         setNegativeCondition('');
       }
+
+      // Load min_confidence (defaults to 0.7)
+      setMinConfidence(rule.min_confidence ?? 0.7);
     } else {
       // Reset for new rule
       setName('');
@@ -256,6 +260,7 @@ export function RuleEditDialog({
       setInstructions('');
       setAttachments([]);
       setNegativeCondition('');
+      setMinConfidence(0.7);
     }
   }, [rule, open]);
 
@@ -328,6 +333,7 @@ export function RuleEditDialog({
         intent: intent.trim() || undefined,
         condition,
         negative_condition: parsedNegativeCondition,
+        min_confidence: minConfidence,
         actions,
         instructions: hasDraftAction ? instructions : undefined,
         attachments: hasDraftAction ? attachments : [],
@@ -574,6 +580,33 @@ export function RuleEditDialog({
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <span>Confidence Threshold</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {(minConfidence * 100).toFixed(0)}% minimum
+              </span>
+            </label>
+            <input
+              type="range"
+              min="0.5"
+              max="1.0"
+              step="0.05"
+              value={minConfidence}
+              onChange={(e) => setMinConfidence(parseFloat(e.target.value))}
+              className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>50% (Experimental)</span>
+              <span>70% (Balanced)</span>
+              <span>100% (Strict)</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              💡 Lower = more matches but more false positives. Higher = fewer matches but more precision.
+              Recommended: 90% for critical rules, 70% for default, 50% for experimental/cleanup rules.
+            </p>
           </div>
 
           <div className="space-y-2">

@@ -96,6 +96,7 @@ export const schemas = {
         priority: z.number().int().min(0).max(100).optional(),
         condition: z.record(z.unknown()),
         negative_condition: z.record(z.unknown()).optional(),
+        min_confidence: z.number().min(0).max(1).optional().default(0.7),
         action: z.union([
             z.enum(['delete', 'archive', 'draft', 'star', 'read']),
             z.string().regex(/^label:.+/, 'Label actions must start with "label:"')
@@ -117,6 +118,7 @@ export const schemas = {
         priority: z.number().int().min(0).max(100).optional(),
         condition: z.record(z.unknown()).optional(),
         negative_condition: z.record(z.unknown()).optional(),
+        min_confidence: z.number().min(0).max(1).optional(),
         action: z.union([
             z.enum(['delete', 'archive', 'draft', 'star', 'read']),
             z.string().regex(/^label:.+/, 'Label actions must start with "label:"')
