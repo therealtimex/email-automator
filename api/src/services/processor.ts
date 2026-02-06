@@ -13,6 +13,7 @@ import { EventLogger } from './eventLogger.js';
 import { DefaultRuleService } from './DefaultRuleService.js';
 import { processDraftWithNames } from '../utils/nameExtraction.js';
 import { shouldSkipDraft } from '../utils/senderValidation.js';
+import { parseEmailHeaders } from '../utils/emailHeaders.js';
 
 const logger = createLogger('Processor');
 
@@ -677,6 +678,9 @@ export class EmailProcessorService {
         const date = parsed.date ? parsed.date.toISOString() : new Date().toISOString();
         const bodySnippet = (parsed.text || parsed.textAsHtml || '').substring(0, 500);
 
+        // Parse email headers for rule matching and LLM analysis
+        const headerMetadata = parseEmailHeaders(parsed, account.email_address);
+
         if (eventLogger) await eventLogger.info('Ingesting', `Ingesting email: ${subject}`);
 
         // 2. Save raw content to local storage (.eml format)
@@ -706,6 +710,15 @@ export class EmailProcessorService {
             body_snippet: bodySnippet,
             file_path: filePath,
             processing_status: 'pending',
+            // Email header metadata
+            headers: headerMetadata.raw,
+            recipient_type: headerMetadata.recipient_type,
+            is_automated: headerMetadata.is_automated,
+            has_unsubscribe: headerMetadata.has_unsubscribe,
+            is_reply: headerMetadata.is_reply,
+            thread_id: headerMetadata.thread_id,
+            mailer: headerMetadata.mailer,
+            sender_priority: headerMetadata.sender_priority,
         };
 
         const { data: savedEmail, error: saveError } = await this.supabase
@@ -808,12 +821,19 @@ export class EmailProcessorService {
             // Extract clean content (prioritize text)
             const cleanContent = parsed.text || parsed.textAsHtml || '';
 
-            // Extract metadata signals from headers
+            // Extract metadata signals from headers (legacy fields + enhanced header metadata)
             const metadata = {
                 importance: parsed.headers.get('importance')?.toString() || parsed.headers.get('x-priority')?.toString(),
                 listUnsubscribe: parsed.headers.get('list-unsubscribe')?.toString(),
                 autoSubmitted: parsed.headers.get('auto-submitted')?.toString(),
-                mailer: parsed.headers.get('x-mailer')?.toString()
+                mailer: parsed.headers.get('x-mailer')?.toString(),
+                // Enhanced header metadata from database (parsed during ingestion)
+                recipient_type: email.recipient_type || undefined,
+                is_automated: email.is_automated ?? undefined,
+                has_unsubscribe: email.has_unsubscribe ?? undefined,
+                is_reply: email.is_reply ?? undefined,
+                sender_priority: email.sender_priority || undefined,
+                thread_id: email.thread_id || undefined,
             };
 
             // 3. Fetch account for action execution
@@ -838,72 +858,74 @@ export class EmailProcessorService {
             // Fallback: build context if not pre-compiled
             if (!compiledContext && rules && rules.length > 0) {
                 compiledContext = rules.map((r, i) => {
-                    // Build human-readable condition text
-                    let conditionText = '';
-                    if (r.condition) {
-                        const cond = r.condition as any;
+                    // Build human-readable condition text (recursive for AND/OR)
+                    const parseCondition = (cond: any, depth = 0): string => {
+                        if (!cond) return '';
 
-                        // Handle new simple condition format: {"category": "news"}
-                        if (cond.category) {
-                            conditionText = `When category is "${cond.category}"`;
-                        }
-                        if (cond.sentiment) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `sentiment is "${cond.sentiment}"`;
-                        }
-                        if (cond.priority) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `priority is "${cond.priority}"`;
-                        }
-                        if (cond.sender_email) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `sender is "${cond.sender_email}"`;
-                        }
-                        if (cond.sender_domain) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `sender domain is "${cond.sender_domain}"`;
-                        }
-                        if (cond.sender_contains) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `sender contains "${cond.sender_contains}"`;
-                        }
-                        if (cond.subject_contains) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `subject contains "${cond.subject_contains}"`;
-                        }
-                        if (cond.body_contains) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `body contains "${cond.body_contains}"`;
-                        }
+                        const parts: string[] = [];
 
-                        // Handle legacy format with field/operator/value
-                        if (cond.field) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + cond.field;
-                            if (cond.operator === 'equals') {
-                                conditionText += ` equals "${cond.value}"`;
-                            } else if (cond.operator === 'contains') {
-                                conditionText += ` contains "${cond.value}"`;
-                            } else if (cond.operator === 'domain_equals') {
-                                conditionText += ` domain equals "${cond.value}"`;
-                            } else {
-                                conditionText += ` ${cond.operator} "${cond.value}"`;
+                        // Handle AND conditions
+                        if (cond.and && Array.isArray(cond.and)) {
+                            const subConditions = cond.and.map((c: any) => parseCondition(c, depth + 1)).filter(Boolean);
+                            if (subConditions.length > 0) {
+                                return subConditions.join(' AND ');
                             }
                         }
 
-                        if (cond.is_useless === true) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + 'email is useless/low-value';
+                        // Handle OR conditions
+                        if (cond.or && Array.isArray(cond.or)) {
+                            const subConditions = cond.or.map((c: any) => parseCondition(c, depth + 1)).filter(Boolean);
+                            if (subConditions.length > 0) {
+                                return '(' + subConditions.join(' OR ') + ')';
+                            }
                         }
-                        if (cond.ai_priority) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `AI priority is "${cond.ai_priority}"`;
-                        }
-                        // Extract older_than_days from condition JSONB
-                        if (cond.older_than_days) {
-                            conditionText += (conditionText ? ' AND ' : 'When ') + `email is older than ${cond.older_than_days} days`;
-                        }
-                    }
 
-                    return `Rule ${i + 1} [ID: ${r.id}]\n` +
-                        `  Name: ${r.name}\n` +
-                        (r.description ? `  Description: ${r.description}\n` : '') +
-                        (r.intent ? `  Intent: ${r.intent}\n` : '') +
-                        (conditionText ? `  Condition: ${conditionText}\n` : '') +
-                        `  Actions: ${r.actions?.join(', ') || r.action || 'none'}\n` +
-                        (r.instructions ? `  Draft Instructions: ${r.instructions}\n` : '') +
-                        '\n';
-                }).join('');
+                        // Simple conditions
+                        if (cond.category) parts.push(`category="${cond.category}"`);
+                        if (cond.sentiment) parts.push(`sentiment="${cond.sentiment}"`);
+                        if (cond.priority) parts.push(`priority="${cond.priority}"`);
+                        if (cond.sender_email) parts.push(`sender="${cond.sender_email}"`);
+                        if (cond.sender_domain) parts.push(`sender_domain="${cond.sender_domain}"`);
+                        if (cond.sender_contains) parts.push(`sender contains "${cond.sender_contains}"`);
+                        if (cond.subject_contains) parts.push(`subject contains "${cond.subject_contains}"`);
+                        if (cond.body_contains) parts.push(`body contains "${cond.body_contains}"`);
+                        if (cond.is_useless === true) parts.push('is_useless=true');
+                        if (cond.ai_priority) parts.push(`ai_priority="${cond.ai_priority}"`);
+                        if (cond.older_than_days) parts.push(`age>${cond.older_than_days}days`);
+                        if (cond.confidence_gt) parts.push(`confidence>${(cond.confidence_gt * 100).toFixed(0)}%`);
+
+                        // Header-based conditions (NEW!)
+                        if (cond.recipient_type) parts.push(`recipient_type="${cond.recipient_type}"`);
+                        if (cond.is_automated !== undefined) parts.push(`is_automated=${cond.is_automated}`);
+                        if (cond.has_unsubscribe !== undefined) parts.push(`has_unsubscribe=${cond.has_unsubscribe}`);
+                        if (cond.is_reply !== undefined) parts.push(`is_reply=${cond.is_reply}`);
+
+                        // Legacy format
+                        if (cond.field) {
+                            let fieldPart = cond.field;
+                            if (cond.operator === 'equals') fieldPart += `="${cond.value}"`;
+                            else if (cond.operator === 'contains') fieldPart += ` contains "${cond.value}"`;
+                            else if (cond.operator === 'domain_equals') fieldPart += ` domain="${cond.value}"`;
+                            else fieldPart += ` ${cond.operator} "${cond.value}"`;
+                            parts.push(fieldPart);
+                        }
+
+                        return parts.join(' AND ');
+                    };
+
+                    const conditionText = parseCondition(r.condition as any);
+
+                    // Format: "- Rule Name [ID: xxx]: Intent [WHEN: conditions] → actions"
+                    let ruleText = `- ${r.name} [ID: ${r.id}]: ${r.intent || r.description || 'No description'}`;
+                    if (conditionText) {
+                        ruleText += `\n  WHEN: ${conditionText}`;
+                    }
+                    ruleText += `\n  THEN: ${r.actions?.join(', ') || r.action || 'none'}`;
+                    if (r.instructions) {
+                        ruleText += `\n  DRAFT: ${r.instructions}`;
+                    }
+                    return ruleText;
+                }).join('\n\n');
             }
 
             // 5. Context-Aware Analysis: AI evaluates email against user's rules
@@ -935,6 +957,57 @@ export class EmailProcessorService {
 
             if (!analysis) {
                 throw new Error('AI analysis returned no result');
+            }
+
+            // PHASE 2: Post-LLM Validation - Filter out incorrectly matched rules
+            // This catches any LLM hallucinations or fuzzy matches that don't meet actual conditions
+            if (analysis.matched_rules && analysis.matched_rules.length > 0 && rules) {
+                const emailAge = email.date ? Math.floor((Date.now() - new Date(email.date).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                const validatedMatches = [];
+
+                for (const match of analysis.matched_rules) {
+                    const rule = rules.find(r => r.id === match.rule_id);
+                    if (!rule) {
+                        logger.warn('LLM matched non-existent rule', { rule_id: match.rule_id });
+                        continue;
+                    }
+
+                    // Validate this match against actual rule conditions
+                    const isValid = this.evaluateRuleCondition(rule.condition as any, {
+                        category: analysis.category,
+                        sentiment: analysis.sentiment,
+                        priority: analysis.priority,
+                        confidence: match.confidence,
+                        email,
+                        emailAge
+                    });
+
+                    if (isValid) {
+                        validatedMatches.push(match);
+                    } else {
+                        logger.info('Filtered out invalid LLM rule match', {
+                            rule_name: rule.name,
+                            rule_id: rule.id,
+                            reason: 'Does not meet actual rule conditions',
+                            category: analysis.category,
+                            email_id: email.id
+                        });
+                        if (eventLogger) {
+                            await eventLogger.info('Validation',
+                                `Filtered out incorrect rule match: ${rule.name}`,
+                                {
+                                    rule_id: rule.id,
+                                    reason: 'LLM matched but conditions not met',
+                                    llm_confidence: match.confidence
+                                },
+                                email.id
+                            );
+                        }
+                    }
+                }
+
+                // Replace with validated matches
+                analysis.matched_rules = validatedMatches;
             }
 
             // Log detailed rule evaluation for debugging
@@ -1556,16 +1629,33 @@ export class EmailProcessorService {
 
                 // === Recipient analysis ===
                 case 'recipient_type':
-                    // Check if user is in to/cc/bcc
-                    // Note: This requires parsing the recipient field
-                    // For now, simple heuristic: if recipient field exists and matches pattern
-                    // TODO: Implement proper recipient parsing
+                    // Check if user is in to/cc/bcc (parsed from headers during ingestion)
+                    if (typeof value !== 'string') return false;
+                    if (email.recipient_type !== value) return false;
                     break;
 
                 case 'recipient_count_gt':
                     // Count number of recipients
-                    // Note: This requires parsing recipient lists
-                    // TODO: Implement recipient counting
+                    // Note: This requires parsing recipient lists from headers
+                    // TODO: Implement recipient counting from To/CC headers
+                    break;
+
+                case 'is_automated':
+                    // Check if email is automated/bulk (detected from headers)
+                    if (typeof value !== 'boolean') return false;
+                    if (email.is_automated !== value) return false;
+                    break;
+
+                case 'has_unsubscribe':
+                    // Check for List-Unsubscribe header
+                    if (typeof value !== 'boolean') return false;
+                    if (email.has_unsubscribe !== value) return false;
+                    break;
+
+                case 'is_reply':
+                    // Check if email is part of a reply thread
+                    if (typeof value !== 'boolean') return false;
+                    if (email.is_reply !== value) return false;
                     break;
 
                 case 'is_first_contact':
@@ -1787,5 +1877,70 @@ export class EmailProcessorService {
         } catch (err) {
             logger.warn('Failed to reset stop request status', { error: err, userId });
         }
+    }
+
+    /**
+     * Validate if an email meets a rule's conditions
+     * Used for post-LLM validation to filter out incorrect matches
+     */
+    private evaluateRuleCondition(
+        condition: any,
+        context: {
+            category: string;
+            sentiment?: string;
+            priority?: string;
+            confidence: number;
+            email: Email;
+            emailAge: number;
+        }
+    ): boolean {
+        if (!condition) return true; // No conditions = always match
+
+        const { category, sentiment, priority, confidence, email, emailAge } = context;
+
+        // Handle AND conditions (all must be true)
+        if (condition.and && Array.isArray(condition.and)) {
+            return condition.and.every((subCond: any) =>
+                this.evaluateRuleCondition(subCond, context)
+            );
+        }
+
+        // Handle OR conditions (at least one must be true)
+        if (condition.or && Array.isArray(condition.or)) {
+            return condition.or.some((subCond: any) =>
+                this.evaluateRuleCondition(subCond, context)
+            );
+        }
+
+        // Evaluate simple conditions
+        if (condition.category && condition.category !== category) return false;
+        if (condition.sentiment && condition.sentiment !== sentiment) return false;
+        if (condition.priority && condition.priority !== priority) return false;
+        if (condition.confidence_gt && confidence < condition.confidence_gt) return false;
+        if (condition.older_than_days && emailAge < condition.older_than_days) return false;
+
+        // Header-based conditions
+        if (condition.recipient_type && condition.recipient_type !== email.recipient_type) return false;
+        if (condition.is_automated !== undefined && condition.is_automated !== email.is_automated) return false;
+        if (condition.has_unsubscribe !== undefined && condition.has_unsubscribe !== email.has_unsubscribe) return false;
+        if (condition.is_reply !== undefined && condition.is_reply !== email.is_reply) return false;
+
+        // Sender conditions
+        if (condition.sender_email && condition.sender_email !== email.sender) return false;
+        if (condition.sender_domain) {
+            const senderDomain = email.sender?.split('@')[1];
+            if (senderDomain !== condition.sender_domain) return false;
+        }
+        if (condition.sender_contains && !email.sender?.toLowerCase().includes(condition.sender_contains.toLowerCase())) return false;
+
+        // Content conditions
+        if (condition.subject_contains && !email.subject?.toLowerCase().includes(condition.subject_contains.toLowerCase())) return false;
+        if (condition.body_contains && !email.body_snippet?.toLowerCase().includes(condition.body_contains.toLowerCase())) return false;
+
+        // AI conditions
+        if (condition.is_useless !== undefined && condition.is_useless !== email.is_useless) return false;
+        if (condition.ai_priority && condition.ai_priority !== priority) return false;
+
+        return true; // All checks passed
     }
 }

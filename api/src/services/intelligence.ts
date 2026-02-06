@@ -76,10 +76,18 @@ export interface EmailContext {
     sender: string;
     date: string;
     metadata?: {
+        // Original metadata fields (deprecated but kept for compatibility)
         importance?: string;
         listUnsubscribe?: string;
         autoSubmitted?: string;
         mailer?: string;
+        // Enhanced header metadata for better LLM analysis
+        recipient_type?: 'to' | 'cc' | 'bcc';
+        is_automated?: boolean;
+        has_unsubscribe?: boolean;
+        is_reply?: boolean;
+        sender_priority?: 'high' | 'normal' | 'low';
+        thread_id?: string;
     };
     userPreferences?: {
         autoTrashSpam?: boolean;
@@ -158,7 +166,17 @@ export class IntelligenceService {
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
 
         const metadataSignals = [];
-        if (context.metadata?.listUnsubscribe) metadataSignals.push('- Contains Unsubscribe header');
+        // Header-based signals (enhanced)
+        if (context.metadata?.recipient_type === 'cc') metadataSignals.push('- Recipient: CC (not directly addressed)');
+        if (context.metadata?.recipient_type === 'bcc') metadataSignals.push('- Recipient: BCC (bulk/mass email)');
+        if (context.metadata?.is_automated) metadataSignals.push('- Automated/Bulk email detected (List-Unsubscribe or Precedence:bulk)');
+        if (context.metadata?.has_unsubscribe) metadataSignals.push('- Contains Unsubscribe header (likely newsletter/marketing)');
+        if (context.metadata?.is_reply) metadataSignals.push('- Part of reply thread (ongoing conversation)');
+        if (context.metadata?.sender_priority === 'high') metadataSignals.push('- Sender Priority: HIGH (marked as urgent)');
+        if (context.metadata?.sender_priority === 'low') metadataSignals.push('- Sender Priority: LOW');
+        if (context.metadata?.mailer) metadataSignals.push(`- Sent via: ${context.metadata.mailer}`);
+        // Legacy metadata (deprecated but kept for compatibility)
+        if (context.metadata?.listUnsubscribe && !context.metadata?.has_unsubscribe) metadataSignals.push('- Contains Unsubscribe header');
         if (context.metadata?.autoSubmitted && context.metadata.autoSubmitted !== 'no') metadataSignals.push(`- Auto-Submitted: ${context.metadata.autoSubmitted}`);
         if (context.metadata?.importance) metadataSignals.push(`- Priority: ${context.metadata.importance}`);
 
@@ -191,11 +209,12 @@ CATEGORY DEFINITIONS:
 
 CRITICAL RULES:
 1. Platform notifications (linkedin.com, github.com) are ALWAYS "notification" or "social", never "personal"
-2. Emails from noreply@, no-reply@ are likely "transactional" or "notification"
+2. Automated sender addresses (noreply@, no-reply@, donotreply@, alerts@, notifications@, updates@, newsletter@, etc.) are ALWAYS "transactional", "notification", or "newsletter" - NEVER "personal"
 3. Weekly/Monthly digests are "newsletter"
 4. If "List-Unsubscribe" header is present, it is likely "newsletter" or "promotional"
 5. Follow "LEARNED PATTERN" signals strictly if present
 6. VIP Senders must be "High" priority unless irrelevant (e.g. OOO auto-reply)
+7. Google Alerts (googlealerts-noreply@google.com) are ALWAYS "news" category, NEVER "personal" or "promotional"
 
 FEW-SHOT EXAMPLES:
 
@@ -520,6 +539,33 @@ REQUIRED JSON STRUCTURE:
         });
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
 
+        // Build metadata signals (same as analyzeEmail)
+        const metadataSignals = [];
+        // Header-based signals (enhanced)
+        if (context.metadata?.recipient_type === 'cc') metadataSignals.push('- Recipient: CC (not directly addressed)');
+        if (context.metadata?.recipient_type === 'bcc') metadataSignals.push('- Recipient: BCC (bulk/mass email)');
+        if (context.metadata?.is_automated) metadataSignals.push('- Automated/Bulk email detected (likely newsletter/marketing)');
+        if (context.metadata?.has_unsubscribe) metadataSignals.push('- Contains Unsubscribe header (newsletter indicator)');
+        if (context.metadata?.is_reply) metadataSignals.push('- Part of reply thread (ongoing conversation)');
+        if (context.metadata?.sender_priority === 'high') metadataSignals.push('- Sender Priority: HIGH (marked as urgent)');
+        if (context.metadata?.sender_priority === 'low') metadataSignals.push('- Sender Priority: LOW');
+        if (context.metadata?.mailer) metadataSignals.push(`- Sent via: ${context.metadata.mailer}`);
+        // Legacy metadata (deprecated but kept for compatibility)
+        if (context.metadata?.listUnsubscribe && !context.metadata?.has_unsubscribe) metadataSignals.push('- Contains Unsubscribe header');
+        if (context.metadata?.autoSubmitted && context.metadata.autoSubmitted !== 'no') metadataSignals.push(`- Auto-Submitted: ${context.metadata.autoSubmitted}`);
+        if (context.metadata?.importance) metadataSignals.push(`- Priority: ${context.metadata.importance}`);
+
+        // Adaptive Learning Signals
+        if (context.userPreferences?.vipSenders?.includes(context.sender)) {
+            metadataSignals.push('- SENDER IS VIP (High Priority Required)');
+        }
+
+        const senderDomain = context.sender.split('@')[1];
+        if (senderDomain && context.userPreferences?.categoryPatterns?.[senderDomain]) {
+            const learnedCategory = context.userPreferences.categoryPatterns[senderDomain];
+            metadataSignals.push(`- LEARNED PATTERN: Sender domain '${senderDomain}' is strictly category '${learnedCategory}'`);
+        }
+
         let rulesContext: string;
         if (typeof compiledRulesContext === 'string') {
             rulesContext = compiledRulesContext;
@@ -542,6 +588,11 @@ CATEGORY DEFINITIONS:
 - personal: Personal correspondence from friends/family
 - notification: Platform alerts/notifications (Github, Linear, etc) - distinct from social
 - other: Anything that doesn't fit above categories
+
+Email Context:
+- Subject: ${context.subject}
+- From: ${context.sender}
+${metadataSignals.join('\n')}
 
 Rules Context:
 ${rulesContext}
@@ -571,7 +622,8 @@ CRITICAL INSTRUCTIONS:
 - Actions will be merged by the system - you don't need to resolve conflicts
 - Use "draft" action only if a rule explicitly requests it
 - Platform notifications (linkedin, github) are ALWAYS "notification" or "social"
-- Emails from noreply@ are likely "transactional" or "notification"`;
+- Automated sender addresses (noreply@, no-reply@, donotreply@, alerts@, notifications@, updates@, newsletter@, etc.) are ALWAYS "transactional", "notification", or "newsletter" - NEVER "personal"
+- Google Alerts (googlealerts-noreply@google.com) are ALWAYS "news" category`;
 
         if (eventLogger) {
             await eventLogger.info('Thinking', `Context-aware analysis: ${context.subject}`, {

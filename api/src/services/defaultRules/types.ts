@@ -59,6 +59,11 @@ export interface EnhancedRuleCondition {
   recipient_count_gt?: number;       // Number of recipients threshold
   is_first_contact?: boolean;        // No prior thread with sender
 
+  // Email header metadata (parsed during sync)
+  is_automated?: boolean;            // Detected from List-Unsubscribe, Precedence:bulk, X-Mailer
+  has_unsubscribe?: boolean;         // Contains List-Unsubscribe header
+  is_reply?: boolean;                // Part of a reply thread (In-Reply-To/References headers)
+
   // Content matching
   contains_keywords?: string[];      // Any of these words (case-insensitive)
   matches_pattern?: string;          // Regex pattern

@@ -116,6 +116,16 @@ export interface Email {
     is_useless: boolean;
     ai_analysis: Record<string, unknown> | null;
 
+    // Email Header Metadata (for rule matching and LLM analysis)
+    headers?: Record<string, any> | null;
+    recipient_type?: 'to' | 'cc' | 'bcc' | null;
+    is_automated?: boolean | null;
+    has_unsubscribe?: boolean | null;
+    is_reply?: boolean | null;
+    thread_id?: string | null;
+    mailer?: string | null;
+    sender_priority?: 'high' | 'normal' | 'low' | null;
+
     // Action Fields
     suggested_action: string | null; // Deprecated
     suggested_actions?: string[];

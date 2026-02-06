@@ -59,7 +59,7 @@ export const EMAIL_ORG_RULES: DefaultRule[] = [
     actions: ['label:Sales/Cold Outreach', 'draft'],
     instructions: 'Politely acknowledge the outreach. If not interested, thank them and decline. If potentially interested, ask for more details.',
     priority: 20,
-    is_enabled_by_default: true
+    is_enabled_by_default: true  // ← RE-ENABLED: recipient_type now implemented!
   },
 
   // Rule 3: CC Organizer
