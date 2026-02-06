@@ -5,6 +5,25 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.11] - 2026-02-06
+
+### Added
+- **Advanced Automation Conditions**: Significant upgrade to the rule engine with support for negative conditions and exclusion logic.
+  - **Negative Conditions**: Rules can now specify criteria for *excluding* emails (e.g., "Match category: News, but EXCLUDE if sender is googlealerts.com").
+  - **Smart Parsing**: The Rule Editor now features a "Smart Input" for negative conditions that handles plain text, domains, and complex JSON filters.
+  - **Min Confidence Threshold**: Introduced per-rule confidence tuning. Users can now set a minimum AI confidence score (0.0 to 1.0) required for a rule to match, allowing for stricter control over critical automations.
+- **Enhanced Email Intelligence**:
+  - **Header Metadata Extraction**: The ingestion pipeline now extracts technical headers (`Recipient-Type`, `Is-Automated`, `Has-Unsubscribe`, `Is-Reply`, `Thread-ID`, `Mailer`, `Sender-Priority`) and stores them as structured columns.
+  - **Context-Aware Analysis**: AI analysis now utilizes these "Metadata Signals" to improve classification accuracy for newsletters, automated alerts, and reply threads.
+- **Active Learning & Feedback**:
+  - **Positive Feedback Tracking**: Added a "Thumbs Up" button to email cards. Submitting positive feedback now updates learning metrics to track AI accuracy improvements over time.
+  - **Learning API**: New `/api/learning/feedback` endpoint for instant metric updates and feedback persistence.
+- **Database Architecture**: Added migrations `20260206000012` through `20260206000017` to support header storage, negative conditions, confidence thresholds, and default template updates.
+
+### Improved
+- **Rule Matching Resilience**: Implemented a Post-LLM Validation phase that double-checks AI matches against actual rule conditions, filtering out hallucinations or fuzzy matches that don't meet strict criteria.
+- **Dashboard UI**: Added "AI Trace" and "Feedback" accessibility improvements, including localized tooltips and better state handling for positive feedback.
+
 ## [2.23.10] - 2026-02-06
 
 ### Added
