@@ -226,8 +226,13 @@ export class LearningService {
 
     private async updateMetrics(userId: string, items: UserFeedback[]): Promise<void> {
         try {
-            // Simple counters for now
-            const corrections = items.filter(i => i.feedback_type === 'analysis').length;
+            // Separate positive feedback (correct) from corrections (incorrect)
+            const positiveFeedback = items.filter(i =>
+                i.feedback_type === 'analysis' && i.corrected_data?.is_correct === true
+            );
+            const corrections = items.filter(i =>
+                i.feedback_type === 'analysis' && i.corrected_data?.is_correct !== true
+            );
             const draftEdits = items.filter(i => i.feedback_type === 'draft_edit').length;
 
             // Fetch existing or create
@@ -247,8 +252,7 @@ export class LearningService {
                     .from('learning_metrics')
                     .update({
                         total_classifications: (existing.total_classifications || 0) + items.length,
-                        // If it's a correction, it wasn't correct. If it's pure positive feedback... (not impl yet)
-                        // For now, this is just activity tracking
+                        correct_classifications: (existing.correct_classifications || 0) + positiveFeedback.length,
                         drafts_edited: (existing.drafts_edited || 0) + draftEdits,
                         updated_at: new Date().toISOString()
                     })
@@ -261,11 +265,19 @@ export class LearningService {
                     .insert({
                         user_id: userId,
                         total_classifications: items.length,
+                        correct_classifications: positiveFeedback.length,
                         drafts_edited: draftEdits
                     });
 
                 if (insertError) throw insertError;
             }
+
+            logger.info('Updated learning metrics', {
+                userId,
+                positive: positiveFeedback.length,
+                corrections: corrections.length,
+                total: items.length
+            });
         } catch (error) {
             logger.error('Failed to update learning metrics', error as Error);
         }

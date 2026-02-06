@@ -88,14 +88,22 @@ export const schemas = {
 
     // Rule schemas - supports both single action (legacy) and actions array
     // Now includes description and intent for context-aware AI matching
+    // Actions support: 'delete', 'archive', 'draft', 'star', 'read', or 'label:*' (e.g., 'label:Financial')
     createRule: z.object({
         name: z.string().min(1).max(100),
         description: z.string().max(500).optional(),
         intent: z.string().max(200).optional(),
         priority: z.number().int().min(0).max(100).optional(),
         condition: z.record(z.unknown()),
-        action: z.enum(['delete', 'archive', 'draft', 'star', 'read']).optional(),
-        actions: z.array(z.enum(['delete', 'archive', 'draft', 'star', 'read'])).optional(),
+        negative_condition: z.record(z.unknown()).optional(),
+        action: z.union([
+            z.enum(['delete', 'archive', 'draft', 'star', 'read']),
+            z.string().regex(/^label:.+/, 'Label actions must start with "label:"')
+        ]).optional(),
+        actions: z.array(z.union([
+            z.enum(['delete', 'archive', 'draft', 'star', 'read']),
+            z.string().regex(/^label:.+/, 'Label actions must start with "label:"')
+        ])).optional(),
         instructions: z.string().optional(),
         is_enabled: z.boolean().default(true),
     }).refine(data => data.action || (data.actions && data.actions.length > 0), {
@@ -108,8 +116,15 @@ export const schemas = {
         intent: z.string().max(200).optional(),
         priority: z.number().int().min(0).max(100).optional(),
         condition: z.record(z.unknown()).optional(),
-        action: z.enum(['delete', 'archive', 'draft', 'star', 'read']).optional(),
-        actions: z.array(z.enum(['delete', 'archive', 'draft', 'star', 'read'])).optional(),
+        negative_condition: z.record(z.unknown()).optional(),
+        action: z.union([
+            z.enum(['delete', 'archive', 'draft', 'star', 'read']),
+            z.string().regex(/^label:.+/, 'Label actions must start with "label:"')
+        ]).optional(),
+        actions: z.array(z.union([
+            z.enum(['delete', 'archive', 'draft', 'star', 'read']),
+            z.string().regex(/^label:.+/, 'Label actions must start with "label:"')
+        ])).optional(),
         instructions: z.string().optional(),
         is_enabled: z.boolean().optional(),
     }),

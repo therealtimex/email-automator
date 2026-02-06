@@ -69,6 +69,8 @@ export interface RuleContext {
     intent?: string;
     actions: string[];
     draft_instructions?: string;
+    condition?: any; // Positive condition
+    negative_condition?: any; // Negative condition (exclusion logic)
 }
 
 export interface EmailContext {
@@ -166,6 +168,26 @@ export class IntelligenceService {
         const cleanedContent = ContentCleaner.cleanEmailBody(content).substring(0, 2500);
 
         const metadataSignals = [];
+
+        // Email age signal (objective time context only)
+        if (context.date) {
+            const emailDate = new Date(context.date);
+            const now = new Date();
+            const ageMs = now.getTime() - emailDate.getTime();
+            const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+            const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+
+            if (ageDays === 0 && ageHours < 1) {
+                metadataSignals.push('- Email age: Less than 1 hour old');
+            } else if (ageDays === 0) {
+                metadataSignals.push(`- Email age: ${ageHours} hours old`);
+            } else if (ageDays === 1) {
+                metadataSignals.push('- Email age: 1 day old');
+            } else {
+                metadataSignals.push(`- Email age: ${ageDays} days old`);
+            }
+        }
+
         // Header-based signals (enhanced)
         if (context.metadata?.recipient_type === 'cc') metadataSignals.push('- Recipient: CC (not directly addressed)');
         if (context.metadata?.recipient_type === 'bcc') metadataSignals.push('- Recipient: BCC (bulk/mass email)');
@@ -541,6 +563,26 @@ REQUIRED JSON STRUCTURE:
 
         // Build metadata signals (same as analyzeEmail)
         const metadataSignals = [];
+
+        // Email age signal (objective time context only)
+        if (context.date) {
+            const emailDate = new Date(context.date);
+            const now = new Date();
+            const ageMs = now.getTime() - emailDate.getTime();
+            const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+            const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+
+            if (ageDays === 0 && ageHours < 1) {
+                metadataSignals.push('- Email age: Less than 1 hour old');
+            } else if (ageDays === 0) {
+                metadataSignals.push(`- Email age: ${ageHours} hours old`);
+            } else if (ageDays === 1) {
+                metadataSignals.push('- Email age: 1 day old');
+            } else {
+                metadataSignals.push(`- Email age: ${ageDays} days old`);
+            }
+        }
+
         // Header-based signals (enhanced)
         if (context.metadata?.recipient_type === 'cc') metadataSignals.push('- Recipient: CC (not directly addressed)');
         if (context.metadata?.recipient_type === 'bcc') metadataSignals.push('- Recipient: BCC (bulk/mass email)');
@@ -566,11 +608,39 @@ REQUIRED JSON STRUCTURE:
             metadataSignals.push(`- LEARNED PATTERN: Sender domain '${senderDomain}' is strictly category '${learnedCategory}'`);
         }
 
+        // Format rules with positive and negative conditions
+        const formatCondition = (cond: any): string => {
+            if (!cond) return '';
+            if (cond.and) return `(${cond.and.map(formatCondition).join(' AND ')})`;
+            if (cond.or) return `(${cond.or.map(formatCondition).join(' OR ')})`;
+            if (cond.not) return `NOT ${formatCondition(cond.not)}`;
+
+            const parts = [];
+            for (const [key, value] of Object.entries(cond)) {
+                if (key === 'category') parts.push(`category=${value}`);
+                else if (key === 'is_automated') parts.push(`is_automated=${value}`);
+                else if (key === 'has_unsubscribe') parts.push(`has_unsubscribe=${value}`);
+                else if (key === 'recipient_type') parts.push(`recipient_type=${value}`);
+                else if (key === 'sender_domain') parts.push(`sender_domain=${value}`);
+                else parts.push(`${key}=${value}`);
+            }
+            return parts.join(', ');
+        };
+
         let rulesContext: string;
         if (typeof compiledRulesContext === 'string') {
             rulesContext = compiledRulesContext;
         } else {
-            rulesContext = compiledRulesContext.map(r => `- ${r.name}: ${r.intent}`).join('\n');
+            rulesContext = compiledRulesContext.map(r => {
+                let ruleText = `- ${r.name}: ${r.intent || r.description || 'No description'}`;
+                if (r.condition) {
+                    ruleText += `\n  Match when: ${formatCondition(r.condition)}`;
+                }
+                if (r.negative_condition) {
+                    ruleText += `\n  EXCLUDE when: ${formatCondition(r.negative_condition)}`;
+                }
+                return ruleText;
+            }).join('\n');
         }
 
         const systemPrompt = `You are an AI Automation Agent. Analyze the email and identify ALL rules that apply.

@@ -85,6 +85,7 @@ export function FeedbackModal({ email, isOpen, onClose, defaultType = 'analysis'
                 feedback_type: feedbackType,
                 original_state: originalData,
                 corrected_state: correctedData,
+                reasoning: reasoning.trim() || undefined,  // Include reasoning text
             });
 
             // Optimistic update if category changed (optional, could also be part of api.submitFeedback response handling if we moved logic there)
@@ -94,6 +95,13 @@ export function FeedbackModal({ email, isOpen, onClose, defaultType = 'analysis'
             }
 
             toast.success("Thanks! I'll learn from this feedback.");
+
+            // Reset form state
+            setCategory(email.category || 'other');
+            setPriority((email.ai_analysis?.priority as string) || 'Medium');
+            setSelectedIssues([]);
+            setReasoning("");
+
             onClose();
         } catch (error) {
             console.error('Feedback error:', error);

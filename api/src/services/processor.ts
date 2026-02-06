@@ -847,6 +847,13 @@ export class EmailProcessorService {
             // Falls back to building context if not cached
             let compiledContext: string | null = settings?.compiled_rule_context || null;
 
+            // CRITICAL: Detect stale cache (doesn't include conditions)
+            // If cached context exists but doesn't have "WHEN:" markers, it's using old format - force rebuild
+            if (compiledContext && !compiledContext.includes('WHEN:')) {
+                logger.info('Stale compiled_rule_context detected (no conditions), forcing rebuild');
+                compiledContext = null;  // Force rebuild
+            }
+
             // Fetch rules for action execution (need attachments, instructions)
             const { data: rules } = await this.supabase
                 .from('rules')
@@ -914,11 +921,15 @@ export class EmailProcessorService {
                     };
 
                     const conditionText = parseCondition(r.condition as any);
+                    const negativeConditionText = r.negative_condition ? parseCondition(r.negative_condition as any) : null;
 
-                    // Format: "- Rule Name [ID: xxx]: Intent [WHEN: conditions] → actions"
+                    // Format: "- Rule Name [ID: xxx]: Intent [WHEN: conditions] [EXCLUDE: negative conditions] → actions"
                     let ruleText = `- ${r.name} [ID: ${r.id}]: ${r.intent || r.description || 'No description'}`;
                     if (conditionText) {
                         ruleText += `\n  WHEN: ${conditionText}`;
+                    }
+                    if (negativeConditionText) {
+                        ruleText += `\n  EXCLUDE WHEN: ${negativeConditionText}`;
                     }
                     ruleText += `\n  THEN: ${r.actions?.join(', ') || r.action || 'none'}`;
                     if (r.instructions) {
@@ -973,16 +984,57 @@ export class EmailProcessorService {
                     }
 
                     // Validate this match against actual rule conditions
+                    // Pass user preferences to enable learned pattern application
                     const isValid = this.evaluateRuleCondition(rule.condition as any, {
                         category: analysis.category,
                         sentiment: analysis.sentiment,
                         priority: analysis.priority,
                         confidence: match.confidence,
                         email,
-                        emailAge
+                        emailAge,
+                        userPreferences: {
+                            categoryPatterns: settings?.category_patterns,
+                            vipSenders: settings?.vip_senders
+                        }
                     });
 
-                    if (isValid) {
+                    // Check negative condition (exclusion logic)
+                    let isExcluded = false;
+                    if (isValid && rule.negative_condition) {
+                        isExcluded = this.evaluateRuleCondition(rule.negative_condition as any, {
+                            category: analysis.category,
+                            sentiment: analysis.sentiment,
+                            priority: analysis.priority,
+                            confidence: match.confidence,
+                            email,
+                            emailAge,
+                            userPreferences: {
+                                categoryPatterns: settings?.category_patterns,
+                                vipSenders: settings?.vip_senders
+                            }
+                        });
+
+                        if (isExcluded) {
+                            logger.info('Rule excluded by negative condition', {
+                                rule_name: rule.name,
+                                rule_id: rule.id,
+                                negative_condition: rule.negative_condition,
+                                email_id: email.id
+                            });
+                            if (eventLogger) {
+                                await eventLogger.info('Validation',
+                                    `Rule "${rule.name}" excluded by negative condition`,
+                                    {
+                                        rule_id: rule.id,
+                                        negative_condition: rule.negative_condition
+                                    },
+                                    email.id
+                                );
+                            }
+                        }
+                    }
+
+                    if (isValid && !isExcluded) {
                         validatedMatches.push(match);
                     } else {
                         logger.info('Filtered out invalid LLM rule match', {
@@ -1077,6 +1129,11 @@ export class EmailProcessorService {
                         }
                     });
 
+                // Check if learned patterns would apply
+                const senderDomain = email.sender?.split('@')[1];
+                const learnedCategory = senderDomain && settings?.category_patterns?.[senderDomain];
+                const isVIP = email.sender && settings?.vip_senders?.includes(email.sender);
+
                 await eventLogger.info('Rule Evaluation',
                     `Evaluated ${ruleEvaluations.length} rules: ${analysis.matched_rules.length} matched, ${ruleEvaluations.length - analysis.matched_rules.length} failed`,
                     {
@@ -1085,6 +1142,17 @@ export class EmailProcessorService {
                             confidence: analysis.matched_rules[0]?.confidence || 0,
                             email_age_days: emailAge,
                             summary: analysis.summary
+                        },
+                        learned_patterns_applied: {
+                            category_override: learnedCategory ? {
+                                domain: senderDomain,
+                                llm_category: analysis.category,
+                                learned_category: learnedCategory
+                            } : null,
+                            vip_sender: isVIP ? {
+                                sender: email.sender,
+                                priority_boosted: true
+                            } : null
                         },
                         rule_evaluations: ruleEvaluations
                     },
@@ -1327,18 +1395,37 @@ export class EmailProcessorService {
     ): Promise<void> {
         // User-defined and System rules (Unified)
         for (const rule of rules) {
-            if (this.matchesCondition(email, analysis, rule.condition as any)) {
-                // Get actions array (fallback to single action for backward compatibility)
-                const actions = rule.actions && rule.actions.length > 0
-                    ? rule.actions
-                    : (rule.action ? [rule.action] : []);
+            // Check positive condition
+            const positiveMatch = this.matchesCondition(email, analysis, rule.condition as any);
+            if (!positiveMatch) continue;
 
-                if (eventLogger && actions.length > 1) {
-                    await eventLogger.info('Multi-Action', `Executing ${actions.length} actions for rule: ${rule.name}`, { actions }, email.id);
+            // Check negative condition (exclusion logic)
+            if (rule.negative_condition) {
+                const negativeMatch = this.matchesCondition(email, analysis, rule.negative_condition as any);
+                if (negativeMatch) {
+                    // Email matches negative condition - exclude from this rule
+                    if (eventLogger) {
+                        await eventLogger.info('Rule Excluded', `Rule "${rule.name}" excluded due to negative condition match`, {
+                            rule_name: rule.name,
+                            negative_condition: rule.negative_condition
+                        }, email.id);
+                    }
+                    continue;
                 }
+            }
 
-                // Execute each action in the rule
-                for (const action of actions) {
+            // Rule matched (positive condition met, negative condition not met)
+            // Get actions array (fallback to single action for backward compatibility)
+            const actions = rule.actions && rule.actions.length > 0
+                ? rule.actions
+                : (rule.action ? [rule.action] : []);
+
+            if (eventLogger && actions.length > 1) {
+                await eventLogger.info('Multi-Action', `Executing ${actions.length} actions for rule: ${rule.name}`, { actions }, email.id);
+            }
+
+            // Execute each action in the rule
+            for (const action of actions) {
                     let draftContent = undefined;
 
                     // If the action is to draft, and it has specific instructions, generate it now
@@ -1507,7 +1594,6 @@ export class EmailProcessorService {
                         continue;
                     }
                 }
-            }
         }
     }
 
@@ -1882,6 +1968,8 @@ export class EmailProcessorService {
     /**
      * Validate if an email meets a rule's conditions
      * Used for post-LLM validation to filter out incorrect matches
+     *
+     * LEARNING INTEGRATION: Applies learned patterns to override LLM categorization
      */
     private evaluateRuleCondition(
         condition: any,
@@ -1892,11 +1980,46 @@ export class EmailProcessorService {
             confidence: number;
             email: Email;
             emailAge: number;
+            userPreferences?: {
+                categoryPatterns?: Record<string, string>;
+                vipSenders?: string[];
+            };
         }
     ): boolean {
         if (!condition) return true; // No conditions = always match
 
-        const { category, sentiment, priority, confidence, email, emailAge } = context;
+        let { category, sentiment, priority, confidence, email, emailAge, userPreferences } = context;
+
+        // ========================================
+        // ACTIVE LEARNING: Apply learned patterns
+        // ========================================
+
+        // 1. Category Pattern Learning: Override LLM category with learned pattern
+        if (userPreferences?.categoryPatterns && email.sender) {
+            const senderDomain = email.sender.split('@')[1];
+            if (senderDomain && userPreferences.categoryPatterns[senderDomain]) {
+                const learnedCategory = userPreferences.categoryPatterns[senderDomain];
+                logger.debug('Applying learned category pattern', {
+                    domain: senderDomain,
+                    llm_category: category,
+                    learned_category: learnedCategory,
+                    email_id: email.id
+                });
+                category = learnedCategory; // Override with learned pattern
+            }
+        }
+
+        // 2. VIP Sender Detection: Override priority to High
+        if (userPreferences?.vipSenders && email.sender) {
+            if (userPreferences.vipSenders.includes(email.sender)) {
+                logger.debug('Applying VIP sender priority boost', {
+                    sender: email.sender,
+                    original_priority: priority,
+                    email_id: email.id
+                });
+                priority = 'High'; // VIP senders always high priority
+            }
+        }
 
         // Handle AND conditions (all must be true)
         if (condition.and && Array.isArray(condition.and)) {

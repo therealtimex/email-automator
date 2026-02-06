@@ -12,6 +12,7 @@ import ttsRoutes from './tts.js';
 import agentRoutes from './agent.js';
 import draftsRoutes from './drafts.js';
 import attachmentsRoutes from './attachments.js';
+import learningRoutes from './learning.js';
 
 
 const router = Router();
@@ -30,6 +31,7 @@ router.use('/tts', ttsRoutes);
 router.use('/agent', agentRoutes);
 router.use('/drafts', draftsRoutes);
 router.use('/drafts', attachmentsRoutes);
+router.use('/learning', learningRoutes);
 
 
 export default router;

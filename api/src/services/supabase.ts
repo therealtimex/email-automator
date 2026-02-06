@@ -153,7 +153,8 @@ export interface Rule {
     description?: string;  // Semantic context for AI matching
     intent?: string;       // The intent behind the rule (e.g., "Politely decline sales pitches")
     priority?: number;     // Higher = evaluated first by AI
-    condition: Record<string, unknown>; // Legacy - kept for backwards compatibility
+    condition: Record<string, unknown>; // Positive condition - email must match this
+    negative_condition?: Record<string, unknown>; // Negative condition - email matching this will be excluded
     action?: 'delete' | 'archive' | 'draft' | 'star' | 'read'; // Legacy single action
     actions?: ('delete' | 'archive' | 'draft' | 'star' | 'read')[]; // New multi-action array
     instructions?: string; // Draft generation instructions

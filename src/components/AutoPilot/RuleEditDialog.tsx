@@ -28,6 +28,76 @@ interface RuleEditDialogProps {
   onRemoveAttachment?: (path: string) => void;
 }
 
+/**
+ * Smart parser for negative conditions
+ * Accepts plain text or JSON and converts to valid condition object
+ */
+function smartParseNegativeCondition(input: string): any | null {
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+
+  // Try parsing as JSON first
+  try {
+    return JSON.parse(trimmed);
+  } catch (e) {
+    // Not JSON - apply smart conversions
+  }
+
+  // Pattern 1: Check if it looks like a category name
+  const validCategories = ['newsletter', 'news', 'spam', 'promotional', 'transactional',
+                          'social', 'support', 'client', 'internal', 'personal', 'notification', 'other'];
+  const lowerInput = trimmed.toLowerCase();
+
+  if (validCategories.includes(lowerInput)) {
+    return { category: lowerInput };
+  }
+
+  // Pattern 2: Multiple comma-separated categories
+  if (trimmed.includes(',')) {
+    const items = trimmed.split(',').map(s => s.trim().toLowerCase());
+    const matchedCategories = items.filter(item => validCategories.includes(item));
+
+    if (matchedCategories.length > 0) {
+      if (matchedCategories.length === 1) {
+        return { category: matchedCategories[0] };
+      } else {
+        return {
+          or: matchedCategories.map(cat => ({ category: cat }))
+        };
+      }
+    }
+  }
+
+  // Pattern 3: Domain (starts with @ or ends with common TLDs)
+  if (trimmed.startsWith('@') || /\.(com|net|org|io|co|ai)$/i.test(trimmed)) {
+    const domain = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
+    return { sender_domain: domain };
+  }
+
+  // Pattern 4: Key-value pair (field=value)
+  if (trimmed.includes('=')) {
+    const [key, value] = trimmed.split('=').map(s => s.trim());
+    if (key && value) {
+      // Handle boolean values
+      if (value.toLowerCase() === 'true') return { [key]: true };
+      if (value.toLowerCase() === 'false') return { [key]: false };
+      // Handle numeric values
+      if (!isNaN(Number(value))) return { [key]: Number(value) };
+      // String value
+      return { [key]: value };
+    }
+  }
+
+  // Pattern 5: Plain text - search in sender or subject
+  // User typed something like "Google Alert" - exclude emails with this text
+  return {
+    or: [
+      { sender_contains: trimmed },
+      { subject_contains: trimmed }
+    ]
+  };
+}
+
 export function RuleEditDialog({
   open,
   rule,
@@ -51,6 +121,7 @@ export function RuleEditDialog({
   const [actions, setActions] = useState<string[]>(['archive']);
   const [instructions, setInstructions] = useState('');
   const [attachments, setAttachments] = useState<RuleAttachment[]>([]);
+  const [negativeCondition, setNegativeCondition] = useState('');
 
   // Initialize form when rule changes
   useEffect(() => {
@@ -165,6 +236,13 @@ export function RuleEditDialog({
       } else {
         setOlderThan('');
       }
+
+      // Load negative condition (if exists)
+      if (rule.negative_condition) {
+        setNegativeCondition(JSON.stringify(rule.negative_condition, null, 2));
+      } else {
+        setNegativeCondition('');
+      }
     } else {
       // Reset for new rule
       setName('');
@@ -177,6 +255,7 @@ export function RuleEditDialog({
       setActions(['archive']);
       setInstructions('');
       setAttachments([]);
+      setNegativeCondition('');
     }
   }, [rule, open]);
 
@@ -233,11 +312,22 @@ export function RuleEditDialog({
 
       const hasDraftAction = actions.includes('draft');
 
+      // Smart parse negative condition if provided
+      let parsedNegativeCondition = undefined;
+      if (negativeCondition.trim()) {
+        parsedNegativeCondition = smartParseNegativeCondition(negativeCondition.trim());
+        if (parsedNegativeCondition === null) {
+          alert('Could not parse negative condition. Please check the input.');
+          return;
+        }
+      }
+
       const ruleData = {
         name: name.trim(),
         description: description.trim() || undefined,
         intent: intent.trim() || undefined,
         condition,
+        negative_condition: parsedNegativeCondition,
         actions,
         instructions: hasDraftAction ? instructions : undefined,
         attachments: hasDraftAction ? attachments : [],
@@ -454,6 +544,36 @@ export function RuleEditDialog({
             <p className="text-[10px] text-muted-foreground">
               {t('autopilot.editDialog.olderThanHelp')}
             </p>
+          </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <span>Exclude When (Optional)</span>
+              <span className="text-xs font-normal text-muted-foreground">Advanced</span>
+            </label>
+            <textarea
+              className="w-full p-3 border rounded-md bg-background min-h-[100px] text-xs font-mono custom-scrollbar"
+              placeholder="Google Alert\nnewsletter\n@googlealerts.com\nis_automated=true"
+              value={negativeCondition}
+              onChange={(e) => setNegativeCondition(e.target.value)}
+            />
+            <div className="text-[10px] text-muted-foreground space-y-1">
+              <p className="font-medium">💡 Smart input - use plain text or JSON:</p>
+              <div className="grid grid-cols-2 gap-2 pl-2">
+                <div>
+                  <p className="text-[9px] opacity-70 mb-0.5">Plain text:</p>
+                  <code className="bg-secondary/50 px-1 py-0.5 rounded block">Google Alert</code>
+                  <code className="bg-secondary/50 px-1 py-0.5 rounded block mt-0.5">newsletter</code>
+                  <code className="bg-secondary/50 px-1 py-0.5 rounded block mt-0.5">@googlealerts.com</code>
+                </div>
+                <div>
+                  <p className="text-[9px] opacity-70 mb-0.5">JSON (advanced):</p>
+                  <code className="bg-secondary/50 px-1 py-0.5 rounded block">{'{ "is_automated": true }'}</code>
+                  <code className="bg-secondary/50 px-1 py-0.5 rounded block mt-0.5">{'{ "category": "news" }'}</code>
+                  <code className="bg-secondary/50 px-1 py-0.5 rounded block mt-0.5">{'{ "or": [...] }'}</code>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

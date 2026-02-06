@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, X, MessageSquare } from 'lucide-react';
+import { Mail, ShieldCheck, Trash2, Send, RefreshCw, Archive, Flag, Search, ChevronLeft, ChevronRight, Loader2, Settings2, Calendar, Hash, AlertCircle, CheckCircle2, RotateCcw, Eye, Cpu, Clock, Code, Brain, Zap, Info, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, X, MessageSquare, ThumbsUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -408,6 +408,29 @@ export function Dashboard() {
         setIsFeedbackOpen(true);
     };
 
+    const handlePositiveFeedback = async (email: Email) => {
+        try {
+            // Submit positive feedback to track correct classifications
+            await api.submitFeedback({
+                email_id: email.id,
+                feedback_type: 'analysis',
+                original_state: {
+                    category: email.category,
+                    priority: email.ai_analysis?.priority
+                },
+                corrected_state: {
+                    category: email.category,  // Same = correct
+                    priority: email.ai_analysis?.priority,  // Same = correct
+                    is_correct: true  // Mark as positive feedback
+                }
+            });
+            toast.success(t('dashboard.positiveFeedbackSuccess') || 'Thanks! This helps improve AI accuracy.');
+        } catch (error) {
+            console.error('Positive feedback error:', error);
+            toast.error(t('dashboard.positiveFeedbackError') || 'Failed to submit feedback.');
+        }
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
             {/* Main Content */}
@@ -553,6 +576,7 @@ export function Dashboard() {
                                 onRetry={handleRetry}
                                 onViewTrace={handleViewTrace}
                                 onFeedback={handleFeedback}
+                                onPositiveFeedback={handlePositiveFeedback}
                                 onSelect={() => setSelectedEmail(email)}
                                 isSelected={selectedEmail?.id === email.id}
                                 loadingAction={actionLoading[email.id]}
@@ -938,6 +962,7 @@ interface EmailCardProps {
 
     onViewTrace: (email: Email) => void;
     onFeedback: (email: Email) => void;
+    onPositiveFeedback: (email: Email) => void;
     onSelect: () => void;
     isSelected: boolean;
     loadingAction?: string;
@@ -945,7 +970,7 @@ interface EmailCardProps {
     onCancelDelete?: () => void;
 }
 
-function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
+function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onPositiveFeedback, onSelect, isSelected, loadingAction, isDeletePending, onCancelDelete }: EmailCardProps) {
     const { t } = useLanguage();
     if (!email) return null;
     const categoryClass = CATEGORY_COLORS[email.category || 'other'];
@@ -1124,6 +1149,15 @@ function EmailCard({ email, onAction, onRetry, onViewTrace, onFeedback, onSelect
                                         <ExternalLink className="w-3.5 h-3.5" />
                                     </a>
                                 )}
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-green-500"
+                                    onClick={() => onPositiveFeedback(email)}
+                                    title={t('dashboard.positiveFeedbackTooltip') || "AI got this right!"}
+                                >
+                                    <ThumbsUp className="w-3.5 h-3.5" />
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"

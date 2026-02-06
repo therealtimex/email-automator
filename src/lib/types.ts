@@ -76,6 +76,7 @@ export interface Rule {
     intent?: string;       // The intent behind the rule (e.g., "Politely decline sales pitches")
     priority?: number;     // Higher = evaluated first by AI
     condition: RuleCondition; // Legacy - kept for backwards compatibility
+    negative_condition?: RuleCondition; // Exclude emails matching these conditions
     action?: 'delete' | 'archive' | 'draft' | 'star'; // Legacy single action
     actions?: ('delete' | 'archive' | 'draft' | 'star')[]; // New multi-action array
     instructions?: string; // Draft generation instructions
@@ -100,6 +101,13 @@ export interface RuleCondition {
     priority?: Priority;
     sentiment?: Sentiment;
     suggested_actions?: EmailAction[];
+
+    // Header-based conditions (for negative_condition support)
+    recipient_type?: 'to' | 'cc' | 'bcc';
+    is_automated?: boolean;
+    has_unsubscribe?: boolean;
+    is_reply?: boolean;
+    sender_priority?: 'high' | 'normal' | 'low';
 }
 
 export interface RuleAttachment {

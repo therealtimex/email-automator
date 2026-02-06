@@ -509,23 +509,13 @@ class HybridApiClient {
         feedback_type: 'analysis' | 'draft';
         original_state: any;
         corrected_state: any;
+        reasoning?: string;
     }) {
-        if (!this.supabaseClient) return { error: 'Supabase client not initialized' };
-
-        const { data: { user } } = await this.supabaseClient.auth.getUser();
-        if (!user) return { error: 'Not authenticated' };
-
-        const { error } = await this.supabaseClient
-            .from('user_feedback')
-            .insert({
-                user_id: user.id,
-                email_id: feedback.email_id,
-                feedback_type: feedback.feedback_type,
-                original_data: feedback.original_state,
-                corrected_data: feedback.corrected_state,
-            });
-
-        return { success: !error, error };
+        // Use Express API for instant metric updates (especially for positive feedback)
+        return this.expressRequest('/api/learning/feedback', {
+            method: 'POST',
+            body: JSON.stringify(feedback)
+        });
     }
 
     async getLearningMetrics() {
