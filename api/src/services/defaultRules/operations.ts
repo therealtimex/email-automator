@@ -2,133 +2,105 @@
  * Operations Rules
  *
  * Rules for support, operations, and customer success teams:
- * - Support ticket organization
- * - System monitoring alerts
- * - Internal announcements
+ * - Meeting invites with draft automation
+ * - Internal requests with draft automation
+ * - Vendor communications with draft automation
+ * - System alert cleanup
  */
 
 import { DefaultRule } from './types.js';
 
 export const OPERATIONS_RULES: DefaultRule[] = [
+  // Rule 6: Meeting Invites
   {
-    id: 'support-tickets-organizer',
+    id: 'exec-meeting-invites',
     category: 'operations',
-    name: '🎫 Support Ticket Organizer',
-    intent: 'Organize customer support tickets and cases',
-    description: 'Labels support tickets from Zendesk, Intercom, and other support tools',
+    name: '📅 Meeting Invites',
+    intent: 'Organize meeting requests and draft accept/decline replies',
+    description: 'Labels meeting invites and drafts accept/decline response',
     condition: {
-      or: [
+      and: [
         {
-          sender_domain: 'zendesk.com'
+          or: [
+            { category: 'internal' },
+            { category: 'client' },
+            { category: 'personal' }
+          ]
         },
-        {
-          sender_domain: 'intercom.io'
-        },
-        {
-          sender_domain: 'freshdesk.com'
-        },
-        {
-          contains_keywords: ['ticket', 'case created', 'support request', 'customer inquiry']
-        },
-        {
-          category: 'support',
-          confidence_gt: 0.7
-        }
+        { contains_keywords: ['meeting', 'calendar invite', 'zoom', 'teams', 'google meet'] },
+        { confidence_gt: 0.70 }
       ]
     },
-    actions: ['label:Support'],
+    actions: ['label:Meetings', 'draft'],
+    instructions: 'Confirm availability or suggest alternative times. Accept or politely decline with reason if needed.',
     priority: 80,
     is_enabled_by_default: true
   },
+
+  // Rule 24: Internal Requests
   {
-    id: 'urgent-tickets-highlighter',
+    id: 'ops-internal-requests',
     category: 'operations',
-    name: '🚨 Urgent Ticket Highlighter',
-    intent: 'Highlight high-priority and urgent customer issues',
-    description: 'Stars urgent support tickets that need immediate attention',
+    name: '📥 Internal Requests',
+    intent: 'Organize internal asks and draft acknowledgment replies',
+    description: 'Labels internal requests and drafts acknowledgment',
     condition: {
-      category: 'support',
-      or: [
-        {
-          contains_keywords: ['urgent', 'emergency', 'critical', 'down', 'not working']
-        },
-        {
-          ai_priority: 'High'
-        }
+      and: [
+        { category: 'internal' },
+        { contains_keywords: ['need', 'request', 'help', 'can you', 'could you', 'would you'] },
+        { confidence_gt: 0.70 }
       ]
     },
-    actions: ['star', 'important'],
-    priority: 100,
+    actions: ['label:Internal/Requests', 'draft'],
+    instructions: 'Acknowledge the request. Confirm understanding. Provide timeline or next steps.',
+    priority: 75,
     is_enabled_by_default: true
   },
+
+  // Rule 25: Vendor Communications
   {
-    id: 'system-monitoring-organizer',
+    id: 'ops-vendor-comms',
     category: 'operations',
-    name: '⚠️ System Alerts Organizer',
-    intent: 'Organize system monitoring and uptime alerts',
-    description: 'Labels system alerts while starring critical incidents',
+    name: '🏢 Vendor Communications',
+    intent: 'Track vendor operations traffic and draft response stubs',
+    description: 'Labels vendor communications and drafts response',
     condition: {
-      or: [
+      and: [
         {
-          sender_domain: 'pingdom.com'
+          or: [
+            { category: 'transactional' },
+            { category: 'support' },
+            { category: 'client' }
+          ]
         },
-        {
-          sender_domain: 'uptimerobot.com'
-        },
-        {
-          sender_domain: 'statuspage.io'
-        },
-        {
-          sender_domain: 'datadog.com'
-        }
+        { contains_keywords: ['vendor', 'supplier', 'invoice', 'shipment', 'delivery', 'purchase order'] },
+        { confidence_gt: 0.70 }
       ]
     },
-    actions: ['label:Monitoring'],
+    actions: ['label:Vendors', 'draft'],
+    instructions: 'Acknowledge receipt. Confirm details or next steps. Ask questions if needed.',
     priority: 70,
     is_enabled_by_default: true
   },
+
+  // Rule 26: System Alerts
   {
-    id: 'critical-system-alerts-highlighter',
+    id: 'ops-system-alerts',
     category: 'operations',
-    name: '🔥 Critical Alert Highlighter',
-    intent: 'Highlight critical system incidents',
-    description: 'Stars critical alerts that indicate system downtime or major issues',
+    name: '🔔 System Alerts',
+    intent: 'Remove non-urgent system notifications after retention',
+    description: 'Labels and deletes non-urgent system alerts older than 14 days',
     condition: {
-      or: [
+      and: [
+        { category: 'notification' },
         {
-          sender_domain: 'pingdom.com',
-          contains_keywords: ['down', 'offline']
+          not: { contains_keywords: ['critical', 'urgent', 'down'] }
         },
-        {
-          sender_domain: 'datadog.com',
-          contains_keywords: ['critical', 'incident']
-        }
+        { older_than_days: 14 }
       ]
     },
-    actions: ['star', 'important', 'pin'],
-    priority: 100,
-    is_enabled_by_default: true
-  },
-  {
-    id: 'internal-announcements',
-    category: 'operations',
-    name: '🏢 Internal Announcements',
-    intent: 'Keep internal company announcements in inbox',
-    description: 'Keeps HR, team, and company-wide announcements visible (doesn\'t archive)',
-    condition: {
-      or: [
-        {
-          category: 'internal',
-          confidence_gt: 0.7
-        },
-        {
-          sender_domain: 'company.com',  // This should be customizable
-          contains_keywords: ['all-hands', 'team announcement', 'company update']
-        }
-      ]
-    },
-    actions: [],  // No actions - keep in inbox
-    priority: 50,
+    actions: ['label:System Alerts', 'delete'],
+    priority: 15,
     is_enabled_by_default: true
   }
 ];

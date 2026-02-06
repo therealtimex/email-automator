@@ -2,134 +2,178 @@
  * Development Rules
  *
  * Rules for software engineers and technical teams:
- * - System alert prioritization
- * - CI/CD and monitoring notifications
- * - Code review highlights
- * - Project management tool organization
+ * - GitHub mentions and assignments
+ * - CI/CD failure alerts
+ * - Dependabot cleanup
+ * - Code review tracking with draft automation
+ * - Monitoring alert cleanup
+ * - Weekly reports cleanup
  */
 
 import { DefaultRule } from './types.js';
 
 export const DEVELOPMENT_RULES: DefaultRule[] = [
+  // Rule 11: GitHub Mentions
   {
-    id: 'system-alerts-prioritizer',
+    id: 'dev-github-mentions',
     category: 'development',
-    name: '🚨 System Alerts Prioritizer',
-    intent: 'Prioritize critical system alerts and incidents',
-    description: 'Stars critical alerts from AWS, Datadog, Sentry, PagerDuty while archiving info-level notifications',
+    name: '👤 GitHub Mentions',
+    intent: 'Keep mention and assignment notifications discoverable',
+    description: 'Labels GitHub mentions and assignments for tracking',
     condition: {
-      or: [
+      and: [
         {
-          sender_domain: 'aws.amazon.com',
-          contains_keywords: ['critical', 'down', 'outage', 'incident']
+          or: [
+            { category: 'notification' },
+            { category: 'internal' }
+          ]
         },
+        { contains_keywords: ['@', 'mentioned you', 'assigned you', 'requested your review'] },
         {
-          sender_domain: 'datadoghq.com',
-          contains_keywords: ['alert', 'critical', 'error rate']
-        },
-        {
-          sender_domain: 'sentry.io',
-          contains_keywords: ['new issue', 'regression', 'error']
-        },
-        {
-          sender_domain: 'pagerduty.com',
-          contains_keywords: ['triggered', 'incident']
+          or: [
+            { sender_domain: 'github.com' },
+            { sender_domain: 'gitlab.com' }
+          ]
         }
       ]
     },
-    actions: ['star', 'important', 'pin'],
-    priority: 100,
+    actions: ['label:GitHub/Mentions'],
+    priority: 80,
     is_enabled_by_default: true
   },
+
+  // Rule 12: CI/CD Failures
   {
-    id: 'system-info-organizer',
+    id: 'dev-ci-failures',
     category: 'development',
-    name: '⚠️ System Info Organizer',
-    intent: 'Archive non-critical system notifications',
-    description: 'Archives info and warning level alerts from monitoring tools',
+    name: '❌ CI/CD Failures',
+    intent: 'Escalate build/deploy failures for faster recovery',
+    description: 'Stars CI/CD failure notifications for immediate attention',
     condition: {
-      or: [
+      and: [
+        { category: 'notification' },
+        { contains_keywords: ['failed', 'failure', 'error', 'broken', 'build failed'] },
         {
-          sender_domain: 'aws.amazon.com',
-          not: {
-            contains_keywords: ['critical', 'down', 'outage']
-          }
-        },
-        {
-          sender_domain: 'datadoghq.com',
-          contains_keywords: ['info', 'warning', 'recovered']
-        },
-        {
-          sender_domain: 'circleci.com'
-        },
-        {
-          sender_domain: 'github.com',
-          contains_keywords: ['build', 'workflow']
+          or: [
+            { sender_domain: 'circleci.com' },
+            { sender_domain: 'github.com' },
+            { sender_domain: 'gitlab.com' },
+            { sender_domain: 'travis-ci.com' }
+          ]
         }
       ]
     },
-    actions: ['label:Logs', 'archive'],
-    priority: 20,
+    actions: ['star', 'label:CI/Failures'],
+    priority: 90,
     is_enabled_by_default: true
   },
+
+  // Rule 13: Dependabot Noise
   {
-    id: 'project-management-organizer',
+    id: 'dev-dependabot',
     category: 'development',
-    name: '🔨 Project Management Organizer',
-    intent: 'Organize Jira, GitHub, and project management notifications',
-    description: 'Archives project management notifications unless you\'re directly assigned',
+    name: '🤖 Dependabot Noise',
+    intent: 'Reduce low-priority dependency update noise',
+    description: 'Deletes non-security Dependabot notifications older than 14 days',
     condition: {
-      or: [
+      and: [
         {
-          sender_domain: 'atlassian.net',
-          not: {
-            contains_keywords: ['assigned to you', 'mentioned you']
-          }
+          or: [
+            { category: 'notification' },
+            { category: 'newsletter' }
+          ]
         },
+        { contains_keywords: ['dependabot', 'dependency', 'package update'] },
         {
-          sender_domain: 'github.com',
-          not: {
-            contains_keywords: ['assigned', 'review requested', '@']
-          }
+          not: { contains_keywords: ['security', 'vulnerability', 'CVE'] }
         },
-        {
-          sender_domain: 'asana.com',
-          not: {
-            contains_keywords: ['assigned to you']
-          }
-        },
-        {
-          sender_domain: 'trello.com'
-        },
-        {
-          sender_domain: 'monday.com'
-        }
+        { older_than_days: 14 }
       ]
     },
-    actions: ['label:Tools', 'archive'],
+    actions: ['delete'],
     priority: 15,
     is_enabled_by_default: true
   },
+
+  // Rule 14: Code Review Requests
   {
-    id: 'code-reviews-highlighter',
+    id: 'dev-code-review',
     category: 'development',
-    name: '👀 Code Review Highlighter',
-    intent: 'Highlight pull request reviews and assignments',
-    description: 'Stars GitHub/GitLab notifications where your review is requested',
+    name: '👀 Code Review Requests',
+    intent: 'Track review requests and draft quick acknowledgments',
+    description: 'Labels code review requests and drafts acknowledgment',
     condition: {
-      or: [
+      and: [
         {
-          sender_domain: 'github.com',
-          contains_keywords: ['review requested', 'requested your review']
+          or: [
+            { category: 'internal' },
+            { category: 'notification' }
+          ]
         },
-        {
-          sender_domain: 'gitlab.com',
-          contains_keywords: ['review', 'merge request']
-        }
+        { contains_keywords: ['review requested', 'pull request', 'merge request', 'PR'] },
+        { confidence_gt: 0.70 }
       ]
     },
-    actions: ['star'],
+    actions: ['label:GitHub/Review Requests', 'draft'],
+    instructions: 'Acknowledge review request. Provide estimated review timeline. Ask for context if needed.',
     priority: 80,
     is_enabled_by_default: true
+  },
+
+  // Rule 15: Monitoring Alerts
+  {
+    id: 'dev-monitoring',
+    category: 'development',
+    name: '⚠️ Monitoring Alerts',
+    intent: 'Tidy non-urgent monitoring alerts while keeping labels',
+    description: 'Labels and deletes non-urgent monitoring alerts older than 14 days',
+    condition: {
+      and: [
+        {
+          or: [
+            { category: 'notification' },
+            { category: 'support' }
+          ]
+        },
+        {
+          not: { contains_keywords: ['critical', 'urgent', 'down', 'outage'] }
+        },
+        {
+          or: [
+            { sender_domain: 'datadog.com' },
+            { sender_domain: 'pingdom.com' },
+            { sender_domain: 'sentry.io' }
+          ]
+        },
+        { older_than_days: 14 }
+      ]
+    },
+    actions: ['label:Monitoring', 'delete'],
+    priority: 20,
+    is_enabled_by_default: true
+  },
+
+  // Rule 7: Weekly Reports
+  {
+    id: 'exec-reports',
+    category: 'development',
+    name: '📊 Weekly Reports',
+    intent: 'Keep reports structured and remove stale report traffic',
+    description: 'Labels reports and deletes them after 30 days',
+    condition: {
+      and: [
+        {
+          or: [
+            { category: 'internal' },
+            { category: 'client' }
+          ]
+        },
+        { contains_keywords: ['weekly report', 'status report', 'metrics', 'dashboard'] },
+        { older_than_days: 30 }
+      ]
+    },
+    actions: ['label:Reports', 'delete'],
+    priority: 10,
+    is_enabled_by_default: false
   }
 ];

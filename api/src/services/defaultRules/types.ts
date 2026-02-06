@@ -16,6 +16,7 @@ export type EmailCategory =
   | 'client'
   | 'internal'
   | 'personal'
+  | 'notification'
   | 'other';
 
 export type EmailAction =

@@ -2,153 +2,140 @@
  * Email Organization Rules
  *
  * Rules for keeping inbox clean through automated organization:
- * - Newsletter management
- * - Cold outreach filtering
- * - CC/FYI organization
+ * - Newsletter cleanup with age-based deletion
+ * - Cold outreach filtering with draft automation
+ * - CC organization
  * - Receipt labeling
+ * - Social media noise reduction
+ * - Stack Overflow digest cleanup
  */
 
 import { DefaultRule } from './types.js';
 
 export const EMAIL_ORG_RULES: DefaultRule[] = [
+  // Rule 1: Newsletter Sweeper
   {
-    id: 'newsletters-auto-archive',
+    id: 'universal-newsletters',
     category: 'email_organization',
     name: '📚 Newsletter Sweeper',
-    intent: 'Keep newsletters organized and out of main inbox',
-    description: 'Automatically archives newsletters and mass-marketing emails so you can read them later without inbox clutter',
+    intent: 'Remove low-value newsletters/news updates from inbox after short retention',
+    description: 'Deletes newsletters and news digests older than 7 days to keep inbox clean',
     condition: {
-      category: 'newsletter',
-      confidence_gt: 0.7
-    },
-    actions: ['archive'],
-    priority: 10,
-    is_enabled_by_default: true
-  },
-  {
-    id: 'cold-outreach-filter',
-    category: 'email_organization',
-    name: '❄️ Cold Outreach Filter',
-    intent: 'Filter unsolicited sales and marketing emails',
-    description: 'Identifies and archives cold emails from unknown senders with sales language',
-    condition: {
-      or: [
+      and: [
         {
-          // High-confidence promotional emails that are first contact
-          category: 'promotional',
-          confidence_gt: 0.85,
-          is_first_contact: true
+          or: [
+            { category: 'newsletter' },
+            { category: 'news' }
+          ]
         },
-        {
-          // Spam category (very high confidence)
-          category: 'spam',
-          confidence_gt: 0.9
-        }
+        { confidence_gt: 0.81 },
+        { older_than_days: 7 }
       ]
-    },
-    actions: ['archive'],
-    priority: 20,
-    is_enabled_by_default: true
-  },
-  {
-    id: 'cc-fyi-organizer',
-    category: 'email_organization',
-    name: '👀 CC/FYI Organizer',
-    intent: 'Keep inbox focused on direct communications',
-    description: 'Archives emails where you\'re CC\'d in group threads, keeping your inbox for direct messages',
-    condition: {
-      recipient_type: 'cc',
-      recipient_count_gt: 3  // Group emails (more than 3 recipients)
-    },
-    actions: ['archive'],
-    priority: 5,
-    is_enabled_by_default: true
-  },
-  {
-    id: 'receipts-organizer',
-    category: 'email_organization',
-    name: '🧾 Receipt Organizer',
-    intent: 'Auto-label receipts for easy tax and expense retrieval',
-    description: 'Labels transactional emails (receipts, invoices, confirmations) for easy searching',
-    condition: {
-      category: 'transactional',
-      contains_keywords: ['receipt', 'invoice', 'payment', 'order confirmation', 'purchase'],
-      confidence_gt: 0.75
-    },
-    actions: ['label:Finance/Receipts'],
-    priority: 15,
-    is_enabled_by_default: true
-  },
-  {
-    id: 'social-notifications-archiver',
-    category: 'email_organization',
-    name: '🔔 Social Media Archiver',
-    intent: 'Archive social media notifications',
-    description: 'Automatically archives LinkedIn, Twitter, and other social notifications',
-    condition: {
-      category: 'social',
-      confidence_gt: 0.8
-    },
-    actions: ['archive'],
-    priority: 5,
-    is_enabled_by_default: true
-  },
-  {
-    id: 'calendar-responses-cleaner',
-    category: 'email_organization',
-    name: '📅 Calendar Response Cleaner',
-    intent: 'Clean up calendar accept/decline notifications',
-    description: 'Deletes automatic calendar responses that don\'t contain custom messages',
-    condition: {
-      contains_keywords: ['accepted:', 'declined:', 'tentative:'],
-      not: {
-        recipient_type: 'to'  // Don't delete if you're the only recipient
-      }
     },
     actions: ['delete'],
     priority: 10,
-    is_enabled_by_default: false  // Disabled by default - deletion is aggressive
+    is_enabled_by_default: true
   },
+
+  // Rule 2: Cold Outreach Filter
   {
-    id: 'drive-shares-organizer',
+    id: 'universal-cold-outreach',
     category: 'email_organization',
-    name: '📂 Drive Share Organizer',
-    intent: 'Archive Google Drive/Docs share notifications',
-    description: 'Archives notifications about shared documents (usually redundant)',
+    name: '❄️ Cold Outreach Filter',
+    intent: 'Route cold outreach and prepare a polite response draft',
+    description: 'Labels cold outreach and generates polite decline/interest draft responses',
     condition: {
-      sender_domain: 'google.com',
-      contains_keywords: ['shared', 'document', 'commented on', 'mentioned you in']
+      and: [
+        {
+          or: [
+            { category: 'promotional' },
+            { category: 'client' }
+          ]
+        },
+        { recipient_type: 'bcc' },
+        { confidence_gt: 0.70 }
+      ]
     },
-    actions: ['label:Drive', 'archive'],
+    actions: ['label:Sales/Cold Outreach', 'draft'],
+    instructions: 'Politely acknowledge the outreach. If not interested, thank them and decline. If potentially interested, ask for more details.',
+    priority: 20,
+    is_enabled_by_default: true
+  },
+
+  // Rule 3: CC Organizer
+  {
+    id: 'universal-cc-organizer',
+    category: 'email_organization',
+    name: '👀 CC Organizer',
+    intent: 'Label CC traffic for quick triage',
+    description: 'Labels emails where you are CC\'d for easier filtering and batch review',
+    condition: {
+      recipient_type: 'cc'
+    },
+    actions: ['label:CC'],
     priority: 5,
     is_enabled_by_default: true
   },
+
+  // Rule 4: Receipt Organizer
   {
-    id: 'meeting-recordings-archiver',
+    id: 'universal-receipts',
     category: 'email_organization',
-    name: '📹 Meeting Recording Archiver',
-    intent: 'Archive meeting recordings and transcripts',
-    description: 'Automatically archives Zoom, Teams, and AI note-taker recordings',
+    name: '🧾 Receipt Organizer',
+    intent: 'Preserve receipts for tracing, audit, and tax filing',
+    description: 'Labels transactional emails (receipts, invoices) for easy searching and tax filing',
     condition: {
-      or: [
-        {
-          sender_domain: 'zoom.us',
-          contains_keywords: ['recording', 'cloud recording']
-        },
-        {
-          sender_domain: 'microsoft.com',
-          contains_keywords: ['recording', 'teams recording']
-        },
-        {
-          sender_domain: 'fireflies.ai'
-        },
-        {
-          sender_domain: 'otter.ai'
-        }
+      and: [
+        { category: 'transactional' },
+        { confidence_gt: 0.90 },
+        { contains_keywords: ['receipt', 'invoice', 'payment', 'order confirmation', 'purchase'] }
       ]
     },
-    actions: ['label:Recordings', 'archive'],
-    priority: 10,
+    actions: ['label:Receipts'],
+    priority: 15,
     is_enabled_by_default: true
+  },
+
+  // Rule 8: Social Noise
+  {
+    id: 'exec-social',
+    category: 'email_organization',
+    name: '🔔 Social Noise',
+    intent: 'Reduce social updates that do not require action',
+    description: 'Deletes social media notifications older than 7 days (LinkedIn, Twitter, etc.)',
+    condition: {
+      and: [
+        { category: 'social' },
+        { confidence_gt: 0.81 },
+        { older_than_days: 7 }
+      ]
+    },
+    actions: ['delete'],
+    priority: 5,
+    is_enabled_by_default: true
+  },
+
+  // Rule 16: Stack Overflow Digests
+  {
+    id: 'dev-stack-overflow',
+    category: 'email_organization',
+    name: '💻 Stack Overflow Digests',
+    intent: 'Remove stale Stack Overflow digests from inbox',
+    description: 'Deletes Stack Overflow digest emails older than 7 days',
+    condition: {
+      and: [
+        {
+          or: [
+            { category: 'newsletter' },
+            { category: 'news' }
+          ]
+        },
+        { contains_keywords: ['stack overflow', 'stackoverflow'] },
+        { older_than_days: 7 }
+      ]
+    },
+    actions: ['delete'],
+    priority: 5,
+    is_enabled_by_default: false
   }
 ];

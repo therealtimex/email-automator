@@ -2,113 +2,85 @@
  * Priority Alert Rules
  *
  * Rules for highlighting important and urgent communications:
- * - VIP client/customer prioritization
- * - Direct questions requiring responses
- * - Legal documents and contracts
- * - Travel itineraries
+ * - VIP urgent messages with draft automation
+ * - Critical system alerts
+ * - Urgent support tickets with draft automation
  */
 
 import { DefaultRule } from './types.js';
 
 export const PRIORITY_RULES: DefaultRule[] = [
+  // Rule 5: VIP Urgent Messages
   {
-    id: 'vip-clients-prioritizer',
+    id: 'exec-urgent-vip',
     category: 'priority_alerts',
-    name: '⭐ VIP Client Prioritizer',
-    intent: 'Star and prioritize emails from key clients and partners',
-    description: 'Automatically highlights emails from VIP contacts and important clients',
+    name: '⭐ VIP Urgent Messages',
+    intent: 'Surface high-priority VIP threads and suggest immediate response',
+    description: 'Stars VIP messages, labels them, and generates immediate response draft',
     condition: {
-      or: [
+      and: [
         {
-          sender_is_vip: true  // From VIP list (requires VIP management feature)
+          or: [
+            { category: 'client' },
+            { category: 'internal' }
+          ]
         },
-        {
-          category: 'client',
-          ai_priority: 'High'
-        }
+        { ai_priority: 'High' },
+        { confidence_gt: 0.70 }
       ]
     },
-    actions: ['star', 'important'],
+    actions: ['star', 'label:VIP', 'draft'],
+    instructions: 'Acknowledge receipt and priority. Express willingness to address immediately. Ask for clarification if needed.',
     priority: 100,
     is_enabled_by_default: true
   },
+
+  // Rule 10: Critical Alerts
   {
-    id: 'direct-questions-highlighter',
+    id: 'dev-critical-alerts',
     category: 'priority_alerts',
-    name: '⚡ Direct Questions Highlighter',
-    intent: 'Highlight emails that require your direct input',
-    description: 'Identifies emails where you\'re the only recipient and a response is clearly needed',
+    name: '🚨 Critical Alerts',
+    intent: 'Highlight production-impacting incidents immediately',
+    description: 'Stars critical system alerts from monitoring/alerting tools',
     condition: {
-      recipient_type: 'to',
-      recipient_count_gt: 0,  // Only sent to you
-      contains_keywords: ['?', 'your input', 'your thoughts', 'need your', 'awaiting your', 'question', 'wondering', 'can you', 'could you'],
-      not: {
-        category: 'newsletter'  // Exclude automated newsletters
-      }
-    },
-    actions: ['important'],
-    priority: 90,
-    is_enabled_by_default: true
-  },
-  {
-    id: 'travel-itineraries-organizer',
-    category: 'priority_alerts',
-    name: '✈️ Travel Organizer',
-    intent: 'Organize flight confirmations, hotel bookings, and itineraries',
-    description: 'Labels travel-related emails for easy access before trips',
-    condition: {
-      or: [
+      and: [
         {
-          sender_domain: 'delta.com'
+          or: [
+            { category: 'notification' },
+            { category: 'support' }
+          ]
         },
-        {
-          sender_domain: 'united.com'
-        },
-        {
-          sender_domain: 'aa.com'
-        },
-        {
-          sender_domain: 'hilton.com'
-        },
-        {
-          sender_domain: 'marriott.com'
-        },
-        {
-          sender_domain: 'airbnb.com'
-        },
-        {
-          contains_keywords: ['itinerary', 'flight confirmation', 'booking confirmation', 'reservation confirmed']
-        }
+        { contains_keywords: ['critical', 'down', 'outage', 'incident', 'urgent', 'emergency'] },
+        { confidence_gt: 0.85 }
       ]
     },
-    actions: ['label:Travel', 'star'],
-    priority: 70,
+    actions: ['star', 'label:Alerts/Critical'],
+    priority: 100,
     is_enabled_by_default: true
   },
+
+  // Rule 23: Urgent Support Tickets
   {
-    id: 'legal-contracts-highlighter',
+    id: 'ops-urgent-tickets',
     category: 'priority_alerts',
-    name: '⚖️ Legal & Contracts Highlighter',
-    intent: 'Highlight important legal documents and contracts',
-    description: 'Stars emails containing contracts, NDAs, and legal documents requiring signature',
+    name: '🎫 Urgent Support Tickets',
+    intent: 'Escalate urgent customer support threads and draft first response',
+    description: 'Stars urgent support tickets and drafts acknowledgment response',
     condition: {
-      or: [
+      and: [
         {
-          sender_domain: 'docusign.com'
+          or: [
+            { category: 'support' },
+            { category: 'client' }
+          ]
         },
-        {
-          sender_domain: 'hellosign.com'
-        },
-        {
-          sender_domain: 'pandadoc.com'
-        },
-        {
-          contains_keywords: ['nda', 'agreement', 'contract', 'sign', 'signature required', 'proposal', 'quote']
-        }
+        { contains_keywords: ['urgent', 'emergency', 'critical', 'asap', 'escalate'] },
+        { confidence_gt: 0.70 }
       ]
     },
-    actions: ['label:Legal', 'star'],
-    priority: 95,
+    actions: ['star', 'label:Support/Urgent', 'draft'],
+    instructions: 'Acknowledge ticket receipt and urgency. Confirm we are investigating. Provide initial timeline if possible.',
+    priority: 100,
     is_enabled_by_default: true
   }
 ];
