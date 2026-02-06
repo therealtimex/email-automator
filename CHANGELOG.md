@@ -5,6 +5,15 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.6] - 2026-02-06
+
+### Fixed
+- **Database Architecture**: Resolved a critical issue in fresh deployments where user initialization would fail due to missing tables and conflicting triggers.
+  - Restored the `rule_templates` table and populated it with 26 default automation rules.
+  - Refactored the user creation flow into a robust two-stage trigger system: `auth.users` -> `profiles` -> `user_settings`/`rules`.
+- **Data Integrity**: Added missing unique constraint `rules_user_template_unique` to ensure reliable rule seeding during onboarding.
+- **Onboarding Reliability**: Improved error handling and logging in database triggers to prevent silent failures during account creation.
+
 ## [2.23.5] - 2026-02-05
 
 ### Added
