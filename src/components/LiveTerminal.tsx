@@ -360,6 +360,69 @@ export function LiveTerminal() {
                                         </p>
                                     )}
                                 </div>
+                            ) : event.agent_state === 'Rule Evaluation' && event.details ? (
+                                <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3 space-y-3">
+                                    {/* AI Analysis Summary */}
+                                    {event.details.ai_analysis && (
+                                        <div className="space-y-1.5">
+                                            <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">AI Analysis</p>
+                                            <div className="flex gap-2 flex-wrap">
+                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 uppercase">
+                                                    {event.details.ai_analysis.category}
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20">
+                                                    Confidence: {(event.details.ai_analysis.confidence * 100).toFixed(0)}%
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20">
+                                                    Age: {event.details.ai_analysis.email_age_days} days
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Rule Evaluations */}
+                                    {event.details.rule_evaluations && (
+                                        <div className="space-y-2">
+                                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                                Rules Evaluated ({event.details.rule_evaluations.length})
+                                            </p>
+                                            <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
+                                                {event.details.rule_evaluations.map((rule: any, i: number) => (
+                                                    <div key={i} className={cn(
+                                                        "p-2 rounded border text-[10px]",
+                                                        rule.result === 'MATCHED'
+                                                            ? "bg-emerald-500/5 border-emerald-500/20"
+                                                            : "bg-muted/50 border-border"
+                                                    )}>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className="font-bold text-foreground">{rule.rule_name}</span>
+                                                            <span className={cn(
+                                                                "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase",
+                                                                rule.result === 'MATCHED'
+                                                                    ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                                                    : "bg-red-500/20 text-red-600 dark:text-red-400"
+                                                            )}>
+                                                                {rule.result === 'MATCHED' ? '✓ Matched' : '✗ Failed'}
+                                                            </span>
+                                                        </div>
+                                                        {rule.result === 'MATCHED' ? (
+                                                            <div className="space-y-0.5 text-muted-foreground">
+                                                                <p>Confidence: {(rule.confidence * 100).toFixed(0)}%</p>
+                                                                {rule.reasoning && <p className="italic">"{rule.reasoning}"</p>}
+                                                            </div>
+                                                        ) : (
+                                                            <ul className="space-y-0.5 text-muted-foreground list-disc list-inside">
+                                                                {rule.reasons?.map((reason: string, j: number) => (
+                                                                    <li key={j} className="text-red-600 dark:text-red-400">{reason}</li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 <p className="text-muted-foreground leading-relaxed">
                                     {translateMessage(event.details?.message) || JSON.stringify(event.details)}
@@ -400,7 +463,13 @@ export function LiveTerminal() {
                                             </div>
                                             <div className="bg-secondary/50 rounded-md p-3 border border-border overflow-x-auto">
                                                 <pre className="text-[10px] text-muted-foreground select-all">
-                                                    {JSON.stringify(JSON.parse(event.details._raw_response), null, 2)}
+                                                    {(() => {
+                                                        try {
+                                                            return JSON.stringify(JSON.parse(event.details._raw_response), null, 2);
+                                                        } catch {
+                                                            return event.details._raw_response;
+                                                        }
+                                                    })()}
                                                 </pre>
                                             </div>
                                         </div>

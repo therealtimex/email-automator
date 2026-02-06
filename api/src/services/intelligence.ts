@@ -244,14 +244,26 @@ REQUIRED JSON STRUCTURE:
             } : null;
 
             if (eventLogger && emailId && result) {
+                // Clean raw response for logging (remove markdown code fences)
+                let cleanedRawResponse = rawResponse.trim();
+                if (cleanedRawResponse.includes('```json')) {
+                    cleanedRawResponse = cleanedRawResponse.split('```json')[1].split('```')[0].trim();
+                } else if (cleanedRawResponse.includes('```')) {
+                    cleanedRawResponse = cleanedRawResponse.split('```')[1].split('```')[0].trim();
+                }
+
                 await eventLogger.analysis('Decided', emailId, {
                     ...result,
-                    _raw_response: rawResponse
+                    system_prompt: systemPrompt,
+                    content_preview: cleanedContent?.substring(0, 500) || '[Empty]',
+                    _raw_response: cleanedRawResponse
                 });
             } else if (eventLogger && !result) {
                 await eventLogger.error('Malformed Response', {
                     message: 'AI returned data that did not match the required schema',
-                    raw_response: rawResponse.substring(0, 500)
+                    raw_response: rawResponse.substring(0, 500),
+                    system_prompt: systemPrompt,
+                    content_preview: cleanedContent?.substring(0, 500) || '[Empty]'
                 }, emailId);
             }
 
@@ -566,14 +578,26 @@ CRITICAL INSTRUCTIONS:
             } : null;
 
             if (eventLogger && emailId && result) {
+                // Clean raw response for logging (remove markdown code fences)
+                let cleanedRawResponse = rawResponse.trim();
+                if (cleanedRawResponse.includes('```json')) {
+                    cleanedRawResponse = cleanedRawResponse.split('```json')[1].split('```')[0].trim();
+                } else if (cleanedRawResponse.includes('```')) {
+                    cleanedRawResponse = cleanedRawResponse.split('```')[1].split('```')[0].trim();
+                }
+
                 await eventLogger.analysis('Decided', emailId, {
                     ...result,
-                    _raw_response: rawResponse
+                    system_prompt: systemPrompt,
+                    content_preview: cleanedContent?.substring(0, 500) || '[Empty]',
+                    _raw_response: cleanedRawResponse
                 });
             } else if (eventLogger && !result) {
                 await eventLogger.error('Malformed Response', {
                     message: 'AI returned rule analysis that did not match the required schema',
-                    raw_response: rawResponse.substring(0, 500)
+                    raw_response: rawResponse.substring(0, 500),
+                    system_prompt: systemPrompt,
+                    content_preview: cleanedContent?.substring(0, 500) || '[Empty]'
                 }, emailId);
             }
 

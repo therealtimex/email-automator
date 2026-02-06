@@ -937,6 +937,88 @@ export class EmailProcessorService {
                 throw new Error('AI analysis returned no result');
             }
 
+            // Log detailed rule evaluation for debugging
+            if (eventLogger && rules) {
+                const emailAge = email.date ? Math.floor((Date.now() - new Date(email.date).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                const matchedRuleIds = new Set(analysis.matched_rules.map(m => m.rule_id));
+
+                // Evaluate all enabled rules to show why they matched/didn't match
+                const ruleEvaluations = rules
+                    .filter(r => r.is_enabled)
+                    .map(rule => {
+                        const matched = analysis.matched_rules.find(m => m.rule_id === rule.id);
+
+                        if (matched) {
+                            return {
+                                rule_name: rule.name,
+                                result: 'MATCHED',
+                                confidence: matched.confidence,
+                                reasoning: matched.reasoning,
+                                priority: rule.priority
+                            };
+                        } else {
+                            // Rule didn't match - try to determine why
+                            const condition = rule.condition as any;
+                            const reasons: string[] = [];
+
+                            // Check category match
+                            if (condition?.category && condition.category !== analysis.category) {
+                                reasons.push(`Category mismatch: expected "${condition.category}", got "${analysis.category}"`);
+                            }
+                            if (condition?.or) {
+                                const categories = condition.or.filter((c: any) => c.category).map((c: any) => c.category);
+                                if (categories.length > 0 && !categories.includes(analysis.category)) {
+                                    reasons.push(`Category not in [${categories.join(', ')}], got "${analysis.category}"`);
+                                }
+                            }
+
+                            // Check confidence threshold
+                            if (condition?.confidence_gt) {
+                                reasons.push(`Requires confidence >= ${(condition.confidence_gt * 100).toFixed(0)}%`);
+                            }
+
+                            // Check age threshold
+                            if (condition?.older_than_days && emailAge < condition.older_than_days) {
+                                reasons.push(`Age ${emailAge} days < ${condition.older_than_days} days required`);
+                            }
+
+                            // Check AND conditions
+                            if (condition?.and) {
+                                const ageCondition = condition.and.find((c: any) => c.older_than_days);
+                                if (ageCondition && emailAge < ageCondition.older_than_days) {
+                                    reasons.push(`Age ${emailAge} days < ${ageCondition.older_than_days} days required`);
+                                }
+
+                                const confCondition = condition.and.find((c: any) => c.confidence_gt);
+                                if (confCondition) {
+                                    reasons.push(`Requires confidence >= ${(confCondition.confidence_gt * 100).toFixed(0)}%`);
+                                }
+                            }
+
+                            return {
+                                rule_name: rule.name,
+                                result: 'NOT_MATCHED',
+                                reasons: reasons.length > 0 ? reasons : ['Did not meet rule conditions'],
+                                priority: rule.priority
+                            };
+                        }
+                    });
+
+                await eventLogger.info('Rule Evaluation',
+                    `Evaluated ${ruleEvaluations.length} rules: ${analysis.matched_rules.length} matched, ${ruleEvaluations.length - analysis.matched_rules.length} failed`,
+                    {
+                        ai_analysis: {
+                            category: analysis.category,
+                            confidence: analysis.matched_rules[0]?.confidence || 0,
+                            email_age_days: emailAge,
+                            summary: analysis.summary
+                        },
+                        rule_evaluations: ruleEvaluations
+                    },
+                    email.id
+                );
+            }
+
             // 6. Update the email record with context-aware results
             const primaryRule = analysis.matched_rules[0]; // Highest priority/confidence rule
             await this.supabase

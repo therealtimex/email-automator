@@ -5,6 +5,19 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.8] - 2026-02-06
+
+### Added
+- **Transparency & Observability**: Significant upgrade to the AI processing visibility in the Live Terminal.
+  - **Rule Evaluation Logs**: The background processor now logs a detailed breakdown of *all* evaluated rules for every email.
+  - **Match Analysis**: Users can now see exactly why a rule matched (confidence/reasoning) or failed (category mismatch, confidence threshold, or age requirements).
+  - **Enhanced AI Trace**: Expanded "Decided" events with full system prompts, content previews, and cleaned raw JSON responses for better debugging.
+- **Improved Terminal UI**: Upgraded the `LiveTerminal` with a new "Rule Evaluation" card format featuring color-coded status badges, confidence meters, and scrollable rule lists.
+
+### Improved
+- **AI Logging**: Sanitized raw AI responses by automatically stripping markdown code fences (` ```json `) before persisting to processing logs, ensuring cleaner data in the AI Trace modal.
+- **Diagnostic Granularity**: Added `content_preview` and `system_prompt` to malformed response logs to aid in prompt engineering and troubleshooting.
+
 ## [2.23.7] - 2026-02-06
 
 ### Added
