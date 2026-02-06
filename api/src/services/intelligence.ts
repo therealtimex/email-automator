@@ -252,21 +252,27 @@ REQUIRED JSON STRUCTURE:
             // Check if SDK call failed
             if (!response.success || response.error) {
                 const errorMsg = response.error || 'Unknown SDK error';
-                logger.error('SDK chat failed for email analysis', {
+                logger.error('SDK chat failed for email analysis, using fallback', {
                     provider,
                     model,
                     error: errorMsg,
                     code: response.code
                 });
-                if (eventLogger) await eventLogger.error('SDK Error', `${errorMsg} (${provider}/${model})`, emailId);
-                return null;
+                if (eventLogger) {
+                    await eventLogger.error('SDK Error', `${errorMsg} (${provider}/${model})`, emailId);
+                    await eventLogger.info('Fallback', 'Using heuristic analysis due to SDK error', undefined, emailId);
+                }
+                return this.createFallbackAnalysis(context, cleanedContent);
             }
 
             const rawResponse = response.response?.content || '';
             if (!rawResponse) {
-                logger.warn('SDK returned empty response for analysis', { provider, model });
-                if (eventLogger) await eventLogger.error('Empty Response', `LLM (${provider}/${model}) returned no content`, emailId);
-                return null;
+                logger.warn('SDK returned empty response for analysis, using fallback', { provider, model });
+                if (eventLogger) {
+                    await eventLogger.error('Empty Response', `LLM (${provider}/${model}) returned no content`, emailId);
+                    await eventLogger.info('Fallback', 'Using heuristic analysis due to empty response', undefined, emailId);
+                }
+                return this.createFallbackAnalysis(context, cleanedContent);
             }
 
             const validated = this.parseRobustJSON<EmailAnalysis>(rawResponse, EmailAnalysisSchema, eventLogger, emailId);
@@ -585,30 +591,89 @@ CRITICAL INSTRUCTIONS:
             // Check if SDK call failed
             if (!response.success || response.error) {
                 const errorMsg = response.error || 'Unknown SDK error';
-                logger.error('SDK chat failed for rule analysis', {
+                logger.error('SDK chat failed for rule analysis, using fallback', {
                     provider,
                     model,
                     error: errorMsg,
                     code: response.code
                 });
-                if (eventLogger) await eventLogger.error('SDK Error', `${errorMsg} (${provider}/${model})`, emailId);
-                return null;
+                if (eventLogger) {
+                    await eventLogger.error('SDK Error', `${errorMsg} (${provider}/${model})`, emailId);
+                    await eventLogger.info('Fallback', 'Using heuristic analysis due to SDK error', undefined, emailId);
+                }
+                // Return fallback analysis wrapped in ContextAwareAnalysis structure
+                const fallbackAnalysis = this.createFallbackAnalysis(context, cleanedContent);
+                const actions = fallbackAnalysis.suggested_actions?.includes('archive') ? ['archive' as const] : [];
+                return {
+                    ...fallbackAnalysis,
+                    matched_rules: [],
+                    actions_to_execute: actions,
+                    _metadata: {
+                        provider,
+                        model,
+                        is_fallback: true,
+                        timestamp: new Date().toISOString()
+                    }
+                };
             }
 
             const rawResponse = response.response?.content || '';
             if (!rawResponse) {
-                logger.warn('SDK returned empty response for rule analysis', {
+                logger.warn('SDK returned empty response for rule analysis, using fallback', {
                     provider,
                     model,
                     success: response.success
                 });
-                if (eventLogger) await eventLogger.error('Empty Response', `LLM (${provider}/${model}) returned no content`, emailId);
-                return null;
+                if (eventLogger) {
+                    await eventLogger.error('Empty Response', `LLM (${provider}/${model}) returned no content`, emailId);
+                    await eventLogger.info('Fallback', 'Using heuristic analysis due to empty response', undefined, emailId);
+                }
+                // Return fallback analysis wrapped in ContextAwareAnalysis structure
+                const fallbackAnalysis = this.createFallbackAnalysis(context, cleanedContent);
+                const actions = fallbackAnalysis.suggested_actions?.includes('archive') ? ['archive' as const] : [];
+                return {
+                    ...fallbackAnalysis,
+                    matched_rules: [],
+                    actions_to_execute: actions,
+                    _metadata: {
+                        provider,
+                        model,
+                        is_fallback: true,
+                        timestamp: new Date().toISOString()
+                    }
+                };
             }
 
             const validated = this.parseRobustJSON<ContextAwareAnalysis>(rawResponse, ContextAwareAnalysisSchema, eventLogger, emailId);
 
-            const result = validated ? {
+            if (!validated) {
+                // JSON parsing failed - use fallback
+                logger.warn('JSON parsing failed for rule analysis, using fallback', { provider, model });
+                if (eventLogger) {
+                    await eventLogger.error('Malformed Response', {
+                        message: 'AI returned rule analysis that did not match the required schema',
+                        raw_response: rawResponse.substring(0, 500),
+                        system_prompt: systemPrompt,
+                        content_preview: cleanedContent?.substring(0, 500) || '[Empty]'
+                    }, emailId);
+                    await eventLogger.info('Fallback', 'Using heuristic analysis due to malformed response', undefined, emailId);
+                }
+                const fallbackAnalysis = this.createFallbackAnalysis(context, cleanedContent);
+                const actions = fallbackAnalysis.suggested_actions?.includes('archive') ? ['archive' as const] : [];
+                return {
+                    ...fallbackAnalysis,
+                    matched_rules: [],
+                    actions_to_execute: actions,
+                    _metadata: {
+                        provider,
+                        model,
+                        is_fallback: true,
+                        timestamp: new Date().toISOString()
+                    }
+                };
+            }
+
+            const result = {
                 ...validated,
                 _metadata: {
                     provider,
@@ -616,9 +681,9 @@ CRITICAL INSTRUCTIONS:
                     is_fallback: isDefaultFallback,
                     timestamp: new Date().toISOString()
                 }
-            } : null;
+            };
 
-            if (eventLogger && emailId && result) {
+            if (eventLogger && emailId) {
                 // Clean raw response for logging (remove markdown code fences)
                 let cleanedRawResponse = rawResponse.trim();
                 if (cleanedRawResponse.includes('```json')) {
@@ -633,13 +698,6 @@ CRITICAL INSTRUCTIONS:
                     content_preview: cleanedContent?.substring(0, 500) || '[Empty]',
                     _raw_response: cleanedRawResponse
                 });
-            } else if (eventLogger && !result) {
-                await eventLogger.error('Malformed Response', {
-                    message: 'AI returned rule analysis that did not match the required schema',
-                    raw_response: rawResponse.substring(0, 500),
-                    system_prompt: systemPrompt,
-                    content_preview: cleanedContent?.substring(0, 500) || '[Empty]'
-                }, emailId);
             }
 
             return result;

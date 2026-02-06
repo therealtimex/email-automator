@@ -5,6 +5,15 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.10] - 2026-02-06
+
+### Added
+- **Deep Resilience**: Expanded the heuristic fallback system to cover more failure modes in the AI analysis pipeline.
+  - **SDK Error Recovery**: The system now automatically triggers heuristic analysis if the LLM SDK returns an error or fails to connect, preventing processing interruptions.
+  - **Empty Response Handling**: Added detection for empty LLM responses, ensuring emails are still categorized using the fallback engine instead of failing silently.
+  - **Parsing Robustness**: Heuristic fallback is now automatically used if the LLM's JSON response is malformed or fails schema validation, maintaining data integrity in the dashboard.
+- **Improved AI Logging**: Enhanced the `IntelligenceService` to log "Fallback" events whenever the heuristic engine is triggered due to SDK, response, or parsing issues, providing better diagnostic visibility.
+
 ## [2.23.9] - 2026-02-06
 
 ### Added
