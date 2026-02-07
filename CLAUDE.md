@@ -230,6 +230,179 @@ const supabase = getSupabaseFromRequest(req); // Headers → ENV fallback
 
 **Development Note**: Backend can still use `SUPABASE_URL` and `SUPABASE_ANON_KEY` env vars as a fallback for local development, but this is NOT the primary user-facing configuration method.
 
+## Database Triggers & SECURITY DEFINER Patterns
+
+### Critical Patterns for Supabase Triggers
+
+**⚠️ CRITICAL**: PostgreSQL triggers with `SECURITY DEFINER` require specific patterns to work correctly in Supabase.
+
+#### 1. Search Path Configuration
+
+**❌ WRONG - Causes extension function failures:**
+```sql
+CREATE FUNCTION public.my_trigger()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''  -- Empty breaks extension functions!
+AS $$
+BEGIN
+  -- gen_random_bytes() NOT FOUND - can't locate pgcrypto functions
+  ...
+END;
+$$;
+```
+
+**✅ CORRECT - Includes necessary schemas:**
+```sql
+CREATE FUNCTION public.my_trigger()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public'  -- Required for extensions!
+AS $$
+BEGIN
+  -- Now can access pg_catalog built-ins AND public schema extensions
+  ...
+END;
+$$;
+```
+
+**Why**:
+- `SET search_path TO ''` (empty) prevents finding extension functions like `gen_random_bytes()`
+- `SET search_path TO 'pg_catalog', 'public'` gives access to both built-in functions and extensions
+- Still secure: uses fully qualified table names (`public.user_settings`)
+
+#### 2. RLS Policies for Trigger Inserts
+
+**❌ WRONG - Blocks trigger inserts:**
+```sql
+CREATE POLICY "Users can only access their own settings" ON user_settings
+    FOR ALL USING (auth.uid() = user_id);  -- Blocks triggers!
+```
+
+**✅ CORRECT - Allows both users and triggers:**
+```sql
+-- Separate policies for different operations
+CREATE POLICY "Users can view their own settings" ON user_settings
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own settings" ON user_settings
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own settings" ON user_settings
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users and triggers can insert settings" ON user_settings
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR auth.uid() IS NULL);  -- Key!
+```
+
+**Why**: During trigger execution, `auth.uid()` is NULL, so `auth.uid() = user_id` blocks trigger inserts.
+
+#### 3. Avoid Extension Dependencies
+
+**❌ PROBLEMATIC - Requires pgcrypto extension:**
+```sql
+v_encryption_key := encode(gen_random_bytes(32), 'hex');  -- May not work in all environments
+```
+
+**✅ BETTER - Uses built-in functions only:**
+```sql
+-- Generates 64-character hex string using only built-in functions
+v_encryption_key := md5(random()::text || clock_timestamp()::text) ||
+                    md5(random()::text || clock_timestamp()::text);
+```
+
+**Why**:
+- Built-in functions (`md5()`, `random()`, `clock_timestamp()`) work everywhere
+- No extension dependencies = works in fresh deployments
+- More reliable across different Supabase instances
+
+#### 4. User Initialization Trigger Pattern
+
+**Complete working example** (`handle_new_profile()` trigger):
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_profile()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public'  -- Include both schemas
+AS $$
+DECLARE
+  v_encryption_key TEXT;
+  v_new_encryption_key TEXT;
+BEGIN
+  BEGIN  -- Exception handler prevents profile creation failure
+    -- Generate encryption key (built-in functions only)
+    SELECT encryption_key INTO v_encryption_key
+    FROM public.user_settings
+    WHERE encryption_key IS NOT NULL
+    LIMIT 1;
+
+    IF v_encryption_key IS NULL THEN
+      v_new_encryption_key := md5(random()::text || clock_timestamp()::text) ||
+                              md5(random()::text || clock_timestamp()::text);
+    ELSE
+      v_new_encryption_key := v_encryption_key;
+    END IF;
+
+    -- Insert with fully qualified table names
+    INSERT INTO public.user_settings (
+      user_id, encryption_key, created_at, updated_at
+    ) VALUES (
+      NEW.id, v_new_encryption_key, NOW(), NOW()
+    ) ON CONFLICT (user_id) DO NOTHING;
+
+    -- Install rules from templates
+    INSERT INTO public.rules (user_id, name, ...)
+    SELECT NEW.id, rt.name, ...
+    FROM public.rule_templates rt
+    ON CONFLICT (user_id, rule_template_id) DO NOTHING;
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE WARNING 'Trigger failed for user %: %', NEW.id, SQLERRM;
+  END;
+
+  RETURN NEW;
+END;
+$$;
+```
+
+**Key elements:**
+- ✅ `SET search_path TO 'pg_catalog', 'public'`
+- ✅ Fully qualified table names (`public.table_name`)
+- ✅ Exception handler prevents cascading failures
+- ✅ Built-in functions only (no extension dependencies)
+- ✅ `ON CONFLICT DO NOTHING` for idempotency
+
+### Common Trigger Issues & Solutions
+
+| Issue | Symptom | Solution |
+|-------|---------|----------|
+| Extension function not found | `function gen_random_bytes(integer) does not exist` | Use `SET search_path TO 'pg_catalog', 'public'` |
+| Trigger insert blocked | Tables empty after user signup | Add RLS policy: `auth.uid() IS NULL` for INSERT |
+| Trigger fails silently | No error logs, tables empty | Check exception handler isn't swallowing all errors |
+| Migration conflicts | Functions redefined multiple times | Consolidate into single migration, delete conflicts |
+
+**Debugging Triggers:**
+```sql
+-- Check trigger status
+SELECT t.tgname, c.relname, p.proname, t.tgenabled
+FROM pg_trigger t
+JOIN pg_class c ON t.tgrelid = c.oid
+JOIN pg_proc p ON t.tgfoid = p.oid
+WHERE t.tgname = 'your_trigger_name';
+
+-- Check function search_path
+SELECT pg_get_functiondef(oid)
+FROM pg_proc
+WHERE proname = 'your_function_name';
+
+-- Check Postgres logs for RAISE NOTICE/WARNING messages
+```
+
 ## RAG System (Retrieval-Augmented Generation)
 
 ### Architecture
