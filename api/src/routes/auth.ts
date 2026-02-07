@@ -1,19 +1,20 @@
 import { Router } from 'express';
 import { asyncHandler, ValidationError } from '../middleware/errorHandler.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { authRateLimit } from '../middleware/rateLimit.js';
+import { authRateLimit, connectionRateLimit } from '../middleware/rateLimit.js';
 import { validateBody, schemas } from '../middleware/validation.js';
 import { getGmailService } from '../services/gmail.js';
 import { getMicrosoftService } from '../services/microsoft.js';
 import { getImapService } from '../services/imap-service.js';
 import { createLogger } from '../utils/logger.js';
+import { getEncryptionKeyHex } from '../utils/encryption.js';
 
 const router = Router();
 const logger = createLogger('AuthRoutes');
 
 // IMAP/SMTP Connection
 router.post('/imap/connect',
-    authRateLimit,
+    connectionRateLimit, // More lenient for connection testing (30 attempts / 15 min)
     authMiddleware,
     validateBody(schemas.imapConnect),
     asyncHandler(async (req, res) => {
@@ -22,6 +23,27 @@ router.post('/imap/connect',
             imapHost, imapPort, imapSecure,
             smtpHost, smtpPort, smtpSecure
         } = req.body;
+
+        // CRITICAL FIX: Ensure user has encryption key before IMAP operations
+        // This handles the "first user connects IMAP immediately after signup" case
+        const currentKey = getEncryptionKeyHex();
+        if (currentKey) {
+            const { data: userSettings } = await req.supabase!
+                .from('user_settings')
+                .select('encryption_key')
+                .eq('user_id', req.user!.id)
+                .single();
+
+            if (userSettings && !userSettings.encryption_key) {
+                // User doesn't have encryption key yet - persist it now
+                logger.info('User missing encryption key, persisting immediately', { userId: req.user!.id });
+                await req.supabase!
+                    .from('user_settings')
+                    .update({ encryption_key: currentKey })
+                    .eq('user_id', req.user!.id);
+                logger.info('✓ Encryption key persisted to user');
+            }
+        }
 
         const imapService = getImapService();
         const imapConfig = {

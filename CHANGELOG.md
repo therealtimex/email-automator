@@ -5,6 +5,16 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.26.0] - 2026-02-06
+
+### Added
+- **Encryption Resilience**: Implemented a background synchronization mechanism that ensures the system's encryption key is correctly persisted to all users. This eliminates "Encryption Key Missing" errors for first-time users and new signups.
+- **Connection Rate Limiting**: Added a new, dedicated rate limit for account connection testing. This provides a more lenient experience (30 attempts / 15 minutes) for users troubleshooting IMAP/SMTP settings while maintaining system security.
+
+### Fixed
+- **IMAP Connection Race Condition**: Fixed a critical issue where IMAP connection would fail immediately after signup if the encryption key hadn't yet been propagated to the user's settings. The system now performs an "Immediate Sync" of the encryption key during the first connection attempt.
+- **Boot Sequence Reliability**: Improved the server boot sequence to verify and propagate encryption state before accepting incoming requests.
+
 ## [2.25.0] - 2026-02-06
 
 ### Added

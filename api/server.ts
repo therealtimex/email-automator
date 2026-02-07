@@ -14,7 +14,7 @@ import routes from './src/routes/index.js';
 import { logger } from './src/utils/logger.js';
 import { getServerSupabase, getServiceRoleSupabase } from './src/services/supabase.js';
 import { startScheduler, stopScheduler } from './src/services/scheduler.js';
-import { setEncryptionKey } from './src/utils/encryption.js';
+import { setEncryptionKey, getEncryptionKeyHex } from './src/utils/encryption.js';
 
 // Initialize Persistence Encryption
 // NOTE: In RealTimeX Desktop sandbox, all config is stored in Supabase (no .env files)
@@ -80,6 +80,44 @@ async function initializePersistenceEncryption() {
     } catch (err) {
         logger.error('Error initializing encryption:', err);
         logger.warn('⚠ IMAP features may not work properly');
+    }
+}
+
+// Periodic sync: Persist in-memory encryption key to users without one
+// This handles the "first user" case and any users created before key was persisted
+async function syncEncryptionKeyToUsers() {
+    try {
+        const supabase = getServiceRoleSupabase();
+        if (!supabase) return;
+
+        const currentKey = getEncryptionKeyHex();
+        if (!currentKey) return; // No key in memory yet
+
+        // Find users without encryption key
+        const { data: usersWithoutKey, error } = await supabase
+            .from('user_settings')
+            .select('user_id')
+            .is('encryption_key', null)
+            .limit(100);
+
+        if (error || !usersWithoutKey || usersWithoutKey.length === 0) {
+            return; // No users to update
+        }
+
+        logger.info(`Found ${usersWithoutKey.length} user(s) without encryption key, persisting...`);
+
+        // Update all users without a key
+        const updates = usersWithoutKey.map(user =>
+            supabase
+                .from('user_settings')
+                .update({ encryption_key: currentKey })
+                .eq('user_id', user.user_id)
+        );
+
+        await Promise.all(updates);
+        logger.info(`✓ Persisted encryption key to ${usersWithoutKey.length} user(s)`);
+    } catch (err) {
+        logger.warn('Error syncing encryption key to users:', { error: err });
     }
 }
 
@@ -386,6 +424,9 @@ const startServer = async () => {
     // Try to load encryption key before accepting requests
     await initializePersistenceEncryption();
 
+    // Initial sync to persist key to any users without one (handles first user case)
+    setTimeout(() => syncEncryptionKeyToUsers(), 500); // Wait 500ms for DB to be ready
+
     const server = app.listen(config.port, () => {
         const url = `http://localhost:${config.port}`;
         logger.info(`Server running at ${url}`, {
@@ -397,6 +438,19 @@ const startServer = async () => {
         if (getServerSupabase()) {
             startScheduler();
         }
+
+        // Periodic sync: persist encryption key to new users every 30 seconds for first 5 minutes
+        // This ensures first user gets the key even if created after server start
+        let syncCount = 0;
+        const syncInterval = setInterval(() => {
+            syncEncryptionKeyToUsers();
+            syncCount++;
+            if (syncCount >= 10) { // 10 * 30s = 5 minutes
+                clearInterval(syncInterval);
+                // After 5 minutes, sync less frequently (every 5 minutes)
+                setInterval(syncEncryptionKeyToUsers, 5 * 60 * 1000);
+            }
+        }, 30 * 1000); // Every 30 seconds
     });
 
     // Handle server errors

@@ -15,6 +15,10 @@ export function setEncryptionKey(hexKey: string) {
     // console.debug('Encryption key updated from persistence');
 }
 
+export function getEncryptionKeyHex(): string | null {
+    return secretKey ? secretKey.toString('hex') : null;
+}
+
 function getKey(): Buffer {
     if (!secretKey) {
         throw new Error(

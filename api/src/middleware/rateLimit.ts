@@ -85,3 +85,9 @@ export const syncRateLimit = rateLimit({
     windowMs: 60 * 1000, // 1 minute
     max: 20, // 20 sync requests per minute
 });
+
+// Connection testing rate limit (lenient for troubleshooting)
+export const connectionRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 30, // 30 connection attempts per 15 minutes
+});
