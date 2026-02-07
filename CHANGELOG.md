@@ -5,6 +5,19 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.27.0] - 2026-02-07
+
+### Added
+- **BYOK (Bring Your Own Keys) Mode**: The server can now operate with in-memory encryption before a database is connected. This enables "headless" operation and smoother initial configuration.
+- **Encryption Key Synchronization**: Implemented a two-way sync between server memory and Supabase database. The system now automatically recovers or persists encryption keys during IMAP connection attempts.
+- **Rule Categories**: Added support for categorizing automation rules (e.g., Newsletters, Security, Productivity) for better UI organization.
+- **Enhanced Rule Initialization**: New users now automatically receive `negative_condition`, `priority`, and `instructions` from rule templates, enabling more precise out-of-the-box filtering.
+
+### Fixed
+- **RLS Policy Restrictions**: Updated Row Level Security (RLS) policies for `user_settings` and `rules` to allow database triggers (running with elevated privileges) to perform initial setup for new users.
+- **Reliability & Fallbacks**: Improved server boot sequence with emergency fallback encryption key generation to ensure system availability during database outages.
+- **Migration Consolidation**: Cleaned up and consolidated several migration files to resolve naming conflicts and improve database schema reliability.
+
 ## [2.26.0] - 2026-02-06
 
 ### Added

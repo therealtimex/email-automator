@@ -17,7 +17,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'pg_catalog', 'public'
 AS $$
 DECLARE
   profile_count INT;
@@ -46,10 +46,11 @@ CREATE OR REPLACE FUNCTION public.handle_new_profile()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'pg_catalog', 'public'
 AS $$
 DECLARE
   v_encryption_key TEXT;
+  v_new_encryption_key TEXT;
   v_rules_created INTEGER := 0;
 BEGIN
   -- Wrap in exception handler to prevent profile creation failure
@@ -60,7 +61,17 @@ BEGIN
     WHERE encryption_key IS NOT NULL
     LIMIT 1;
 
-    -- 1. Create user_settings
+    -- Generate new encryption key if none exists (first user case)
+    IF v_encryption_key IS NULL THEN
+      -- Use built-in gen_random_uuid() (no extension required) - convert to 64-char hex
+      v_new_encryption_key := md5(random()::text || clock_timestamp()::text) || md5(random()::text || clock_timestamp()::text);
+      RAISE NOTICE '[handle_new_profile] Generated new encryption key for first user %', NEW.id;
+    ELSE
+      v_new_encryption_key := v_encryption_key;
+      RAISE NOTICE '[handle_new_profile] Using existing encryption key for user %', NEW.id;
+    END IF;
+
+    -- 1. Create user_settings with encryption key
     INSERT INTO public.user_settings (
       user_id,
       llm_provider,
@@ -72,7 +83,7 @@ BEGIN
       NEW.id,
       'realtimexai',
       'gpt-4o-mini',
-      v_encryption_key,
+      v_new_encryption_key,
       NOW(),
       NOW()
     )
@@ -153,6 +164,40 @@ GRANT EXECUTE ON FUNCTION public.handle_new_auth_user() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_auth_user() TO service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_profile() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_profile() TO service_role;
+
+-- ============================================================================
+-- FIX RLS POLICIES TO ALLOW TRIGGER INSERTS
+-- ============================================================================
+-- Drop the overly restrictive "FOR ALL" policy
+DROP POLICY IF EXISTS "Users can only access their own settings" ON user_settings;
+
+-- Create granular policies that allow trigger inserts (when auth.uid() IS NULL)
+CREATE POLICY "Users can view their own settings" ON user_settings
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own settings" ON user_settings
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own settings" ON user_settings
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users and triggers can insert settings" ON user_settings
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR auth.uid() IS NULL);
+
+-- Fix RLS for rules table (same issue - triggers need to insert)
+DROP POLICY IF EXISTS "Users can only access their own rules" ON rules;
+
+CREATE POLICY "Users can view their own rules" ON rules
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own rules" ON rules
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own rules" ON rules
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users and triggers can insert rules" ON rules
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR auth.uid() IS NULL);
 
 -- ============================================================================
 -- COMMENTS

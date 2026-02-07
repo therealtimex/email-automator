@@ -21,9 +21,15 @@ import { setEncryptionKey, getEncryptionKeyHex } from './src/utils/encryption.js
 async function initializePersistenceEncryption() {
     try {
         const supabase = getServiceRoleSupabase();
+
         if (!supabase) {
-            logger.info('Supabase not configured yet, skipping encryption initialization');
-            logger.info('IMAP features will be available after completing Setup Wizard');
+            // BYOK mode: Supabase not configured at startup (credentials come via HTTP headers)
+            // Generate encryption key anyway and keep it in memory
+            logger.info('Supabase not configured yet (BYOK mode)');
+            logger.info('Generating encryption key in memory - will persist when Supabase becomes available');
+            const newKey = crypto.randomBytes(32).toString('hex');
+            setEncryptionKey(newKey);
+            logger.info('✓ Encryption key generated and loaded in memory');
             return;
         }
 
@@ -37,6 +43,10 @@ async function initializePersistenceEncryption() {
 
         if (error) {
             logger.warn('Failed to query user_settings for encryption key', { error });
+            // Still generate a key for in-memory use
+            const newKey = crypto.randomBytes(32).toString('hex');
+            setEncryptionKey(newKey);
+            logger.info('✓ Generated fallback encryption key due to DB error');
             return;
         }
 
@@ -74,12 +84,17 @@ async function initializePersistenceEncryption() {
             logger.info('✓ Encryption key saved to database');
         } else {
             logger.info('No users found yet, encryption key loaded in memory');
-            logger.info('Key will be persisted when first user is created');
+            logger.info('Key will be persisted when users are created');
         }
 
     } catch (err) {
         logger.error('Error initializing encryption:', err);
-        logger.warn('⚠ IMAP features may not work properly');
+        // Always ensure we have a key, even if there was an error
+        if (!getEncryptionKeyHex()) {
+            logger.warn('Generating emergency fallback encryption key');
+            const fallbackKey = crypto.randomBytes(32).toString('hex');
+            setEncryptionKey(fallbackKey);
+        }
     }
 }
 

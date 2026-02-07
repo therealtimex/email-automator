@@ -1,104 +1,121 @@
--- Migration: Update handle_new_user() to copy negative_condition from templates
+-- Migration: Update handle_new_profile() to copy negative_condition from templates
 -- Purpose: Ensure new users get negative conditions when rules are initialized
 --
 -- This completes the zero-config UX by ensuring negative_condition flows from
 -- rule_templates → user rules during signup
 
 -- Update the function to include negative_condition
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.handle_new_profile()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public'
+AS $$
 DECLARE
-  pack_install_id UUID;
-  user_exists BOOLEAN;
+  v_encryption_key TEXT;
+  v_new_encryption_key TEXT;
+  v_rules_created INTEGER := 0;
 BEGIN
-  -- Check if user exists in auth.users to avoid foreign key violation
-  SELECT EXISTS (
-    SELECT 1 FROM auth.users WHERE id = NEW.id
-  ) INTO user_exists;
+  -- Wrap in exception handler to prevent profile creation failure
+  BEGIN
+    -- Get shared encryption key (sandbox mode)
+    SELECT encryption_key INTO v_encryption_key
+    FROM public.user_settings
+    WHERE encryption_key IS NOT NULL
+    LIMIT 1;
 
-  IF NOT user_exists THEN
-    RAISE NOTICE 'User % does not exist in auth.users yet, skipping initialization', NEW.id;
-    RETURN NEW;
-  END IF;
+    -- Generate new encryption key if none exists (first user case)
+    IF v_encryption_key IS NULL THEN
+      -- Use built-in functions (no extension required) - generates 64-char hex string
+      v_new_encryption_key := md5(random()::text || clock_timestamp()::text) || md5(random()::text || clock_timestamp()::text);
+      RAISE NOTICE '[handle_new_profile] Generated new encryption key for first user %', NEW.id;
+    ELSE
+      v_new_encryption_key := v_encryption_key;
+      RAISE NOTICE '[handle_new_profile] Using existing encryption key for user %', NEW.id;
+    END IF;
 
-  -- 1. Create user_settings record with defaults (with conflict handling)
-  INSERT INTO public.user_settings (
-    user_id,
-    llm_provider,
-    llm_model,
-    user_role,
-    onboarding_completed,
-    created_at,
-    updated_at
-  ) VALUES (
-    NEW.id,
-    'realtimexai',
-    'gpt-4o-mini',
-    NULL,
-    FALSE,
-    NOW(),
-    NOW()
-  )
-  ON CONFLICT (user_id) DO NOTHING;
-
-  -- 2. Install ALL rules from templates
-  -- First, check if rule_templates table exists (for backwards compatibility)
-  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'rule_templates') THEN
-
-    -- Copy ALL rules from templates (some enabled by default, others disabled)
-    -- Now includes negative_condition, min_confidence, description, instructions, and priority
-    INSERT INTO public.rules (
+    -- 1. Create user_settings with encryption key
+    INSERT INTO public.user_settings (
       user_id,
-      name,
-      description,
-      intent,
-      priority,
-      condition,
-      negative_condition,
-      min_confidence,
-      action,
-      actions,
-      instructions,
-      is_enabled,
-      pack,
-      rule_template_id,
-      is_system_managed,
-      created_at
-    )
-    SELECT
+      llm_provider,
+      llm_model,
+      encryption_key,
+      created_at,
+      updated_at
+    ) VALUES (
       NEW.id,
-      rt.name,
-      rt.description,
-      rt.intent,
-      rt.priority,
-      rt.condition,
-      rt.negative_condition,  -- ✅ NEW: Copy negative conditions
-      0.7,                     -- Default min_confidence (can be overridden by template if column added)
-      rt.actions[1],           -- First action as primary (for backwards compat)
-      rt.actions,              -- All actions array
-      rt.instructions,         -- Draft generation instructions
-      rt.is_enabled_by_default, -- Some enabled, others disabled
-      rt.pack_id,              -- Keep for backwards compat
-      rt.rule_id,
-      true,                    -- is_system_managed
+      'realtimexai',
+      'gpt-4o-mini',
+      v_new_encryption_key,
+      NOW(),
       NOW()
-    FROM public.rule_templates rt
-    ORDER BY rt.pack_id, rt.sort_order;
+    )
+    ON CONFLICT (user_id) DO NOTHING;
 
-  END IF;
+    -- 2. Install rules from templates (including negative_condition)
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'rule_templates') THEN
+      INSERT INTO public.rules (
+        user_id,
+        name,
+        description,
+        intent,
+        priority,
+        condition,
+        negative_condition,
+        min_confidence,
+        action,
+        actions,
+        instructions,
+        is_enabled,
+        category,
+        rule_template_id,
+        is_system_managed,
+        created_at
+      )
+      SELECT
+        NEW.id,
+        rt.name,
+        rt.description,
+        rt.intent,
+        rt.priority,
+        rt.condition,
+        rt.negative_condition,
+        0.7,
+        rt.actions[1],
+        rt.actions,
+        rt.instructions,
+        rt.is_enabled_by_default,
+        rt.category,
+        rt.rule_id,
+        true,
+        NOW()
+      FROM public.rule_templates rt
+      ORDER BY rt.category, rt.sort_order
+      ON CONFLICT (user_id, rule_template_id) DO NOTHING;
+
+      GET DIAGNOSTICS v_rules_created = ROW_COUNT;
+      RAISE NOTICE '✓ User % initialized: settings created, % rules installed', NEW.id, v_rules_created;
+    ELSE
+      RAISE WARNING '⚠ rule_templates table not found for user %', NEW.id;
+    END IF;
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE WARNING '✗ handle_new_profile failed for user %: % (SQLSTATE: %)', NEW.id, SQLERRM, SQLSTATE;
+  END;
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Add comment
-COMMENT ON FUNCTION public.handle_new_user() IS 'Automatically creates user_settings and installs rules from templates (including negative_condition) when a new user signs up';
+COMMENT ON FUNCTION public.handle_new_profile() IS 'Step 2: Initializes user_settings with encryption key and installs rules from templates (including negative_condition)';
 
 -- Log success
 DO $$
 BEGIN
-  RAISE NOTICE '✓ Updated handle_new_user() function to copy negative_condition from templates';
+  RAISE NOTICE '✓ Updated handle_new_profile() function to copy negative_condition from templates';
   RAISE NOTICE '  - New users will automatically get smart exclusion logic';
-  RAISE NOTICE '  - Also copies: description, instructions, priority fields';
+  RAISE NOTICE '  - Also copies: description, instructions, priority, encryption_key fields';
   RAISE NOTICE '  - Zero-Config UX: Complete!';
 END $$;
