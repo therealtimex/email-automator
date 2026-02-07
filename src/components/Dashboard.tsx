@@ -59,7 +59,11 @@ export function AITraceModal({
         }
     };
 
-    const getIcon = (type: string) => {
+    const getIcon = (type: string, agentState?: string) => {
+        // Special icon for Rule Evaluation
+        if (agentState === 'Rule Evaluation') {
+            return <Settings2 className="w-4 h-4 text-amber-500" />;
+        }
         switch (type) {
             case 'analysis': return <Brain className="w-4 h-4 text-purple-500" />;
             case 'action': return <Zap className="w-4 h-4 text-emerald-500" />;
@@ -114,7 +118,7 @@ export function AITraceModal({
 
                                 {/* Icon Badge */}
                                 <div className="absolute left-0 top-0 w-8 h-8 rounded-full border bg-background flex items-center justify-center z-10 shadow-sm">
-                                    {getIcon(event.event_type)}
+                                    {getIcon(event.event_type, event.agent_state)}
                                 </div>
 
                                 <div className="space-y-2">
@@ -240,6 +244,300 @@ export function AITraceModal({
                                                             : event.details.raw_response}
                                                     </pre>
                                                 )}
+                                            </div>
+                                        )}
+
+                                        {/* NEW: Rule Evaluation Event */}
+                                        {event.agent_state === 'Rule Evaluation' && event.details?.validation_details && (
+                                            <div className="space-y-4">
+                                                {/* Validation Summary */}
+                                                {event.details.validation_summary && (
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="text-[10px] bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                                                            <span className="text-muted-foreground mr-1">✅ Matched:</span>
+                                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{event.details.validation_summary.final_matched}</span>
+                                                        </div>
+                                                        <div className="text-[10px] bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
+                                                            <span className="text-muted-foreground mr-1">⚠️ Filtered:</span>
+                                                            <span className="font-bold text-amber-600 dark:text-amber-400">
+                                                                {event.details.validation_summary.llm_matched - event.details.validation_summary.final_matched}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Individual Rule Results */}
+                                                <div className="space-y-2">
+                                                    <div className="text-[9px] font-bold text-muted-foreground uppercase">
+                                                        Rule Validation Results
+                                                    </div>
+                                                    {event.details.validation_details.map((rule: any, idx: number) => (
+                                                        <div key={idx} className={cn(
+                                                            "p-2 rounded border text-[10px]",
+                                                            rule.status === 'MATCHED'
+                                                                ? "bg-emerald-500/5 border-emerald-500/20"
+                                                                : "bg-red-500/5 border-red-500/20"
+                                                        )}>
+                                                            <div className="flex items-start justify-between mb-1">
+                                                                <span className="font-bold flex items-center gap-1">
+                                                                    {rule.status === 'MATCHED' ? '✅' : '❌'}
+                                                                    {rule.rule_name}
+                                                                </span>
+                                                                <span className={cn(
+                                                                    "text-[9px] px-1 py-0.5 rounded font-mono",
+                                                                    rule.status === 'MATCHED'
+                                                                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                                                        : "bg-red-500/20 text-red-700 dark:text-red-300"
+                                                                )}>
+                                                                    {rule.status.replace(/_/g, ' ')}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Confidence Bar */}
+                                                            <div className="mb-1">
+                                                                <div className="flex items-center gap-2 text-[9px] text-muted-foreground mb-0.5">
+                                                                    <span>Confidence:</span>
+                                                                    <span className={cn(
+                                                                        "font-mono font-bold",
+                                                                        rule.confidence >= rule.min_confidence
+                                                                            ? "text-emerald-600 dark:text-emerald-400"
+                                                                            : "text-red-600 dark:text-red-400"
+                                                                    )}>
+                                                                        {(rule.confidence * 100).toFixed(0)}%
+                                                                    </span>
+                                                                    <span>/</span>
+                                                                    <span className="font-mono">{(rule.min_confidence * 100).toFixed(0)}% threshold</span>
+                                                                </div>
+                                                                <div className="w-full bg-secondary/50 rounded-full h-1.5 overflow-hidden">
+                                                                    <div
+                                                                        className={cn(
+                                                                            "h-full transition-all",
+                                                                            rule.confidence >= rule.min_confidence
+                                                                                ? "bg-emerald-500"
+                                                                                : "bg-red-500"
+                                                                        )}
+                                                                        style={{ width: `${Math.min(rule.confidence * 100, 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                {/* Threshold marker */}
+                                                                <div className="relative w-full h-0">
+                                                                    <div
+                                                                        className="absolute bottom-0 w-0.5 h-3 bg-amber-500"
+                                                                        style={{ left: `${rule.min_confidence * 100}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Reason */}
+                                                            <div className="text-[9px] text-muted-foreground italic">
+                                                                {rule.reason}
+                                                            </div>
+
+                                                            {/* Show reasoning for matched rules */}
+                                                            {rule.status === 'MATCHED' && rule.reasoning && (
+                                                                <div className="mt-1 text-[9px] text-foreground/70">
+                                                                    💡 {rule.reasoning}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Show negative condition for excluded rules */}
+                                                            {rule.status === 'FILTERED_NEGATIVE_CONDITION' && rule.negative_condition && (
+                                                                <div className="mt-1 p-1 bg-secondary/50 rounded text-[9px]">
+                                                                    <div className="font-bold text-muted-foreground mb-0.5">Excluded by:</div>
+                                                                    <code className="text-[8px]">{JSON.stringify(rule.negative_condition)}</code>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Learned Patterns Applied */}
+                                                {(event.details.learned_patterns_applied?.category_override || event.details.learned_patterns_applied?.vip_sender) && (
+                                                    <div className="p-2 bg-purple-500/5 border border-purple-500/20 rounded space-y-1">
+                                                        <div className="text-[9px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                                                            <ThumbsUp className="w-3 h-3" />
+                                                            Learned Patterns Applied
+                                                        </div>
+                                                        {event.details.learned_patterns_applied.category_override && (
+                                                            <div className="text-[10px]">
+                                                                <span className="text-muted-foreground">Category override: </span>
+                                                                <code className="bg-secondary px-1 rounded">
+                                                                    {event.details.learned_patterns_applied.category_override.domain}
+                                                                </code>
+                                                                <span className="mx-1">→</span>
+                                                                <span className="font-bold">{event.details.learned_patterns_applied.category_override.learned_category}</span>
+                                                                <span className="text-muted-foreground text-[9px]">
+                                                                    {' '}(was: {event.details.learned_patterns_applied.category_override.llm_category})
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {event.details.learned_patterns_applied.vip_sender && (
+                                                            <div className="text-[10px]">
+                                                                <span className="text-muted-foreground">⭐ VIP Sender: </span>
+                                                                <code className="bg-secondary px-1 rounded">
+                                                                    {event.details.learned_patterns_applied.vip_sender.sender}
+                                                                </code>
+                                                                <span className="text-emerald-600 dark:text-emerald-400 ml-1 font-bold">
+                                                                    Priority Boosted
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Email Age Info */}
+                                                {event.details.ai_analysis?.email_age_days !== undefined && (
+                                                    <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                        <Clock className="w-3 h-3" />
+                                                        Email age: {event.details.ai_analysis.email_age_days} days old
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* NEW: Email Context Event */}
+                                        {event.agent_state === 'Email Context' && event.details && (
+                                            <div className="space-y-3">
+                                                {/* Email Age and Recipient */}
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="text-[10px] bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">
+                                                        <span className="text-muted-foreground mr-1">📅 Age:</span>
+                                                        <span className="font-bold text-blue-600 dark:text-blue-400">
+                                                            {event.details.email_age_days} days
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[10px] bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">
+                                                        <span className="text-muted-foreground mr-1">📧 Recipient:</span>
+                                                        <span className="font-bold text-blue-600 dark:text-blue-400 uppercase">
+                                                            {event.details.recipient_type || 'to'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Metadata Signals */}
+                                                <div className="space-y-1">
+                                                    <div className="text-[9px] font-bold text-muted-foreground uppercase">
+                                                        Email Metadata Signals
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {event.details.is_automated && (
+                                                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                                                                🤖 Automated/Bulk
+                                                            </span>
+                                                        )}
+                                                        {event.details.has_unsubscribe && (
+                                                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                                                📬 Newsletter
+                                                            </span>
+                                                        )}
+                                                        {event.details.is_reply && (
+                                                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                                                                💬 Reply Thread
+                                                            </span>
+                                                        )}
+                                                        {event.details.is_thread && (
+                                                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                                                                🧵 Conversation
+                                                            </span>
+                                                        )}
+                                                        {event.details.sender_priority === 'high' && (
+                                                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                                                                ⚡ High Priority
+                                                            </span>
+                                                        )}
+                                                        {event.details.vip_sender && (
+                                                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                                                ⭐ VIP Sender
+                                                            </span>
+                                                        )}
+                                                        {event.details.learned_category && (
+                                                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                                                🎓 Learned: {event.details.learned_category}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* VIP Sender Details */}
+                                                {event.details.vip_sender_email && (
+                                                    <div className="p-2 bg-amber-500/5 border border-amber-500/20 rounded text-[10px]">
+                                                        <span className="text-muted-foreground">VIP Sender: </span>
+                                                        <code className="bg-secondary px-1 rounded">{event.details.vip_sender_email}</code>
+                                                    </div>
+                                                )}
+
+                                                {/* Learned Pattern Details */}
+                                                {event.details.learned_domain && (
+                                                    <div className="p-2 bg-purple-500/5 border border-purple-500/20 rounded text-[10px]">
+                                                        <span className="text-muted-foreground">Learned Domain: </span>
+                                                        <code className="bg-secondary px-1 rounded">{event.details.learned_domain}</code>
+                                                        <span className="mx-1">→</span>
+                                                        <span className="font-bold">{event.details.learned_category}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* NEW: Performance/Timeline Event */}
+                                        {event.agent_state === 'Performance' && event.details?.timeline && (
+                                            <div className="space-y-3">
+                                                {/* Total Time */}
+                                                <div className="text-[10px] bg-emerald-500/10 px-3 py-2 rounded border border-emerald-500/20 flex items-center justify-between">
+                                                    <span className="text-muted-foreground">⏱️ Total Processing Time:</span>
+                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                                                        {event.details.timeline.total_time_ms}ms
+                                                    </span>
+                                                </div>
+
+                                                {/* Stage Breakdown */}
+                                                <div className="space-y-2">
+                                                    <div className="text-[9px] font-bold text-muted-foreground uppercase">
+                                                        Processing Timeline
+                                                    </div>
+                                                    {event.details.stages && Object.entries(event.details.stages).map(([stage, data]: [string, any]) => (
+                                                        <div key={stage} className="space-y-1">
+                                                            <div className="flex items-center justify-between text-[10px]">
+                                                                <span className="text-muted-foreground capitalize">
+                                                                    {stage === 'llm' ? 'LLM Analysis' : stage.replace(/_/g, ' ')}:
+                                                                </span>
+                                                                <span className="font-mono font-bold">
+                                                                    {data.duration_ms}ms ({data.percent}%)
+                                                                </span>
+                                                            </div>
+                                                            {/* Visual Progress Bar */}
+                                                            <div className="w-full bg-secondary/50 rounded-full h-1.5 overflow-hidden">
+                                                                <div
+                                                                    className={cn(
+                                                                        "h-full transition-all",
+                                                                        stage === 'llm' ? "bg-purple-500" :
+                                                                        stage === 'parse' ? "bg-blue-500" :
+                                                                        stage === 'metadata' ? "bg-teal-500" :
+                                                                        stage === 'validation' ? "bg-amber-500" :
+                                                                        stage === 'actions' ? "bg-emerald-500" :
+                                                                        "bg-secondary"
+                                                                    )}
+                                                                    style={{ width: `${data.percent}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Performance Breakdown Table */}
+                                                <div className="p-2 bg-secondary/30 border border-border/50 rounded text-[9px] font-mono">
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <div className="font-bold text-muted-foreground">Stage</div>
+                                                        <div className="font-bold text-muted-foreground text-right">Time</div>
+                                                        <div className="font-bold text-muted-foreground text-right">%</div>
+                                                        {event.details.stages && Object.entries(event.details.stages).map(([stage, data]: [string, any]) => (
+                                                            <>
+                                                                <div className="capitalize">{stage === 'llm' ? 'LLM' : stage}</div>
+                                                                <div className="text-right">{data.duration_ms}ms</div>
+                                                                <div className="text-right">{data.percent}%</div>
+                                                            </>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>

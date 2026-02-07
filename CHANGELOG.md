@@ -5,6 +5,16 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.25.0] - 2026-02-06
+
+### Added
+- **Performance Observability**: Implemented granular timeline tracking for the email processing pipeline. The system now logs the exact duration of each stage (Parsing, Metadata Extraction, LLM Analysis, Validation, Actions) to help identify bottlenecks.
+- **Enhanced AI Trace UI**: Major upgrade to the "AI Trace" modal in the dashboard to visualize new telemetry data:
+  - **Performance Timeline**: New card showing total processing time and a visual breakdown of where time was spent.
+  - **Rule Validation Details**: Visualizes the exact decision process for every rule, including confidence bars, threshold markers, and specific reasons for filtering (e.g., "Excluded by negative condition").
+  - **Email Context Signals**: Displays rich metadata signals used by the AI, such as "VIP Sender", "Newsletter", "Reply Thread", and learned category overrides.
+- **Detailed Validation Logging**: The background processor now captures comprehensive logs for every rule evaluation, including why a rule was *not* matched (e.g., confidence 85% < threshold 90%).
+
 ## [2.24.0] - 2026-02-06
 
 ### Added

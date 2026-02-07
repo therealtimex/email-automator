@@ -813,10 +813,22 @@ export class EmailProcessorService {
 
             if (eventLogger) await eventLogger.info('Processing', `Background processing: ${email.subject}`, undefined, email.id);
 
+            // Timeline tracking for performance metrics
+            const timeline = {
+                start: Date.now(),
+                parsed: 0,
+                metadata_extracted: 0,
+                llm_analysis: 0,
+                validation: 0,
+                actions: 0,
+                end: 0
+            };
+
             // 2. Read content from disk and parse with mailparser
             if (!email.file_path) throw new Error('No file path found for email');
             const rawMime = await this.storageService.readEmail(email.file_path);
             const parsed = await simpleParser(rawMime);
+            timeline.parsed = Date.now();
 
             // Extract clean content (prioritize text)
             const cleanContent = parsed.text || parsed.textAsHtml || '';
@@ -835,6 +847,40 @@ export class EmailProcessorService {
                 sender_priority: email.sender_priority || undefined,
                 thread_id: email.thread_id || undefined,
             };
+            timeline.metadata_extracted = Date.now();
+
+            // Calculate email age
+            const emailAge = email.date ? Math.floor((Date.now() - new Date(email.date).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
+            // Check for VIP sender and learned patterns (for metadata event)
+            const senderDomain = email.sender?.split('@')[1];
+            const learnedCategory = senderDomain && settings?.category_patterns?.[senderDomain];
+            const isVIP = email.sender && settings?.vip_senders?.includes(email.sender);
+
+            // Log Email Metadata event for trace UI
+            if (eventLogger) {
+                await eventLogger.info('Email Context',
+                    `Email metadata extracted: ${emailAge} days old, ${metadata.recipient_type || 'TO'} recipient`,
+                    {
+                        email_age_days: emailAge,
+                        email_date: email.date,
+                        recipient_type: metadata.recipient_type || 'to',
+                        is_automated: metadata.is_automated || false,
+                        has_unsubscribe: metadata.has_unsubscribe || false,
+                        is_reply: metadata.is_reply || false,
+                        is_thread: !!metadata.thread_id,
+                        sender_priority: metadata.sender_priority || 'normal',
+                        mailer: metadata.mailer || 'unknown',
+                        vip_sender: isVIP || false,
+                        vip_sender_email: isVIP ? email.sender : null,
+                        learned_category: learnedCategory || null,
+                        learned_domain: learnedCategory ? senderDomain : null,
+                        sender: email.sender,
+                        subject: email.subject
+                    },
+                    email.id
+                );
+            }
 
             // 3. Fetch account for action execution
             const { data: account } = await this.supabase
@@ -971,9 +1017,13 @@ export class EmailProcessorService {
             if (!analysis) {
                 throw new Error('AI analysis returned no result');
             }
+            timeline.llm_analysis = Date.now();
 
             // PHASE 2: Post-LLM Validation - Filter out incorrectly matched rules
             // This catches any LLM hallucinations or fuzzy matches that don't meet actual conditions
+            // Track detailed validation results for trace UI
+            const validationDetails: any[] = [];
+
             if (analysis.matched_rules && analysis.matched_rules.length > 0 && rules) {
                 const emailAge = email.date ? Math.floor((Date.now() - new Date(email.date).getTime()) / (1000 * 60 * 60 * 24)) : 0;
                 const validatedMatches = [];
@@ -1012,6 +1062,17 @@ export class EmailProcessorService {
                             min_confidence: minConfidence,
                             email_id: email.id
                         });
+
+                        // Track validation failure for trace UI
+                        validationDetails.push({
+                            rule_name: rule.name,
+                            rule_id: rule.id,
+                            status: 'FILTERED_CONFIDENCE',
+                            confidence: match.confidence,
+                            min_confidence: minConfidence,
+                            reason: `Confidence ${(match.confidence * 100).toFixed(0)}% below threshold ${(minConfidence * 100).toFixed(0)}%`
+                        });
+
                         if (eventLogger) {
                             await eventLogger.info('Validation',
                                 `Rule "${rule.name}" below confidence threshold (${(match.confidence * 100).toFixed(0)}% < ${(minConfidence * 100).toFixed(0)}%)`,
@@ -1049,6 +1110,18 @@ export class EmailProcessorService {
                                 negative_condition: rule.negative_condition,
                                 email_id: email.id
                             });
+
+                            // Track validation failure for trace UI
+                            validationDetails.push({
+                                rule_name: rule.name,
+                                rule_id: rule.id,
+                                status: 'FILTERED_NEGATIVE_CONDITION',
+                                confidence: match.confidence,
+                                min_confidence: minConfidence,
+                                negative_condition: rule.negative_condition,
+                                reason: 'Excluded by negative condition'
+                            });
+
                             if (eventLogger) {
                                 await eventLogger.info('Validation',
                                     `Rule "${rule.name}" excluded by negative condition`,
@@ -1063,8 +1136,28 @@ export class EmailProcessorService {
                     }
 
                     if (isValid && !isExcluded) {
+                        // Track successful validation for trace UI
+                        validationDetails.push({
+                            rule_name: rule.name,
+                            rule_id: rule.id,
+                            status: 'MATCHED',
+                            confidence: match.confidence,
+                            min_confidence: minConfidence,
+                            reasoning: match.reasoning,
+                            reason: 'All conditions met, confidence above threshold'
+                        });
                         validatedMatches.push(match);
-                    } else {
+                    } else if (!isExcluded) {
+                        // Track condition failure for trace UI
+                        validationDetails.push({
+                            rule_name: rule.name,
+                            rule_id: rule.id,
+                            status: 'FILTERED_CONDITIONS',
+                            confidence: match.confidence,
+                            min_confidence: minConfidence,
+                            reason: 'LLM matched but rule conditions not met'
+                        });
+
                         logger.info('Filtered out invalid LLM rule match', {
                             rule_name: rule.name,
                             rule_id: rule.id,
@@ -1089,6 +1182,9 @@ export class EmailProcessorService {
                 // Replace with validated matches
                 analysis.matched_rules = validatedMatches;
             }
+
+            // Mark validation complete
+            timeline.validation = Date.now();
 
             // Log detailed rule evaluation for debugging
             if (eventLogger && rules) {
@@ -1162,8 +1258,17 @@ export class EmailProcessorService {
                 const learnedCategory = senderDomain && settings?.category_patterns?.[senderDomain];
                 const isVIP = email.sender && settings?.vip_senders?.includes(email.sender);
 
+                // Count validation results
+                const validationSummary = {
+                    llm_matched: validationDetails.length,
+                    final_matched: validationDetails.filter(v => v.status === 'MATCHED').length,
+                    filtered_confidence: validationDetails.filter(v => v.status === 'FILTERED_CONFIDENCE').length,
+                    filtered_negative: validationDetails.filter(v => v.status === 'FILTERED_NEGATIVE_CONDITION').length,
+                    filtered_conditions: validationDetails.filter(v => v.status === 'FILTERED_CONDITIONS').length
+                };
+
                 await eventLogger.info('Rule Evaluation',
-                    `Evaluated ${ruleEvaluations.length} rules: ${analysis.matched_rules.length} matched, ${ruleEvaluations.length - analysis.matched_rules.length} failed`,
+                    `Evaluated ${ruleEvaluations.length} rules: ${validationSummary.final_matched} matched, ${validationSummary.llm_matched - validationSummary.final_matched} filtered`,
                     {
                         ai_analysis: {
                             category: analysis.category,
@@ -1171,6 +1276,8 @@ export class EmailProcessorService {
                             email_age_days: emailAge,
                             summary: analysis.summary
                         },
+                        validation_summary: validationSummary,
+                        validation_details: validationDetails,
                         learned_patterns_applied: {
                             category_override: learnedCategory ? {
                                 domain: senderDomain,
@@ -1369,6 +1476,47 @@ export class EmailProcessorService {
                 await eventLogger.info('No Match',
                     'No rules matched this email',
                     { category: analysis.category },
+                    email.id
+                );
+            }
+
+            // Mark actions complete
+            timeline.actions = Date.now();
+            timeline.end = Date.now();
+
+            // Log performance summary
+            if (eventLogger) {
+                const performanceMetrics = {
+                    total_time_ms: timeline.end - timeline.start,
+                    parse_time_ms: timeline.parsed - timeline.start,
+                    metadata_extraction_ms: timeline.metadata_extracted - timeline.parsed,
+                    llm_analysis_ms: timeline.llm_analysis - timeline.metadata_extracted,
+                    validation_ms: timeline.validation - timeline.llm_analysis,
+                    actions_ms: timeline.actions - timeline.validation,
+                    finalization_ms: timeline.end - timeline.actions
+                };
+
+                const breakdown = [
+                    `Parse: ${performanceMetrics.parse_time_ms}ms`,
+                    `Metadata: ${performanceMetrics.metadata_extraction_ms}ms`,
+                    `LLM: ${performanceMetrics.llm_analysis_ms}ms`,
+                    `Validation: ${performanceMetrics.validation_ms}ms`,
+                    `Actions: ${performanceMetrics.actions_ms}ms`
+                ].join(', ');
+
+                await eventLogger.info('Performance',
+                    `Completed in ${performanceMetrics.total_time_ms}ms (${breakdown})`,
+                    {
+                        timeline: performanceMetrics,
+                        stages: {
+                            parse: { duration_ms: performanceMetrics.parse_time_ms, percent: ((performanceMetrics.parse_time_ms / performanceMetrics.total_time_ms) * 100).toFixed(1) },
+                            metadata: { duration_ms: performanceMetrics.metadata_extraction_ms, percent: ((performanceMetrics.metadata_extraction_ms / performanceMetrics.total_time_ms) * 100).toFixed(1) },
+                            llm: { duration_ms: performanceMetrics.llm_analysis_ms, percent: ((performanceMetrics.llm_analysis_ms / performanceMetrics.total_time_ms) * 100).toFixed(1) },
+                            validation: { duration_ms: performanceMetrics.validation_ms, percent: ((performanceMetrics.validation_ms / performanceMetrics.total_time_ms) * 100).toFixed(1) },
+                            actions: { duration_ms: performanceMetrics.actions_ms, percent: ((performanceMetrics.actions_ms / performanceMetrics.total_time_ms) * 100).toFixed(1) },
+                            finalization: { duration_ms: performanceMetrics.finalization_ms, percent: ((performanceMetrics.finalization_ms / performanceMetrics.total_time_ms) * 100).toFixed(1) }
+                        }
+                    },
                     email.id
                 );
             }
