@@ -74,6 +74,10 @@ function AppContent() {
     const [showMigrationBanner, setShowMigrationBanner] = useState(false);
     const [showMigrationModal, setShowMigrationModal] = useState(false);
     const [suppressMigrationBanner, setSuppressMigrationBanner] = useState(false);
+    const [migrationSnoozedUntil, setMigrationSnoozedUntil] = useState<Date | null>(() => {
+        const stored = localStorage.getItem('migration_snoozed_until');
+        return stored ? new Date(stored) : null;
+    });
     const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
     const [showUpdateBanner, setShowUpdateBanner] = useState(false);
     const [previewEmail, setPreviewEmail] = useState<any | null>(null);
@@ -173,8 +177,16 @@ function AppContent() {
                 if (session?.user) {
                     const status = await checkMigrationStatus(supabase);
                     setMigrationStatus(status.needsMigration ? status : null);
-                    if (status.needsMigration && !isMigrationReminderDismissed()) {
-                        setShowMigrationBanner(true);
+
+                    // Check if migration should be shown (respects snooze)
+                    if (status.needsMigration) {
+                        const snoozedUntilStr = localStorage.getItem('migration_snoozed_until');
+                        const snoozedUntil = snoozedUntilStr ? new Date(snoozedUntilStr) : null;
+                        const shouldShow = !snoozedUntil || new Date() > snoozedUntil;
+
+                        if (shouldShow) {
+                            setShowMigrationBanner(true);
+                        }
                     }
                 }
 
@@ -264,6 +276,18 @@ function AppContent() {
         setShowMigrationModal(true);
         setShowMigrationBanner(false);
     };
+
+    const handleSnoozeMigration = (until: Date) => {
+        setMigrationSnoozedUntil(until);
+        localStorage.setItem('migration_snoozed_until', until.toISOString());
+        setShowMigrationBanner(false);
+        setShowMigrationModal(false);
+    };
+
+    // Check if migration should be shown (not snoozed)
+    const shouldShowMigration = migrationStatus && migrationStatus.needsMigration && (
+        !migrationSnoozedUntil || new Date() > migrationSnoozedUntil
+    );
 
     const migrationContextValue = {
         migrationStatus,
@@ -439,12 +463,12 @@ function AppContent() {
                     </div>
                 )}
 
-                {/* Migration UI */}
-                {migrationStatus && showMigrationBanner && !suppressMigrationBanner && (
+                {/* Migration UI - Persistent Banner */}
+                {shouldShowMigration && !suppressMigrationBanner && (
                     <MigrationBanner
                         status={migrationStatus}
-                        onDismiss={() => setShowMigrationBanner(false)}
-                        onLearnMore={handleOpenMigrationModal}
+                        onSnooze={handleSnoozeMigration}
+                        onOpenModal={handleOpenMigrationModal}
                     />
                 )}
 
@@ -461,6 +485,7 @@ function AppContent() {
                         open={showMigrationModal}
                         onOpenChange={setShowMigrationModal}
                         status={migrationStatus}
+                        onSnooze={handleSnoozeMigration}
                     />
                 )}
 

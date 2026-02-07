@@ -14,6 +14,8 @@ import {
     Info,
     Loader2,
     Terminal,
+    Clock,
+    Calendar,
 } from "lucide-react";
 import {
     Dialog,
@@ -38,14 +40,24 @@ interface MigrationModalProps {
     onOpenChange: (open: boolean) => void;
     /** Migration status */
     status: MigrationStatus;
+    /** Callback when user snoozes the reminder */
+    onSnooze?: (until: Date) => void;
 }
 
 export function MigrationModal({
     open,
     onOpenChange,
     status,
+    onSnooze,
 }: MigrationModalProps) {
     const config = getSupabaseConfig();
+
+    const handleSnooze = (hours: number) => {
+        const until = new Date(Date.now() + hours * 60 * 60 * 1000);
+        onSnooze?.(until);
+        toast.success(`Reminder snoozed until ${until.toLocaleTimeString()}`);
+        onOpenChange(false);
+    };
 
     // Auto-migration state
     const [isMigrating, setIsMigrating] = useState(false);
@@ -333,15 +345,29 @@ export function MigrationModal({
                     </Alert>
                 </div>
 
-                <DialogFooter>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                        disabled={isMigrating}
-                    >
-                        Close
-                    </Button>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
+                    <div className="flex gap-2 flex-1">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleSnooze(1)}
+                            disabled={isMigrating}
+                            className="flex-1 sm:flex-initial"
+                        >
+                            <Clock className="h-4 w-4 mr-2" />
+                            Remind in 1 Hour
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleSnooze(24)}
+                            disabled={isMigrating}
+                            className="flex-1 sm:flex-initial"
+                        >
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Remind Tomorrow
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

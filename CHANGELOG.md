@@ -5,6 +5,19 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.24.0] - 2026-02-06
+
+### Added
+- **Aggressive Migration Reminders**: Significant upgrade to the database migration notification strategy to ensure users don't miss critical schema updates.
+  - **Persistent Migration Banner**: Replaced the compact floating toast with a full-width top-of-page banner that cannot be permanently dismissed until the migration is complete.
+  - **Migration Snooze**: Added the ability to "Snooze" migration reminders for 1 hour or 24 hours (until tomorrow), providing a balance between persistence and user control.
+  - **Dashboard Migration Widget**: Introduced a new, prominent widget in the Dashboard sidebar that highlights "Action Required" for pending migrations.
+- **Improved Migration UI**: Enhanced the `MigrationModal` with snooze options and clearer messaging about the new features being unlocked by the update (Smart Rule Exclusions, Confidence Tuning).
+
+### Fixed
+- **API Client Race Condition**: Implemented a robust initialization wait-and-retry mechanism in the `HybridApiClient`. The system now automatically waits for the Supabase client to be fully initialized before attempting authenticated requests, preventing "Not Initialized" errors during the application boot process.
+- **UI Consistency**: Standardized the display of migration status across the App, Dashboard, and Account settings.
+
 ## [2.23.11] - 2026-02-06
 
 ### Added

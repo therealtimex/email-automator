@@ -20,6 +20,8 @@ import {
     DialogTitle,
 } from './ui/dialog';
 import { FeedbackModal } from './Feedback/FeedbackModal';
+import { MigrationDashboardWidget } from './migration/MigrationDashboardWidget';
+import { useMigrationContextSafe } from '../context/MigrationContext';
 
 export function AITraceModal({
     email,
@@ -273,6 +275,7 @@ export function Dashboard() {
     const { state, actions } = useApp();
     const { t } = useLanguage();
     const { openTerminal } = useTerminal();
+    const migrationContext = useMigrationContextSafe();
     const [isLoading, setIsLoading] = useState(true);
     const { isSyncing } = state;
     const [searchQuery, setSearchQuery] = useState('');
@@ -633,6 +636,14 @@ export function Dashboard() {
 
             {/* Sidebar */}
             <aside className="space-y-6">
+                {/* Migration Action Required Widget */}
+                {migrationContext?.migrationStatus && migrationContext.migrationStatus.needsMigration && (
+                    <MigrationDashboardWidget
+                        status={migrationContext.migrationStatus}
+                        onRunMigrations={migrationContext.openMigrationModal}
+                    />
+                )}
+
                 {/* Selected Email Detail */}
                 {selectedEmail && (
                     <Card className="p-6 border-primary/20 bg-primary/5 animate-in slide-in-from-right-5">

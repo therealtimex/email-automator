@@ -24,6 +24,7 @@ class HybridApiClient {
     private anonKey: string;
     private token: string | null = null;
     private supabaseClient: any = null;
+    private initialized: boolean = false;
 
     constructor() {
         const config = getApiConfig();
@@ -34,6 +35,8 @@ class HybridApiClient {
 
     setSupabaseClient(client: any) {
         this.supabaseClient = client;
+        this.initialized = true;
+        console.debug('[HybridApiClient] Supabase client initialized');
     }
 
     setToken(token: string | null) {
@@ -56,6 +59,25 @@ class HybridApiClient {
             'Content-Type': 'application/json',
             ...(options.headers || {}),
         };
+
+        // Check if API client is initialized for protected requests
+        if (auth && !this.initialized) {
+            console.warn(`[HybridApiClient] API not initialized yet for ${endpoint} - waiting...`);
+            // Wait up to 3 seconds for initialization
+            const startTime = Date.now();
+            while (!this.initialized && Date.now() - startTime < 3000) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            if (!this.initialized) {
+                console.error(`[HybridApiClient] Timeout waiting for API initialization for ${endpoint}`);
+                return {
+                    error: {
+                        code: 'NOT_INITIALIZED',
+                        message: 'API client not initialized. Please refresh the page.',
+                    },
+                };
+            }
+        }
 
         // Always get the latest token from Supabase session if auth is required
         if (auth && this.supabaseClient) {
