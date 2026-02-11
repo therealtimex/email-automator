@@ -21,14 +21,23 @@ export async function initializePersistenceEncryption(providedSupabase?: any) {
             // BYOK mode: Supabase not configured at startup (credentials come via HTTP headers)
             // If we don't have a key yet, generate a temporary one in memory
             if (!getEncryptionKeyHex()) {
-                logger.info('Supabase not configured yet (BYOK mode)');
-                logger.info('Generating temporary encryption key in memory - will be reconciled when Supabase becomes available');
+                logger.info('Supabase not configured yet (BYOK mode) - using temporary key');
                 const newKey = crypto.randomBytes(32).toString('hex');
                 setEncryptionKey(newKey);
-                logger.info('✓ Temporary encryption key generated and loaded in memory');
             }
             return;
         }
+
+        // Check client type for logging
+        const isServiceRole = !!(supabase as any).supabaseServiceRoleKey || !(supabase as any).auth?.session;
+        const hasToken = !!(supabase as any).realtime?.accessToken; // Simple check for authenticated client
+        
+        if (!isServiceRole && !hasToken) {
+            logger.debug('Skipping encryption reconciliation with unauthenticated anon client');
+            return;
+        }
+
+        logger.info(`Reconciling encryption key with database (${isServiceRole ? 'Service Role' : 'Authenticated User'})`);
 
         // 1. Check if ANY user has an encryption key stored
         // In sandbox mode, encryption key is always in database
@@ -64,42 +73,47 @@ export async function initializePersistenceEncryption(providedSupabase?: any) {
             return;
         }
 
-        // 2. No key in database - use in-memory key or generate and persist
-        // This happens on first run or after fresh database setup
-        let finalKey = getEncryptionKeyHex();
-        if (!finalKey) {
-            logger.info('No encryption key found in database or memory, generating new key...');
-            finalKey = crypto.randomBytes(32).toString('hex');
-            setEncryptionKey(finalKey);
+        // 2. No key in database - only generate and persist if we are the "Master" (Service Role)
+        // or if we've explicitly decided this is a fresh setup.
+        if (isServiceRole) {
+            let finalKey = getEncryptionKeyHex();
+            if (!finalKey) {
+                logger.info('No encryption key found in database or memory, generating new key...');
+                finalKey = crypto.randomBytes(32).toString('hex');
+                setEncryptionKey(finalKey);
+            } else {
+                logger.info('Persisting in-memory encryption key to database...');
+            }
+
+            // 3. Persist to all existing users in database
+            const { data: allUsers } = await supabase
+                .from('user_settings')
+                .select('user_id')
+                .limit(100);
+
+            if (allUsers && allUsers.length > 0) {
+                logger.info(`Saving encryption key to database for ${allUsers.length} user(s)...`);
+
+                // Update all users with the new key
+                const updates = allUsers.map((user: any) =>
+                    supabase
+                        .from('user_settings')
+                        .update({ encryption_key: finalKey })
+                        .eq('user_id', user.user_id)
+                );
+
+                await Promise.all(updates);
+                logger.info('✓ Encryption key saved to database');
+                isEncryptionInitialized = true;
+            } else {
+                logger.info('No users found yet, encryption key loaded in memory');
+                logger.info('Key will be persisted when users are created');
+                // We don't set isEncryptionInitialized = true here because we still want 
+                // to try reconciling once a user is actually created/logged in
+            }
         } else {
-            logger.info('Persisting in-memory encryption key to new Supabase instance...');
+            logger.warn('No encryption key found in database, but cannot persist one with user-restricted client.');
         }
-
-        // 3. Persist to all existing users in database
-        const { data: allUsers } = await supabase
-            .from('user_settings')
-            .select('user_id')
-            .limit(100);
-
-        if (allUsers && allUsers.length > 0) {
-            logger.info(`Saving encryption key to database for ${allUsers.length} user(s)...`);
-
-            // Update all users with the new key
-            const updates = allUsers.map((user: any) =>
-                supabase
-                    .from('user_settings')
-                    .update({ encryption_key: finalKey })
-                    .eq('user_id', user.user_id)
-            );
-
-            await Promise.all(updates);
-            logger.info('✓ Encryption key saved to database');
-        } else {
-            logger.info('No users found yet, encryption key loaded in memory');
-            logger.info('Key will be persisted when users are created');
-        }
-
-        isEncryptionInitialized = true;
     } catch (err) {
         logger.error('Error initializing encryption:', err);
         // Always ensure we have a key, even if there was an error

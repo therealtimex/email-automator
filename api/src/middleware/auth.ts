@@ -57,20 +57,6 @@ export async function authMiddleware(
         const supabaseUrl = isEnvUrlValid ? envUrl : (headerConfig?.url || '');
         const supabaseAnonKey = isEnvKeyValid ? envKey : (headerConfig?.anonKey || '');
 
-        // If encryption is not ready, try to initialize it using available Supabase config
-        if (!isEncryptionReady() && supabaseUrl && supabaseAnonKey) {
-            // Note: Ideally we use service role to read encryption_key from user_settings,
-            // but even with anon key it might work if RLS allows or if we just use it 
-            // to check for existence of keys.
-            const initClient = createClient(supabaseUrl, supabaseAnonKey, {
-                auth: { autoRefreshToken: false, persistSession: false },
-            });
-            // Run in background to not block auth
-            initializePersistenceEncryption(initClient).catch(err => 
-                logger.warn('Failed to initialize encryption in auth middleware', { error: err.message })
-            );
-        }
-
         // Development bypass: skip auth if DISABLE_AUTH=true in non-production
         if (config.security.disableAuth && !config.isProduction) {
             logger.warn('Auth disabled for development - creating mock user');
@@ -97,6 +83,13 @@ export async function authMiddleware(
                 req.supabase = supabase;
                 // Initialize logger persistence for mock user
                 Logger.setPersistence(supabase, req.user.id);
+
+                // If encryption is not ready, try to initialize it now
+                if (!isEncryptionReady()) {
+                    initializePersistenceEncryption(supabase).catch(err => 
+                        logger.warn('Failed to initialize encryption in dev mode', { error: err.message })
+                    );
+                }
             } else {
                 throw new AuthenticationError('Supabase not configured. Please set up Supabase in the app or provide SUPABASE_URL/ANON_KEY in .env');
             }
@@ -131,6 +124,13 @@ export async function authMiddleware(
         if (error || !user) {
             logger.debug('Auth failed', { error: error?.message });
             throw new AuthenticationError('Invalid or expired token');
+        }
+
+        // If encryption is not ready, initialize it now with the authenticated client
+        if (!isEncryptionReady()) {
+            initializePersistenceEncryption(supabase).catch(err => 
+                logger.warn('Failed to initialize encryption with authenticated client', { error: err.message })
+            );
         }
 
         // Initialize logger persistence for this request

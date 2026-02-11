@@ -5,6 +5,14 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.28.2] - 2026-02-11
+
+### Fixed
+- **Encryption Initialization (RLS-Aware)**: Fixed a bug in BYOK mode where the server would fail to read the existing encryption key from Supabase due to Row Level Security (RLS).
+  - The server now defers database key reconciliation until a user is fully authenticated.
+  - Improved `initializePersistenceEncryption` to handle authenticated user clients, allowing it to bypass RLS for the current user's settings.
+  - Added safeguards to prevent temporary in-memory keys from being persisted to the database when using restricted clients, preserving the database as the source of truth.
+
 ## [2.28.1] - 2026-02-11
 
 ### Fixed
