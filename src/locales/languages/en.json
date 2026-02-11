@@ -81,6 +81,8 @@
     "login.initializeMaster": "Initialize Master",
     "login.sendMagicLink": "Send Magic Link",
     "login.openDashboard": "Open Dashboard",
+    "login.resetConnection": "Reset Connection",
+    "login.resetConfirm": "Are you sure you want to reset the connection? You will need to re-enter your Supabase credentials.",
     "setup.title": "System Setup",
     "setup.initiation": "Welcome",
     "setup.coordinates": "Connection Details",

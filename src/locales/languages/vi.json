@@ -81,6 +81,8 @@
   "login.initializeMaster": "Khởi tạo Master",
   "login.sendMagicLink": "Gửi liên kết ma thuật",
   "login.openDashboard": "Mở bảng điều khiển",
+  "login.resetConnection": "Thiết lập lại kết nối",
+  "login.resetConfirm": "Bạn có chắc chắn muốn thiết lập lại kết nối? Bạn sẽ cần phải nhập lại thông tin cấu hình Supabase.",
   "setup.title": "Thiết lập hệ thống",
   "setup.initiation": "Chào mừng",
   "setup.coordinates": "Chi tiết kết nối",

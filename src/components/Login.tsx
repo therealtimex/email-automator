@@ -13,13 +13,16 @@ import { cn } from '../lib/utils';
 import { useLanguage } from '../context/LanguageContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
+import { clearSupabaseConfig } from '../lib/supabase-config';
+
 interface LoginProps {
     onSuccess?: () => void;
     onConfigure?: () => void;
     isInitialized?: boolean;
+    connectionError?: string | null;
 }
 
-export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }: LoginProps) {
+export function Login({ onSuccess, onConfigure, isInitialized: propInitialized, connectionError }: LoginProps) {
     const { t } = useLanguage();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -30,7 +33,7 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
     const [isLoading, setIsLoading] = useState(false);
     const [isCheckingInit, setIsCheckingInit] = useState(propInitialized === undefined);
     const [isInitialized, setIsInitialized] = useState(propInitialized ?? false);
-    const [error, setError] = useState('');
+    const [error, setError] = useState(connectionError || '');
     const [showPassword, setShowPassword] = useState(false);
 
     // Login Mode
@@ -42,12 +45,18 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
 
     // Check initialization status on mount if not provided as prop
     useEffect(() => {
+        if (connectionError) {
+            setError(connectionError);
+            setIsCheckingInit(false);
+            return;
+        }
+
         if (propInitialized === undefined) {
             checkInitialization();
         } else {
             setIsSignUp(!propInitialized);
         }
-    }, [propInitialized]);
+    }, [propInitialized, connectionError]);
 
     const checkInitialization = async () => {
         try {
@@ -60,9 +69,14 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
                     return;
                 }
                 console.warn('[Login] Init check error:', error);
-                setIsInitialized(false);
-                setIsSignUp(true);
-                setError(error.message);
+                // If it's a fetch error, it might be a connection issue
+                if (error.message && (error.message.includes('fetch') || error.message.includes('connection'))) {
+                    setError(error.message);
+                } else {
+                    setIsInitialized(false);
+                    setIsSignUp(true);
+                    setError(error.message);
+                }
                 return;
             }
             const initialized = data && data.length > 0 && data[0].is_initialized > 0;
@@ -70,11 +84,23 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
             setIsSignUp(!initialized);
         } catch (err: any) {
             console.warn('[Login] Init check exception:', err);
-            setIsInitialized(false);
-            setIsSignUp(true);
-            setError(err.message || 'Connection failed');
+            // If it's a fetch error, it might be a connection issue
+            if (err.message && (err.message.includes('fetch') || err.message.includes('connection'))) {
+                setError(err.message);
+            } else {
+                setIsInitialized(false);
+                setIsSignUp(true);
+                setError(err.message || 'Connection failed');
+            }
         } finally {
             setIsCheckingInit(false);
+        }
+    };
+
+    const handleResetConnection = () => {
+        if (confirm(t('login.resetConfirm'))) {
+            clearSupabaseConfig();
+            window.location.reload();
         }
     };
 
@@ -347,10 +373,23 @@ export function Login({ onSuccess, onConfigure, isInitialized: propInitialized }
                             <motion.div
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="bg-destructive/10 text-destructive text-[11px] font-bold p-3 rounded-xl border border-destructive/20 flex items-start gap-2"
+                                className="bg-destructive/10 text-destructive text-[11px] font-bold p-3 rounded-xl border border-destructive/20 flex flex-col gap-2"
                             >
-                                <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                                <p>{error}</p>
+                                <div className="flex items-start gap-2">
+                                    <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                                    <p>{error}</p>
+                                </div>
+                                {(error.includes('fetch') || error.includes('connection') || error.includes('upstream')) && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleResetConnection}
+                                        className="self-end mt-1 text-[10px] h-7 border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                                    >
+                                        {t('login.resetConnection')}
+                                    </Button>
+                                )}
                             </motion.div>
                         )}
 

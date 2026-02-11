@@ -81,6 +81,8 @@
     "login.initializeMaster": "マスターを初期化",
     "login.sendMagicLink": "マジックリンクを送信",
     "login.openDashboard": "ダッシュボードを開く",
+    "login.resetConnection": "接続をリセット",
+    "login.resetConfirm": "接続をリセットしてもよろしいですか？Supabaseの認証情報を再入力する必要があります。",
     "setup.title": "システムセットアップ",
     "setup.initiation": "ようこそ",
     "setup.coordinates": "接続の詳細",

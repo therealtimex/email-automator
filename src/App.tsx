@@ -83,6 +83,7 @@ function AppContent() {
     const [previewEmail, setPreviewEmail] = useState<any | null>(null);
     const [showPersonaWizard, setShowPersonaWizard] = useState(false);
     const [personaDismissed, setPersonaDismissed] = useState(false);
+    const [connectionError, setConnectionError] = useState<string | null>(null);
 
     // Check for Persona completion
     useEffect(() => {
@@ -164,13 +165,25 @@ function AppContent() {
                     console.warn('[App] Init check error (might be fresh DB):', initError);
                     if ((initError as any).code === '42P01') {
                         setIsSystemInitialized(false);
+                    } else if (initError.message && (
+                        initError.message.includes('fetch') ||
+                        initError.message.includes('network') ||
+                        initError.message.includes('connection')
+                    )) {
+                        // Network/Connection error - likely invalid config
+                        throw initError;
                     }
                 } else {
                     setIsSystemInitialized(initData.is_initialized > 0);
                 }
 
                 // 2. Initial session check
-                const { data: { session } } = await supabase.auth.getSession();
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                if (sessionError) {
+                    throw sessionError;
+                }
+
                 const initialUser = session?.user ?? null;
                 setUser((prevUser: any) => {
                     if (prevUser?.id === initialUser?.id) return prevUser;
@@ -200,12 +213,17 @@ function AppContent() {
                     setVersionInfo(updateInfo);
                     setShowUpdateBanner(true);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error('[App] Status check failed:', err);
                 // If it's a connection error, but we have config, maybe don't force setup
                 // unless it's an explicit "Invalid API key" error
-                if (err instanceof Error && err.message.includes('Invalid API key')) {
-                    setNeedsSetup(true);
+                if (err.message.includes('Invalid API key') ||
+                    err.message.includes('fetch') ||
+                    err.message.includes('network') ||
+                    err.message.includes('upstream')
+                ) {
+                    // Set error state to be passed to Login/Error view
+                    setConnectionError(err.message || 'Connection failed');
                 }
             } finally {
                 setLoading(false);
@@ -332,6 +350,7 @@ function AppContent() {
                     onSuccess={() => actions.fetchProfile()}
                     onConfigure={() => setNeedsSetup(true)}
                     isInitialized={isSystemInitialized}
+                    connectionError={connectionError}
                 />
                 <AgentOverlay className="z-[80]" />
             </>

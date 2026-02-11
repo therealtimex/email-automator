@@ -81,6 +81,8 @@
     "login.initializeMaster": "Inicializar maestro",
     "login.sendMagicLink": "Enviar enlace mágico",
     "login.openDashboard": "Abrir panel de control",
+    "login.resetConnection": "Restablecer conexión",
+    "login.resetConfirm": "¿Está seguro de que desea restablecer la conexión? Deberá volver a ingresar sus credenciales de Supabase.",
     "setup.title": "Configuración del sistema",
     "setup.initiation": "Bienvenido",
     "setup.coordinates": "Detalles de conexión",
