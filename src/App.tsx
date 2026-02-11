@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Mail, LayoutDashboard, Settings, BarChart3, LogOut, Clock, Cpu, Brain, Zap, AlertCircle, Info, Code, CheckCircle2, UserCircle, Sparkles, FileText } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/mode-toggle';
@@ -171,7 +171,11 @@ function AppContent() {
 
                 // 2. Initial session check
                 const { data: { session } } = await supabase.auth.getSession();
-                setUser(session?.user ?? null);
+                const initialUser = session?.user ?? null;
+                setUser((prevUser: any) => {
+                    if (prevUser?.id === initialUser?.id) return prevUser;
+                    return initialUser;
+                });
 
                 // 3. Migration Check (Only for authenticated users)
                 if (session?.user) {
@@ -212,7 +216,12 @@ function AppContent() {
 
         // Auth listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ?? null);
+            const newUser = session?.user ?? null;
+            setUser((prevUser: any) => {
+                // Only update if ID changed or one is null
+                if (prevUser?.id === newUser?.id) return prevUser;
+                return newUser;
+            });
             if (!session) {
                 setMigrationStatus(null);
                 setShowMigrationBanner(false);
@@ -289,14 +298,14 @@ function AppContent() {
         !migrationSnoozedUntil || new Date() > migrationSnoozedUntil
     );
 
-    const migrationContextValue = {
+    const migrationContextValue = useMemo(() => ({
         migrationStatus,
         showMigrationBanner,
         showMigrationModal,
         openMigrationModal: handleOpenMigrationModal,
         suppressMigrationBanner,
         setSuppressMigrationBanner,
-    };
+    }), [migrationStatus, showMigrationBanner, showMigrationModal, suppressMigrationBanner]);
 
     if (loading) {
         return (

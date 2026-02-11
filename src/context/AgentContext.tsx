@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react';
 import { useTTS } from '../hooks/useTTS';
 import { getTTSFromLocalStorage } from '../lib/tts-sync';
 import { getApiConfig } from '../lib/api-config';
@@ -212,15 +212,17 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         }
     }, [currentConfig, chatHistory, speak]);
 
+    const value = useMemo(() => ({
+        currentConfig,
+        registerAgent,
+        chatHistory,
+        agentState,
+        sendMessage,
+        resetAgent
+    }), [currentConfig, registerAgent, chatHistory, agentState, sendMessage, resetAgent]);
+
     return (
-        <AgentContext.Provider value={{
-            currentConfig,
-            registerAgent,
-            chatHistory,
-            agentState,
-            sendMessage,
-            resetAgent
-        }}>
+        <AgentContext.Provider value={value}>
             {children}
         </AgentContext.Provider>
     );

@@ -5,6 +5,13 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.28.0] - 2026-02-08
+
+### Added
+- **Performance Optimizations**: Implemented `useMemo` and `useCallback` across all major React Contexts (`AgentContext`, `AppContext`, `LanguageContext`, `TTSContext`, `TerminalContext`, `MigrationContext`) to significantly reduce unnecessary re-renders and improve UI responsiveness.
+- **State Management Refinement**: Optimized `setUser` and auth state listeners to avoid redundant state updates when user identity remains unchanged.
+- **Memoized Context Values**: Standardized on memoized context providers to ensure child components only re-render when relevant state actually changes.
+
 ## [2.27.0] - 2026-02-07
 
 ### Added

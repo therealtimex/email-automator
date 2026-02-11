@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
 
 interface TerminalContextType {
     isExpanded: boolean;
@@ -12,11 +12,18 @@ const TerminalContext = createContext<TerminalContextType | null>(null);
 export function TerminalProvider({ children }: { children: ReactNode }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const openTerminal = () => setIsExpanded(true);
-    const closeTerminal = () => setIsExpanded(false);
+    const openTerminal = useCallback(() => setIsExpanded(true), []);
+    const closeTerminal = useCallback(() => setIsExpanded(false), []);
+
+    const value = useMemo(() => ({
+        isExpanded,
+        setIsExpanded,
+        openTerminal,
+        closeTerminal
+    }), [isExpanded, openTerminal, closeTerminal]);
 
     return (
-        <TerminalContext.Provider value={{ isExpanded, setIsExpanded, openTerminal, closeTerminal }}>
+        <TerminalContext.Provider value={value}>
             {children}
         </TerminalContext.Provider>
     );

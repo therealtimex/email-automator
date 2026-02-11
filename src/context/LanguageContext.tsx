@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { Locale, fallbackTranslations } from '../locales';
 
 interface LanguageContextType {
@@ -50,19 +50,26 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         loadTranslations();
     }, [language]);
 
-    const setLanguage = (lang: Locale) => {
+    const setLanguage = useCallback((lang: Locale) => {
         setLanguageState(lang);
-    };
+    }, []);
 
-    const t = (key: string): string => {
+    const t = useCallback((key: string): string => {
         // 1. Try current language
         // 2. Try English fallback
         // 3. Return key
         return translations[key] || fallbackTranslations[key as keyof typeof fallbackTranslations] || key;
-    };
+    }, [translations]);
+
+    const value = useMemo(() => ({
+        language,
+        setLanguage,
+        t,
+        isLoading
+    }), [language, t, isLoading]);
 
     return (
-        <LanguageContext.Provider value={{ language, setLanguage, t, isLoading }}>
+        <LanguageContext.Provider value={value}>
             {children}
         </LanguageContext.Provider>
     );

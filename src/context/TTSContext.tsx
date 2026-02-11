@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, ReactNode, useMemo } from 'react';
 
 export interface TTSOptions {
     provider?: string;
@@ -209,8 +209,18 @@ export function TTSProvider({ children }: { children: ReactNode }) {
         }
     }, [stop, playAudioBuffer]);
 
+    const value = useMemo(() => ({
+        isPlaying,
+        isSpeaking,
+        speakingId,
+        currentAudio: audioRef.current,
+        speak,
+        speakStream,
+        stop
+    }), [isPlaying, isSpeaking, speakingId, speak, speakStream, stop]);
+
     return (
-        <TTSContext.Provider value={{ isPlaying, isSpeaking, speakingId, currentAudio: audioRef.current, speak, speakStream, stop }}>
+        <TTSContext.Provider value={value}>
             {children}
         </TTSContext.Provider>
     );

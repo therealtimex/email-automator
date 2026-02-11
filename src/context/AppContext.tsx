@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { api, initializeApi } from '../lib/api';
 import { Email, EmailAccount, Rule, UserSettings, Stats, Profile } from '../lib/types';
@@ -94,13 +94,18 @@ type Action =
 
 function reducer(state: AppState, action: Action): AppState {
     switch (action.type) {
-        case 'SET_USER':
+        case 'SET_USER': {
+            const isAuthenticated = !!action.payload;
+            if (state.user?.id === action.payload?.id && state.isAuthenticated === isAuthenticated && !state.isLoading) {
+                return state;
+            }
             return {
                 ...state,
                 user: action.payload,
-                isAuthenticated: !!action.payload,
+                isAuthenticated,
                 isLoading: false,
             };
+        }
         case 'SET_LOADING':
             return { ...state, isLoading: action.payload };
         case 'SET_INITIALIZED':
@@ -386,7 +391,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, []);
 
     // Actions
-    const actions = {
+    const actions = useMemo(() => ({
         fetchEmails: async (params: { category?: string; search?: string; offset?: number; sortBy?: 'date' | 'created_at'; sortOrder?: 'asc' | 'desc' } = {}) => {
             const response = await api.getEmails({
                 limit: 20,
@@ -479,7 +484,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
                     : await api.syncAll();
 
                 // Always refresh accounts to show updated sync status
-                await actions.fetchAccounts();
+                const accResponse = await api.getAccounts();
+                if (accResponse.data) {
+                    dispatch({ type: 'SET_ACCOUNTS', payload: accResponse.data.accounts });
+                }
 
                 if (response.error) {
                     dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Sync failed') });
@@ -604,10 +612,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
             dispatch({ type: 'SET_ERROR', payload: getErrorMessage(response.error, 'Failed to toggle rule') });
             return false;
         },
-    };
+    }), [state.emails, state.accounts, state.rules, state.sortBy, state.sortOrder]);
+
+    const value = useMemo(() => ({
+        state,
+        isSubscribed,
+        dispatch,
+        actions
+    }), [state, isSubscribed, actions]);
 
     return (
-        <AppContext.Provider value={{ state, isSubscribed, dispatch, actions }}>
+        <AppContext.Provider value={value}>
             {children}
         </AppContext.Provider>
     );
