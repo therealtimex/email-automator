@@ -7,6 +7,7 @@ import { createLogger, Logger } from '../utils/logger.js';
 const logger = createLogger('AuthMiddleware');
 
 import { getServerSupabase, isValidUrl } from '../services/supabase.js';
+import { initializePersistenceEncryption, isEncryptionReady } from '../services/encryptionInit.js';
 
 // Extend Express Request to include user
 declare global {
@@ -55,6 +56,20 @@ export async function authMiddleware(
         
         const supabaseUrl = isEnvUrlValid ? envUrl : (headerConfig?.url || '');
         const supabaseAnonKey = isEnvKeyValid ? envKey : (headerConfig?.anonKey || '');
+
+        // If encryption is not ready, try to initialize it using available Supabase config
+        if (!isEncryptionReady() && supabaseUrl && supabaseAnonKey) {
+            // Note: Ideally we use service role to read encryption_key from user_settings,
+            // but even with anon key it might work if RLS allows or if we just use it 
+            // to check for existence of keys.
+            const initClient = createClient(supabaseUrl, supabaseAnonKey, {
+                auth: { autoRefreshToken: false, persistSession: false },
+            });
+            // Run in background to not block auth
+            initializePersistenceEncryption(initClient).catch(err => 
+                logger.warn('Failed to initialize encryption in auth middleware', { error: err.message })
+            );
+        }
 
         // Development bypass: skip auth if DISABLE_AUTH=true in non-production
         if (config.security.disableAuth && !config.isProduction) {

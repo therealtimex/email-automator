@@ -7,7 +7,7 @@ import { getGmailService } from '../services/gmail.js';
 import { getMicrosoftService } from '../services/microsoft.js';
 import { getImapService } from '../services/imap-service.js';
 import { createLogger } from '../utils/logger.js';
-import { getEncryptionKeyHex, setEncryptionKey } from '../utils/encryption.js';
+import { initializePersistenceEncryption } from '../services/encryptionInit.js';
 
 const router = Router();
 const logger = createLogger('AuthRoutes');
@@ -24,53 +24,8 @@ router.post('/imap/connect',
             smtpHost, smtpPort, smtpSecure
         } = req.body;
 
-        // CRITICAL FIX: Sync encryption key between server memory and database
-        // In BYOK mode, database trigger generates key but server has random key in memory
-        // We need to sync them: prefer database key (persistent) over server key (ephemeral)
-        const { data: userSettings, error: fetchError } = await req.supabase!
-            .from('user_settings')
-            .select('encryption_key')
-            .eq('user_id', req.user!.id)
-            .single();
-
-        if (fetchError) {
-            logger.error('Failed to fetch user settings', { error: fetchError });
-            throw new ValidationError('Failed to load user settings. Please try again.');
-        }
-
-        const currentServerKey = getEncryptionKeyHex();
-        const databaseKey = userSettings?.encryption_key;
-
-        logger.info('Encryption key sync check', {
-            hasServerKey: !!currentServerKey,
-            hasDatabaseKey: !!databaseKey,
-            userId: req.user!.id
-        });
-
-        if (databaseKey) {
-            // Database has a key - use it (it's the source of truth)
-            if (currentServerKey !== databaseKey) {
-                logger.info('Loading encryption key from database (overriding server memory)');
-                setEncryptionKey(databaseKey);
-            }
-        } else if (currentServerKey) {
-            // Server has key but database doesn't - persist to database
-            logger.info('Database missing encryption key, persisting server key');
-            const { error: updateError } = await req.supabase!
-                .from('user_settings')
-                .update({ encryption_key: currentServerKey })
-                .eq('user_id', req.user!.id);
-
-            if (updateError) {
-                logger.error('Failed to persist encryption key', { error: updateError });
-                throw new ValidationError('Failed to initialize encryption. Please try again.');
-            }
-            logger.info('✓ Encryption key persisted to database');
-        } else {
-            // Neither server nor database has key - this should never happen with new trigger
-            logger.error('No encryption key found in server OR database!');
-            throw new ValidationError('Encryption not initialized. Please contact support.');
-        }
+        // Reconcile encryption key with database before saving credentials
+        await initializePersistenceEncryption(req.supabase);
 
         const imapService = getImapService();
         const imapConfig = {

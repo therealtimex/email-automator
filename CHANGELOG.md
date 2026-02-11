@@ -5,12 +5,18 @@ All notable changes to Email Automator will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.28.0] - 2026-02-08
+## [2.28.0] - 2026-02-10
 
 ### Added
 - **Performance Optimizations**: Implemented `useMemo` and `useCallback` across all major React Contexts (`AgentContext`, `AppContext`, `LanguageContext`, `TTSContext`, `TerminalContext`, `MigrationContext`) to significantly reduce unnecessary re-renders and improve UI responsiveness.
 - **State Management Refinement**: Optimized `setUser` and auth state listeners to avoid redundant state updates when user identity remains unchanged.
 - **Memoized Context Values**: Standardized on memoized context providers to ensure child components only re-render when relevant state actually changes.
+
+### Fixed
+- **Encryption Resilience (BYOK Mode)**: Resolved a critical flaw where multiple server instances or restarts in "Bring Your Own Key" mode would generate mismatched encryption keys, leading to IMAP decryption failures.
+  - Centralized encryption logic into a new `EncryptionInitService`.
+  - Implemented proactive key reconciliation: the server now automatically retrieves existing encryption keys from Supabase upon the first authenticated request.
+  - Added encryption initialization safeguards to the background synchronization worker to ensure credentials can always be decrypted, even during automated runs.
 
 ## [2.27.0] - 2026-02-07
 

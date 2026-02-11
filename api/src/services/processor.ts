@@ -5,6 +5,7 @@ import { config } from '../config/index.js';
 import { getGmailService, GmailMessage } from './gmail.js';
 import { getMicrosoftService, OutlookMessage } from './microsoft.js';
 import { getImapService, EmailMessage as ImapMessage } from './imap-service.js';
+import { initializePersistenceEncryption, isEncryptionReady } from './encryptionInit.js';
 import { getIntelligenceService, EmailAnalysis, ContextAwareAnalysis, RuleContext } from './intelligence.js';
 import { getStorageService } from './storage.js';
 import { generateEmailFilename } from '../utils/filename.js';
@@ -144,179 +145,189 @@ export class EmailProcessorService {
     async syncAccount(accountId: string, userId: string): Promise<ProcessingResult> {
         const result: ProcessingResult = { processed: 0, deleted: 0, drafted: 0, errors: 0 };
 
-        // Reset stop request flag at the start of a manual sync
-        await this.resetStopRequest(userId);
-
-        // Zero-Config UX: Auto-seed default rules for new users (self-healing)
         try {
-            const defaultRuleService = new DefaultRuleService(this.supabase);
-            const { installed } = await defaultRuleService.ensureDefaultRules(userId);
-            if (installed) {
-                logger.info(`Seeded default rules for user ${userId}`);
-            }
-        } catch (error) {
-            // Don't fail sync if pack installation fails
-            logger.error('Failed to auto-install Universal Pack', error);
-        }
-
-        // Create processing log
-        const { data: log } = await this.supabase
-            .from('processing_logs')
-            .insert({
-                user_id: userId,
-                account_id: accountId,
-                status: 'running',
-            })
-            .select()
-            .single();
-
-        try {
-            // Fetch account
-            const { data: account, error: accError } = await this.supabase
-                .from('email_accounts')
-                .select('*')
-                .eq('id', accountId)
-                .eq('user_id', userId)
-                .single();
-
-            if (accError || !account) {
-                throw new Error('Account not found or access denied');
+            // Ensure encryption is ready (especially for background syncs)
+            if (!isEncryptionReady()) {
+                await initializePersistenceEncryption(this.supabase);
             }
 
-            logger.info('Retrieved account settings', {
-                accountId: account.id,
-                sync_start_date: account.sync_start_date,
-                last_sync_checkpoint: account.last_sync_checkpoint
-            });
+            // Reset stop request flag at the start of a manual sync
+            await this.resetStopRequest(userId);
 
-            // Refresh token if needed
-            let refreshedAccount = account;
-            if (account.provider === 'gmail') {
-                refreshedAccount = await this.gmailService.refreshTokenIfNeeded(this.supabase, account);
-            } else if (account.provider === 'outlook') {
-                refreshedAccount = await this.microsoftService.refreshTokenIfNeeded(this.supabase, account);
-            } else if (account.provider === 'imap') {
-                // IMAP doesn't need token refresh, but we could verify connection here if we wanted
-                refreshedAccount = account;
-            }
-
-            // Update status to syncing
-            await this.supabase
-                .from('email_accounts')
-                .update({
-                    last_sync_status: 'syncing',
-                    last_sync_at: new Date().toISOString()
-                })
-                .eq('id', accountId);
-
-            // Fetch user's rules
-            const { data: rules } = await this.supabase
-                .from('rules')
-                .select('*')
-                .eq('user_id', userId)
-                .eq('is_enabled', true);
-
-            // Fetch user settings for AI preferences
-            const { data: settings } = await this.supabase
-                .from('user_settings')
-                .select('*')
-                .eq('user_id', userId)
-                .single();
-
-            const eventLogger = log ? new EventLogger(this.supabase, log.id) : null;
-            if (eventLogger) await eventLogger.info('Running', 'Starting sync process');
-
-            // --- STOP CHECK ---
-            if (await this.checkStopRequested(userId, eventLogger)) return result;
-
-            // Process based on provider
+            // Zero-Config UX: Auto-seed default rules for new users (self-healing)
             try {
-                if (refreshedAccount.provider === 'gmail') {
-                    await this.processGmailAccount(refreshedAccount, rules || [], settings, result, eventLogger);
-                } else if (refreshedAccount.provider === 'outlook') {
-                    await this.processOutlookAccount(refreshedAccount, rules || [], settings, result, eventLogger);
-                } else if (refreshedAccount.provider === 'imap') {
-                    await this.processImapAccount(refreshedAccount, rules || [], settings, result, eventLogger);
+                const defaultRuleService = new DefaultRuleService(this.supabase);
+                const { installed } = await defaultRuleService.ensureDefaultRules(userId);
+                if (installed) {
+                    logger.info(`Seeded default rules for user ${userId}`);
                 }
-            } catch (providerError) {
-                const providerName = refreshedAccount.provider === 'gmail' ? 'Gmail' :
-                    refreshedAccount.provider === 'outlook' ? 'Outlook' :
-                        'IMAP';
-                throw new Error(`${providerName} Sync Error: ${providerError instanceof Error ? providerError.message : String(providerError)}`);
+            } catch (error) {
+                // Don't fail sync if pack installation fails
+                logger.error('Failed to auto-install Universal Pack', error);
             }
 
-            // After processing new emails, run retention rules for this account
-            if (await this.checkStopRequested(userId, eventLogger)) return result;
-            await this.runRetentionRules(refreshedAccount, rules || [], settings, result, eventLogger);
+            // Create processing log
+            const { data: log } = await this.supabase
+                .from('processing_logs')
+                .insert({
+                    user_id: userId,
+                    account_id: accountId,
+                    status: 'running',
+                })
+                .select()
+                .single();
 
-            // Wait for background worker to process the queue (ensure sync is fully complete before event)
-            await this.processQueue(userId, settings, result).catch(err =>
-                logger.error('Background worker failed', err)
-            );
+            try {
+                // Fetch account
+                const { data: account, error: accError } = await this.supabase
+                    .from('email_accounts')
+                    .select('*')
+                    .eq('id', accountId)
+                    .eq('user_id', userId)
+                    .single();
 
-            // Update log and account on success
-            if (log) {
-                if (eventLogger) {
-                    await eventLogger.success('Finished', 'Sync run completed', {
-                        total_processed: result.processed,
-                        deleted: result.deleted,
-                        drafted: result.drafted,
-                        errors: result.errors
-                    });
+                if (accError || !account) {
+                    throw new Error('Account not found or access denied');
+                }
+
+                logger.info('Retrieved account settings', {
+                    accountId: account.id,
+                    sync_start_date: account.sync_start_date,
+                    last_sync_checkpoint: account.last_sync_checkpoint
+                });
+
+                // Refresh token if needed
+                let refreshedAccount = account;
+                if (account.provider === 'gmail') {
+                    refreshedAccount = await this.gmailService.refreshTokenIfNeeded(this.supabase, account);
+                } else if (account.provider === 'outlook') {
+                    refreshedAccount = await this.microsoftService.refreshTokenIfNeeded(this.supabase, account);
+                } else if (account.provider === 'imap') {
+                    // IMAP doesn't need token refresh, but we could verify connection here if we wanted
+                    refreshedAccount = account;
+                }
+
+                // Update status to syncing
+                await this.supabase
+                    .from('email_accounts')
+                    .update({
+                        last_sync_status: 'syncing',
+                        last_sync_at: new Date().toISOString()
+                    })
+                    .eq('id', accountId);
+
+                // Fetch user's rules
+                const { data: rules } = await this.supabase
+                    .from('rules')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('is_enabled', true);
+
+                // Fetch user settings for AI preferences
+                const { data: settings } = await this.supabase
+                    .from('user_settings')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .single();
+
+                const eventLogger = log ? new EventLogger(this.supabase, log.id) : null;
+                if (eventLogger) await eventLogger.info('Running', 'Starting sync process');
+
+                // --- STOP CHECK ---
+                if (await this.checkStopRequested(userId, eventLogger)) return result;
+
+                // Process based on provider
+                try {
+                    if (refreshedAccount.provider === 'gmail') {
+                        await this.processGmailAccount(refreshedAccount, rules || [], settings, result, eventLogger);
+                    } else if (refreshedAccount.provider === 'outlook') {
+                        await this.processOutlookAccount(refreshedAccount, rules || [], settings, result, eventLogger);
+                    } else if (refreshedAccount.provider === 'imap') {
+                        await this.processImapAccount(refreshedAccount, rules || [], settings, result, eventLogger);
+                    }
+                } catch (providerError) {
+                    const providerName = refreshedAccount.provider === 'gmail' ? 'Gmail' :
+                        refreshedAccount.provider === 'outlook' ? 'Outlook' :
+                            'IMAP';
+                    throw new Error(`${providerName} Sync Error: ${providerError instanceof Error ? providerError.message : String(providerError)}`);
+                }
+
+                // After processing new emails, run retention rules for this account
+                if (await this.checkStopRequested(userId, eventLogger)) return result;
+                await this.runRetentionRules(refreshedAccount, rules || [], settings, result, eventLogger);
+
+                // Wait for background worker to process the queue (ensure sync is fully complete before event)
+                await this.processQueue(userId, settings, result).catch(err =>
+                    logger.error('Background worker failed', err)
+                );
+
+                // Update log and account on success
+                if (log) {
+                    if (eventLogger) {
+                        await eventLogger.success('Finished', 'Sync run completed', {
+                            total_processed: result.processed,
+                            deleted: result.deleted,
+                            drafted: result.drafted,
+                            errors: result.errors
+                        });
+                    }
+
+                    await this.supabase
+                        .from('processing_logs')
+                        .update({
+                            status: 'success',
+                            completed_at: new Date().toISOString(),
+                            emails_processed: result.processed,
+                            emails_deleted: result.deleted,
+                            emails_drafted: result.drafted,
+                        })
+                        .eq('id', log.id);
                 }
 
                 await this.supabase
-                    .from('processing_logs')
+                    .from('email_accounts')
                     .update({
-                        status: 'success',
-                        completed_at: new Date().toISOString(),
-                        emails_processed: result.processed,
-                        emails_deleted: result.deleted,
-                        emails_drafted: result.drafted,
+                        last_sync_status: 'success',
+                        last_sync_error: null,
+                        sync_start_date: null // Clear manual override once used successfully
                     })
-                    .eq('id', log.id);
-            }
+                    .eq('id', accountId);
 
-            await this.supabase
-                .from('email_accounts')
-                .update({
-                    last_sync_status: 'success',
-                    last_sync_error: null,
-                    sync_start_date: null // Clear manual override once used successfully
-                })
-                .eq('id', accountId);
+                logger.info('Sync completed and override cleared', { accountId, ...result });
+            } catch (error) {
+                logger.error('Sync failed', error, { accountId });
 
-            logger.info('Sync completed and override cleared', { accountId, ...result });
-        } catch (error) {
-            logger.error('Sync failed', error, { accountId });
+                const errMsg = error instanceof Error ? error.message : 'Unknown error';
 
-            const errMsg = error instanceof Error ? error.message : 'Unknown error';
+                if (log) {
+                    await this.supabase
+                        .from('processing_logs')
+                        .update({
+                            status: 'failed',
+                            completed_at: new Date().toISOString(),
+                            error_message: errMsg,
+                        })
+                        .eq('id', log.id);
+                }
 
-            if (log) {
                 await this.supabase
-                    .from('processing_logs')
+                    .from('email_accounts')
                     .update({
-                        status: 'failed',
-                        completed_at: new Date().toISOString(),
-                        error_message: errMsg,
+                        last_sync_status: 'error',
+                        last_sync_error: errMsg
                     })
-                    .eq('id', log.id);
+                    .eq('id', accountId);
+
+                // If it's a fatal setup error (e.g. Account not found), throw it
+                if (errMsg.includes('Account not found') || errMsg.includes('access denied')) {
+                    throw error;
+                }
+
+                // Otherwise, increment error count and return partial results
+                result.errors++;
             }
-
-            await this.supabase
-                .from('email_accounts')
-                .update({
-                    last_sync_status: 'error',
-                    last_sync_error: errMsg
-                })
-                .eq('id', accountId);
-
-            // If it's a fatal setup error (e.g. Account not found), throw it
-            if (errMsg.includes('Account not found') || errMsg.includes('access denied')) {
-                throw error;
-            }
-
-            // Otherwise, increment error count and return partial results
+        } catch (globalError) {
+            logger.error('Global sync execution failed', globalError);
             result.errors++;
         }
 
